@@ -1,0 +1,1079 @@
+/**
+ * types.ts — Zustand Store Record Types for Supabase Integration
+ *
+ * Defines all data record types that mirror the Supabase database schema.
+ * Every record includes a `synced: boolean` flag for batch sync tracking:
+ *   - false = created locally, pending Supabase write
+ *   - true  = successfully written to Supabase
+ *
+ * These types are consumed by `simulationDataStore.ts` (the data-layer store)
+ * and by `syncService.ts` (the batch sync engine).
+ *
+ * NOTE: The existing `simulationStore.ts` (S-Clock / P-Clock / conveyor)
+ *       is the MASTER and is not modified. This file is additive.
+ *
+ * Table mapping:
+ *   PressStateRecord     → machine_press_states
+ *   DryerStateRecord     → machine_dryer_states
+ *   GlazeStateRecord     → machine_glaze_states
+ *   PrinterStateRecord   → machine_printer_states
+ *   KilnStateRecord      → machine_kiln_states
+ *   SortingStateRecord   → machine_sorting_states
+ *   PackagingStateRecord → machine_packaging_states
+ *   TileRecord           → tiles
+ *   TileSnapshotRecord   → tile_station_snapshots
+ *   ParameterChangeRecord → parameter_change_events
+ *   ScenarioActivationRecord → scenario_activations
+ *   ProductionMetricsRecord  → production_metrics
+ *   AlarmLogRecord       → simulation_alarm_logs
+ */
+
+// =============================================================================
+// ENUMS & LITERAL TYPES
+// =============================================================================
+
+/** The 7 stations in the ceramic tile production line, in order. */
+export type StationName =
+  | 'press'
+  | 'dryer'
+  | 'glaze'
+  | 'printer'
+  | 'kiln'
+  | 'sorting'
+  | 'packaging';
+
+/** Ordered array of all station names for iteration. */
+export const STATION_ORDER: StationName[] = [
+  'press', 'dryer', 'glaze', 'printer', 'kiln', 'sorting', 'packaging',
+];
+
+/** Numeric position of each station (1-indexed). */
+export const STATION_ORDER_MAP: Record<StationName, number> = {
+  press: 1,
+  dryer: 2,
+  glaze: 3,
+  printer: 4,
+  kiln: 5,
+  sorting: 6,
+  packaging: 7,
+};
+
+/** All possible defect types across all stations. */
+export type DefectType =
+  // Press defects
+  | 'crack_press'
+  | 'delamination'
+  | 'dimension_variance'
+  | 'density_variance'
+  | 'edge_defect'
+  | 'press_explosion'
+  // Dryer defects
+  | 'surface_crack_dry'
+  | 'warp_dry'
+  | 'explosion_dry'
+  // Glaze defects
+  | 'color_tone_variance'
+  | 'glaze_thickness_variance'
+  | 'pinhole_glaze'
+  | 'glaze_drip'
+  | 'line_defect_glaze'
+  | 'edge_buildup'
+  // Printer defects
+  | 'line_defect_print'
+  | 'white_spot'
+  | 'color_shift'
+  | 'saturation_variance'
+  | 'blur'
+  | 'pattern_stretch'
+  | 'pattern_compress'
+  // Kiln defects
+  | 'crack_kiln'
+  | 'warp_kiln'
+  | 'corner_lift'
+  | 'pinhole_kiln'
+  | 'color_fade'
+  | 'size_variance_kiln'
+  | 'thermal_shock_crack'
+  // Packaging defects
+  | 'chip'
+  | 'edge_crack_pack'
+  | 'crush_damage'
+  // Conveyor defects (8th machine — jam-induced damage)
+  | 'conveyor_jam_damage'
+  // Cause-effect map defect types (from causeEffectConfig.ts)
+  | 'surface_defect'
+  | 'mold_sticking'
+  | 'lamination'
+  | 'moisture_variance'
+  | 'glaze_peel'
+  | 'banding'
+  | 'pattern_distortion'
+  | 'missed_defect'
+  | 'false_pass'
+  | 'warp_pass'
+  | 'mislabel'
+  | 'customer_complaint'
+  // Other
+  | 'unknown';
+
+/** Final quality grade assigned at the sorting station. */
+export type QualityGrade =
+  | 'first_quality'
+  | 'second_quality'
+  | 'third_quality'
+  | 'scrap'
+  | 'pending';
+
+/** Lifecycle status of a tile from creation to completion/scrap. */
+export type TileStatus =
+  | 'in_production'
+  | 'scrapped_at_press'
+  | 'scrapped_at_dryer'
+  | 'scrapped_at_glaze'
+  | 'scrapped_at_printer'
+  | 'scrapped_at_kiln'
+  | 'sorted'
+  | 'packaged'
+  | 'completed';
+
+/** Simulation session lifecycle status. */
+export type SimulationStatus =
+  | 'created'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'abandoned'
+  | 'aborted';
+
+/** How a parameter change occurred. */
+export type ChangeType =
+  | 'drift'
+  | 'spike'
+  | 'step'
+  | 'random'
+  | 'scheduled';
+
+/** Root cause of a parameter change. */
+export type ChangeReason =
+  | 'wear'
+  | 'environment'
+  | 'operator'
+  | 'random'
+  | 'scenario'
+  | 'cwf_agent';
+
+/** Dryer drying rate classification. */
+export type DryingRate =
+  | 'slow'
+  | 'normal'
+  | 'fast'
+  | 'excessive';
+
+/** Scenario severity level. */
+export type Severity =
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'critical';
+
+// =============================================================================
+// SIMULATION SESSION
+// =============================================================================
+
+/** Represents a single simulation run, persisted to `simulation_sessions`. */
+export interface SimulationSession {
+  id: string;
+  /** 6-character unique code (e.g., 'A3F2B1'), auto-generated by DB. */
+  session_code: string;
+  name: string;
+  description?: string;
+
+  // Timing configuration
+  tick_duration_ms: number;
+  production_tick_ratio: number;
+  station_gap_production_ticks: number;
+
+  // Session state
+  status: SimulationStatus;
+  current_sim_tick: number;
+  current_production_tick: number;
+
+  // Targets
+  target_tiles_per_hour?: number;
+  target_first_quality_pct?: number;
+
+  // Timestamps
+  started_at?: string;
+  paused_at?: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// =============================================================================
+// MACHINE STATE RECORDS (One per station, keyed by sim_tick in Maps)
+// =============================================================================
+
+/**
+ * Base interface shared by all 7 machine state record types.
+ * Each record captures a full snapshot of one station at one sim_tick.
+ */
+export interface MachineStateRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions. */
+  simulation_id: string;
+  /** S-Clock tick when this state was captured. */
+  sim_tick: number;
+  /** P-Clock tick when this state was captured. */
+  production_tick: number;
+  /** Whether the machine was operating normally at this tick. */
+  is_operating: boolean;
+  /** Machine fault code if any. */
+  fault_code?: string;
+  /** ISO timestamp of record creation. */
+  created_at: string;
+  /**
+   * Station this record belongs to (local-only routing field).
+   * NOT persisted to Supabase. Stripped by syncService.stripFields before upsert.
+   * Allows the flat machineStateRecords array to self-route records to the
+   * correct DB table without a compound queue or Map lookup.
+   */
+  station: StationName;
+  /** Local flag: has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// 2.1 PRESS
+// ---------------------------------------------------------------------------
+
+/** Press machine state — `machine_press_states` table. */
+export interface PressStateRecord extends MachineStateRecord {
+  /** Hydraulic press pressure (280–450 bar). */
+  pressure_bar: number;
+  /** Press cycle duration (4–8 seconds). */
+  cycle_time_sec: number;
+  /** Mold surface temperature (40–60°C). */
+  mold_temperature_c: number;
+  /** Raw powder moisture content (5–7%). */
+  powder_moisture_pct: number;
+  /** Powder fill amount per tile (800–2500 g). */
+  fill_amount_g: number;
+  /** Cumulative mold wear (0–100%). */
+  mold_wear_pct: number;
+  /** Deviation from optimal pressure (derived). */
+  pressure_deviation_pct?: number;
+  /** Fill uniformity score (derived). */
+  fill_homogeneity_pct?: number;
+}
+
+// ---------------------------------------------------------------------------
+// 2.2 DRYER
+// ---------------------------------------------------------------------------
+
+/** Dryer machine state — `machine_dryer_states` table. */
+export interface DryerStateRecord extends MachineStateRecord {
+  /** Hot air inlet temperature (150–250°C). */
+  inlet_temperature_c: number;
+  /** Outlet air temperature (80–120°C). */
+  outlet_temperature_c: number;
+  /** Dryer belt speed (1–5 m/min). */
+  belt_speed_m_min: number;
+  /** Total drying cycle time (30–60 min). */
+  drying_time_min: number;
+  /** Tile moisture at dryer exit (0.5–1.5%). */
+  exit_moisture_pct: number;
+  /** Dryer fan frequency (30–50 Hz). */
+  fan_frequency_hz: number;
+  /** Temperature gradient along belt (derived, °C/m). */
+  temperature_gradient_c_m?: number;
+  /** Drying rate classification (derived). */
+  drying_rate?: DryingRate;
+  /** Moisture uniformity score (derived). */
+  moisture_homogeneity_pct?: number;
+}
+
+// ---------------------------------------------------------------------------
+// 2.3 GLAZE
+// ---------------------------------------------------------------------------
+
+/** Glaze application machine state — `machine_glaze_states` table. */
+export interface GlazeStateRecord extends MachineStateRecord {
+  /** Glaze slurry density (1.35–1.55 g/cm³). */
+  glaze_density_g_cm3: number;
+  /** Glaze viscosity via Ford cup (18–35 sec). */
+  glaze_viscosity_sec: number;
+  /** Glaze applied weight (300–600 g/m²). */
+  application_weight_g_m2: number;
+  /** Spray cabin pressure (0.3–1.2 bar). */
+  cabin_pressure_bar: number;
+  /** Spray nozzle angle (15–45°). */
+  nozzle_angle_deg: number;
+  /** Glaze line belt speed (15–35 m/min). */
+  belt_speed_m_min: number;
+  /** Glaze slurry temperature (20–30°C). */
+  glaze_temperature_c: number;
+  /** Application weight deviation (derived). */
+  weight_deviation_pct?: number;
+  /** Nozzle blockage percentage (derived). */
+  nozzle_clog_pct?: number;
+}
+
+// ---------------------------------------------------------------------------
+// 2.4 DIGITAL PRINTER
+// ---------------------------------------------------------------------------
+
+/** Digital printer machine state — `machine_printer_states` table. */
+export interface PrinterStateRecord extends MachineStateRecord {
+  /** Print head temperature (35–45°C). */
+  head_temperature_c: number;
+  /** Ink viscosity (8–15 mPa·s). */
+  ink_viscosity_mpa_s: number;
+  /** Ink drop size (6–80 picoliters). */
+  drop_size_pl: number;
+  /** Print resolution (360–720 dpi). */
+  resolution_dpi: number;
+  /** Printer belt speed (20–45 m/min). */
+  belt_speed_m_min: number;
+  /** Print head gap from tile surface (1.5–4 mm). */
+  head_gap_mm: number;
+  /** Number of color channels (4–8). */
+  color_channels: number;
+  /** Percentage of active nozzles (95–100%). */
+  active_nozzle_pct: number;
+  /** Nozzle clog rate (derived, 100 - active_nozzle_pct). */
+  nozzle_clog_pct?: number;
+  /** Print head temperature deviation (derived). */
+  temperature_deviation_c?: number;
+  /** Belt encoder error rate (derived). */
+  encoder_error_pct?: number;
+  /** Ink levels per color channel (e.g., {"C": 85, "M": 72, ...}). */
+  ink_levels_pct?: Record<string, number>;
+}
+
+// ---------------------------------------------------------------------------
+// 2.5 KILN
+// ---------------------------------------------------------------------------
+
+/** Kiln machine state — `machine_kiln_states` table. */
+export interface KilnStateRecord extends MachineStateRecord {
+  /** Peak firing temperature (1100–1220°C). */
+  max_temperature_c: number;
+  /** Total firing cycle time (35–60 min). */
+  firing_time_min: number;
+  /** Pre-heat temperature ramp rate (15–40°C/min). */
+  preheat_gradient_c_min: number;
+  /** Cooling ramp rate (20–50°C/min). */
+  cooling_gradient_c_min: number;
+  /** Kiln belt speed (1–3 m/min). */
+  belt_speed_m_min: number;
+  /** Kiln atmosphere pressure (-0.5 to +0.5 mbar). */
+  atmosphere_pressure_mbar: number;
+  /** Number of firing zones (5–15). */
+  zone_count: number;
+  /** Oxygen level in kiln atmosphere (2–8%). */
+  o2_level_pct: number;
+  /** Temperature per zone (e.g., [200, 400, 600, 850, …]). */
+  zone_temperatures_c?: number[];
+  /** Cross-zone temperature deviation (derived). */
+  temperature_deviation_c?: number;
+  /** Balance between heating and cooling gradients (derived). */
+  gradient_balance_pct?: number;
+  /** Cross-tile temperature variance (derived). */
+  zone_variance_c?: number;
+}
+
+// ---------------------------------------------------------------------------
+// 2.6 SORTING
+// ---------------------------------------------------------------------------
+
+/** Sorting machine state — `machine_sorting_states` table. */
+export interface SortingStateRecord extends MachineStateRecord {
+  /** Camera resolution (5–20 megapixels). */
+  camera_resolution_mp: number;
+  /** Scan throughput (20–60 tiles/min). */
+  scan_rate_tiles_min: number;
+  /** Dimensional tolerance (±0.3 to ±1.0 mm). */
+  size_tolerance_mm: number;
+  /** Color difference tolerance (ΔE 0.5–2.0). */
+  color_tolerance_de: number;
+  /** Flatness tolerance (0.1–0.5 mm). */
+  flatness_tolerance_mm: number;
+  /** Minimum defect area to detect (0.5–3.0 mm²). */
+  defect_threshold_mm2: number;
+  /** Number of quality grades (3–5). */
+  grade_count: number;
+  /** Camera calibration drift (derived). */
+  calibration_drift_pct?: number;
+  /** Lighting variance across scan area (derived). */
+  lighting_variance_pct?: number;
+  /** Camera lens cleanliness (derived). */
+  camera_cleanliness_pct?: number;
+  /** Detection algorithm sensitivity (0–1 scale, derived). */
+  algorithm_sensitivity?: number;
+}
+
+// ---------------------------------------------------------------------------
+// 2.7 PACKAGING
+// ---------------------------------------------------------------------------
+
+/** Packaging machine state — `machine_packaging_states` table. */
+export interface PackagingStateRecord extends MachineStateRecord {
+  /** Tiles per box (4–12). */
+  stack_count: number;
+  /** Box sealing press pressure (2–5 bar). */
+  box_sealing_pressure_bar: number;
+  /** Pallet capacity (40–80 m²/pallet). */
+  pallet_capacity_m2: number;
+  /** Stretch wrap tension (150–300%). */
+  stretch_tension_pct: number;
+  /** Palletizing robot speed (6–15 cycles/min). */
+  robot_speed_cycles_min: number;
+  /** Label placement accuracy (99–100%). */
+  label_accuracy_pct: number;
+  /** Box stacking error rate (derived). */
+  stacking_error_rate_pct?: number;
+  /** Sealing pressure deviation (derived). */
+  pressure_deviation_pct?: number;
+}
+
+// =============================================================================
+// UNION TYPES FOR MACHINE STATES
+// =============================================================================
+
+/**
+ * Union of all machine state record types.
+ * Used when operating on a machine state generically.
+ */
+export type AnyMachineStateRecord =
+  | PressStateRecord
+  | DryerStateRecord
+  | GlazeStateRecord
+  | PrinterStateRecord
+  | KilnStateRecord
+  | SortingStateRecord
+  | PackagingStateRecord;
+
+// =============================================================================
+// MACHINE STATE TABLES (Map container, indexed by sim_tick)
+// =============================================================================
+
+/**
+ * Container holding one Map per station.
+ * Key: sim_tick → Value: station-specific state record.
+ * Provides O(1) lookup by tick for any station.
+ */
+export interface MachineStateTables {
+  press: Map<number, PressStateRecord>;
+  dryer: Map<number, DryerStateRecord>;
+  glaze: Map<number, GlazeStateRecord>;
+  printer: Map<number, PrinterStateRecord>;
+  kiln: Map<number, KilnStateRecord>;
+  sorting: Map<number, SortingStateRecord>;
+  packaging: Map<number, PackagingStateRecord>;
+}
+
+// =============================================================================
+// CURRENT MACHINE PARAMETERS (Live values, updated each tick)
+// =============================================================================
+
+/**
+ * Station-specific parameter types (operating values only, no metadata).
+ * These are the "live" values that drift over time.
+ */
+export type PressParams = Omit<PressStateRecord, keyof MachineStateRecord>;
+export type DryerParams = Omit<DryerStateRecord, keyof MachineStateRecord>;
+export type GlazeParams = Omit<GlazeStateRecord, keyof MachineStateRecord>;
+export type PrinterParams = Omit<PrinterStateRecord, keyof MachineStateRecord>;
+export type KilnParams = Omit<KilnStateRecord, keyof MachineStateRecord>;
+export type SortingParams = Omit<SortingStateRecord, keyof MachineStateRecord>;
+export type PackagingParams = Omit<PackagingStateRecord, keyof MachineStateRecord>;
+
+/** Current live parameters for all 7 stations. */
+export interface CurrentMachineParams {
+  press: PressParams;
+  dryer: DryerParams;
+  glaze: GlazeParams;
+  printer: PrinterParams;
+  kiln: KilnParams;
+  sorting: SortingParams;
+  packaging: PackagingParams;
+}
+
+// =============================================================================
+// TILE RECORDS
+// =============================================================================
+
+/**
+ * A single tile's lifecycle record — maps to the `tiles` table.
+ * Tiles are tracked from press entry to completion/scrap.
+ */
+export interface TileRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions. */
+  simulation_id: string;
+  /** Sequential tile number within this simulation (auto-incremented). */
+  tile_number: number;
+  /** S-Clock tick when the tile was created at press. */
+  created_at_sim_tick: number;
+  /** P-Clock tick when the tile was created. */
+  created_at_production_tick: number;
+  /** S-Clock tick when the tile completed or was scrapped. */
+  completed_at_sim_tick?: number;
+  /** Current lifecycle status. */
+  status: TileStatus;
+  /** Station the tile is currently at (or last station before completion). */
+  current_station?: StationName;
+  /** Final quality grade (set at sorting, defaults to 'pending'). */
+  final_grade: QualityGrade;
+  /** Tile width in mm (optional physical spec). */
+  width_mm?: number;
+  /** Tile height in mm (optional physical spec). */
+  height_mm?: number;
+  /** Tile thickness in mm (optional physical spec). */
+  thickness_mm?: number;
+  /** Tile weight in grams (optional physical spec). */
+  weight_g?: number;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+  /**
+   * Monotonically increasing version counter — bumped on every mutation.
+   * Used by markAsSynced to detect tiles modified during a sync's network
+   * round-trip. Only acknowledges the sync if the current version matches
+   * the version captured at sync-read time (prevents stale ack overwrites).
+   */
+  syncVersion: number;
+}
+
+// =============================================================================
+// TILE STATION SNAPSHOT (KÜNYE — Tile Passport)
+// =============================================================================
+
+/**
+ * Records the machine state snapshot when a tile passes through a station.
+ * This is the "künye" — tile passport — for root cause analysis.
+ * Maps to `tile_station_snapshots` table.
+ */
+export interface TileSnapshotRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to tiles. */
+  tile_id: string;
+  /** FK to simulation_sessions. */
+  simulation_id: string;
+  /** Which station this snapshot was taken at. */
+  station: StationName;
+  /** Station order (1–7). */
+  station_order: number;
+  /** S-Clock tick when the tile entered this station. */
+  entry_sim_tick: number;
+  /** P-Clock tick when the tile entered this station. */
+  entry_production_tick: number;
+  /** S-Clock tick when the tile exited this station (set later). */
+  exit_sim_tick?: number;
+  /** How many ticks the tile spent at this station. */
+  processing_duration_ticks?: number;
+  /** FK to the specific machine_*_states record at entry time. */
+  machine_state_id: string | null;
+  /** Denormalized copy of key parameters for quick AI access. */
+  parameters_snapshot: Record<string, unknown>;
+  /** Station-specific measurements taken on this tile. */
+  tile_measurements?: Record<string, unknown>;
+  /** Whether a defect was detected at this station. */
+  defect_detected: boolean;
+  /** Array of detected defect types (if any). */
+  defect_types?: DefectType[];
+  /** Severity score (0–1 scale). */
+  defect_severity?: number;
+  /** Whether this tile was scrapped at this station. */
+  scrapped_here: boolean;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+// =============================================================================
+// PARAMETER CHANGE EVENT
+// =============================================================================
+
+/**
+ * Records when and how a machine parameter changed during simulation.
+ * Maps to `parameter_change_events` table.
+ */
+export interface ParameterChangeRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions. */
+  simulation_id: string;
+  /** S-Clock tick when the change occurred. */
+  sim_tick: number;
+  /** P-Clock tick when the change occurred. */
+  production_tick: number;
+  /** Which station's parameter changed. */
+  station: StationName;
+  /** Name of the parameter that changed (e.g., 'pressure_bar'). */
+  parameter_name: string;
+  /** Previous value (undefined for first-time sets). */
+  old_value?: number;
+  /** New value after the change. */
+  new_value: number;
+  /** Absolute difference |new - old|. */
+  change_magnitude?: number;
+  /** Percentage change ((new-old)/old × 100). */
+  change_pct?: number;
+  /** How the change occurred (drift, spike, etc.). */
+  change_type: ChangeType;
+  /** Why the change occurred (wear, scenario, etc.). */
+  change_reason?: ChangeReason;
+  /** FK to defect_scenarios if triggered by a scenario. */
+  scenario_id?: string;
+  /** Predicted impact on quality (text description). */
+  expected_impact?: string;
+  /** Predicted scrap rate increase. */
+  expected_scrap_increase_pct?: number;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+// =============================================================================
+// SCENARIO ACTIVATION
+// =============================================================================
+
+/**
+ * Records when a defect scenario was activated during simulation.
+ * Maps to `scenario_activations` table.
+ */
+export interface ScenarioActivationRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions. */
+  simulation_id: string;
+  /** FK to defect_scenarios. */
+  scenario_id: string;
+  /** Scenario short code (e.g., 'SCN-001'). */
+  scenario_code: string;
+  /** S-Clock tick when scenario was activated. */
+  activated_at_sim_tick: number;
+  /** S-Clock tick when scenario was deactivated (undefined if still active). */
+  deactivated_at_sim_tick?: number;
+  /** Total duration in ticks. */
+  duration_ticks?: number;
+  /** ID of the first tile affected by this scenario. */
+  first_affected_tile_id?: string;
+  /** ID of the last tile affected by this scenario. */
+  last_affected_tile_id?: string;
+  /** Total tiles affected. */
+  affected_tile_count: number;
+  /** Actual tiles scrapped due to this scenario. */
+  actual_scrap_count: number;
+  /** Actual tiles downgraded due to this scenario. */
+  actual_downgrade_count: number;
+  /** Whether the scenario is currently active. */
+  is_active: boolean;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+// =============================================================================
+// PRODUCTION METRICS (Periodic OEE / KPI aggregation)
+// =============================================================================
+
+/**
+ * Aggregated production metrics for a time window.
+ * Maps to `production_metrics` table.
+ */
+export interface ProductionMetricsRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions. */
+  simulation_id: string;
+  /** Start of the measurement period (S-Clock tick). */
+  period_start_sim_tick: number;
+  /** End of the measurement period (S-Clock tick). */
+  period_end_sim_tick: number;
+  /** Start of the measurement period (P-Clock tick). */
+  period_start_production_tick: number;
+  /** End of the measurement period (P-Clock tick). */
+  period_end_production_tick: number;
+  /** Total tiles produced in this period. */
+  total_tiles_produced: number;
+  /** First quality tile count. */
+  first_quality_count: number;
+  /** Second quality tile count. */
+  second_quality_count: number;
+  /** Third quality tile count. */
+  third_quality_count: number;
+  /** Scrapped tile count. */
+  scrap_count: number;
+  /** OEE availability component (%). */
+  availability_pct?: number;
+  /** OEE performance component (%). */
+  performance_pct?: number;
+  /** OEE quality component (%). */
+  quality_pct?: number;
+  /** Overall Equipment Effectiveness (%). */
+  oee_pct?: number;
+  /** Scrap count broken down by station. */
+  scrap_by_station?: Record<StationName, number>;
+  /** Defect count broken down by defect type. */
+  defect_counts?: Record<DefectType, number>;
+  /** Machine uptime percentage per station. */
+  machine_uptime?: Record<StationName, number>;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+// =============================================================================
+// ALARM LOG RECORD (Per-session alarm events)
+// =============================================================================
+
+/**
+ * Records a single alarm event during a simulation.
+ * Each alarm is scoped to a simulation session via `simulation_id`.
+ * Maps to `simulation_alarm_logs` table.
+ */
+export interface AlarmLogRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions — scopes this alarm to a specific run. */
+  simulation_id: string;
+  /** S-Clock tick at which this alarm was generated. */
+  sim_tick: number;
+  /** Alarm classification (e.g., 'jam_start', 'oee_alert', 'machine_error'). */
+  alarm_type: string;
+  /** Severity level: 'critical', 'warning', or 'info'. */
+  severity: string;
+  /** Optional station that triggered the alarm (e.g., 'press', 'kiln'). */
+  station_id?: string;
+  /** Optional human-readable description of the alarm condition. */
+  message?: string;
+  /** ISO timestamp — real-world time when the alarm was raised. */
+  timestamp: string;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+// =============================================================================
+// CONVEYOR POSITION (Runtime only — NOT persisted to Supabase)
+// =============================================================================
+
+/**
+ * Tracks a tile's position on the conveyor at runtime.
+ * This is ephemeral state — never written to the database.
+ */
+export interface ConveyorPosition {
+  /** ID of the tile at this position. */
+  tile_id: string;
+  /** Current station or 'between_stations'. */
+  current_station: StationName | 'between_stations';
+  /** Progress through current station (0–1). */
+  position_in_station: number;
+  /** S-Clock tick when the tile entered current station. */
+  entered_at_sim_tick: number;
+  /** Next station the tile will move to (undefined at last station). */
+  next_station?: StationName;
+  /** Ticks remaining until the tile moves to next station. */
+  ticks_until_next_station: number;
+}
+
+// =============================================================================
+// DEFECT SCENARIO (Read from DB, used for trigger evaluation)
+// =============================================================================
+
+/** Trigger condition for a defect scenario (loaded from `defect_scenarios`). */
+export interface TriggerCondition {
+  station: StationName;
+  parameter: string;
+  condition: '<' | '>' | '<=' | '>=' | '=' | '!=' | 'not_between';
+  threshold?: number;
+  threshold_low?: number;
+  threshold_high?: number;
+}
+
+/** A predefined defect scenario (loaded from DB, read-only at runtime). */
+export interface DefectScenario {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  trigger_conditions: TriggerCondition;
+  affected_stations: StationName[];
+  cascade_delay_ticks?: number;
+  likely_defects: DefectType[];
+  scrap_probability_pct: number;
+  quality_downgrade_probability_pct: number;
+  severity: Severity;
+  is_active: boolean;
+  created_at: string;
+}
+
+// =============================================================================
+// CONVEYOR ANALYTICS RECORDS (Persisted to Supabase)
+// =============================================================================
+
+/**
+ * Conveyor status values — mirrors the simulationStore conveyorStatus union.
+ * Stored in conveyor_states and referenced during event recording.
+ *
+ * running       — Belt green, normal operation
+ * stopped       — Belt stopped (simulation paused or not started)
+ * jam_scrapping — Belt red, still moving; tiles at jammed station being scrapped
+ * jammed        — Belt frozen; worker clearing the jam
+ */
+export type ConveyorStatus = 'running' | 'stopped' | 'jammed' | 'jam_scrapping';
+
+/**
+ * Records a per-tick snapshot of the conveyor belt's operational state.
+ * One record per S-Clock tick per session. Maps to `conveyor_states` table.
+ */
+export interface ConveyorStateRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions — scopes this record to a specific run. */
+  simulation_id: string;
+  /** S-Clock tick at which this snapshot was captured. */
+  sim_tick: number;
+  /** P-Clock tick (number of tiles produced so far). */
+  production_tick: number;
+  /** Belt speed in the 0.0–2.0 range matching CONVEYOR_SPEED_RANGE. */
+  conveyor_speed: number;
+  /** Operational status at this tick. */
+  conveyor_status: ConveyorStatus;
+  /** Cumulative jam / fault count up to and including this tick. */
+  fault_count: number;
+  /** Total tiles alive on the belt at this tick (from totalPartsRef). */
+  active_tiles_on_belt: number;
+  /** ISO timestamp — real-world time when this record was created. */
+  created_at: string;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+/**
+ * Event types for the conveyor event log.
+ * Recorded only when a state transition occurs — not every tick.
+ */
+export type ConveyorEventType =
+  | 'jam_start'      // Conveyor entered jammed state
+  | 'jam_cleared'    // Jam resolved (auto or manual)
+  | 'speed_change'   // Belt speed changed by behaviour engine
+  | 'status_change'; // Status transitioned for reasons other than jam
+
+/**
+ * Records a discrete conveyor event (state transition or speed change).
+ * Maps to `conveyor_events` table.
+ */
+export interface ConveyorEventRecord {
+  /** Locally generated unique ID (nanoid). */
+  id: string;
+  /** FK to simulation_sessions — scopes this record to a specific run. */
+  simulation_id: string;
+  /** S-Clock tick at which the event occurred. */
+  sim_tick: number;
+  /** P-Clock tick at event time. */
+  production_tick: number;
+  /** Type of event that occurred. */
+  event_type: ConveyorEventType;
+  /** Previous value (speed as string, or previous status). Null for first-time events. */
+  old_value: string | null;
+  /** New value after the event (speed as string, or new status). */
+  new_value: string;
+  /** ISO timestamp — real-world time when this record was created. */
+  created_at: string;
+  /** Has this record been synced to Supabase? */
+  synced: boolean;
+}
+
+// =============================================================================
+// SYNC TRACKING
+// =============================================================================
+
+/**
+ * Tracks which records need to be synced to Supabase.
+ * Each category lists IDs of unsynced records.
+ *
+ * NOTE: machineStates previously stored compound { station, simTick, id }
+ * objects that required a Map lookup in getUnsyncedData(). This was changed to
+ * simple string IDs (same pattern as all other queues) because the Map lookup
+ * was silently returning undefined for unknown reasons, causing machine states
+ * to never appear in the sync payload.
+ */
+export interface UnsyncedRecords {
+  /** Machine state record IDs pending sync (simple strings, same as other queues). */
+  machineStates: string[];
+  /** Tile IDs pending sync. */
+  tiles: string[];
+  /** Tile snapshot IDs pending sync. */
+  snapshots: string[];
+  /** Parameter change event IDs pending sync. */
+  parameterChanges: string[];
+  /** Scenario activation IDs pending sync. */
+  scenarios: string[];
+  /** Production metrics record IDs pending sync. */
+  metrics: string[];
+  /** Alarm log record IDs pending sync. */
+  alarmLogs: string[];
+  /** Conveyor state record IDs pending sync. */
+  conveyorStates: string[];
+  /** Conveyor event record IDs pending sync. */
+  conveyorEvents: string[];
+}
+
+// =============================================================================
+// STORE CONFIG
+// =============================================================================
+
+/** Configuration for the simulation data store timing and behavior. */
+export interface SimulationDataConfig {
+  /** Milliseconds per simulation tick (default: 500). */
+  tickDurationMs: number;
+  /** How many sim ticks per production tick (default: 2). */
+  productionTickRatio: number;
+  /** Production ticks gap between stations (default: 2). */
+  stationGapProductionTicks: number;
+  /** How often to aggregate metrics (in sim ticks, default: 100). */
+  metricsPeriodTicks: number;
+  /** Max records per Supabase batch insert (default: 50). */
+  syncBatchSize: number;
+  /** Probability of random parameter change per tick (default: 0.02). */
+  parameterChangeChance: number;
+}
+
+// =============================================================================
+// OEE TYPES — Hierarchical OEE calculation results
+// =============================================================================
+
+/** Per-station tile IN/OUT counts (A-J variables from real factory model).
+ *
+ *  Measurement points:
+ *    A = PRESS_THEORETICAL_RATE × elapsed_minutes
+ *    B = KILN_THEORETICAL_RATE × elapsed_minutes
+ *    C_in = tiles spawned at press (press input)
+ *    C = tiles exiting press (scrapped_here=false)
+ *    D = tiles exiting dryer (scrapped_here=false)
+ *    E = tiles exiting glaze (scrapped_here=false)
+ *    F = tiles exiting digital printer (scrapped_here=false)
+ *    G = tiles reaching kiln (any kiln snapshot)
+ *    G_clean = tiles transiting conveyor without jam damage
+ *    H = tiles exiting kiln (scrapped_here=false)
+ *    I = first_quality + second_quality
+ *    J = tiles exiting packaging (scrapped_here=false)
+ */
+export interface StationCounts {
+  /** C_in: Tiles spawned at press (press input count) */
+  pressSpawned: number;
+  /** C: Tiles that exited press (scrapped_here=false) */
+  pressOutput: number;
+  /** D: Tiles that exited dryer (scrapped_here=false) */
+  dryerOutput: number;
+  /** E: Tiles that exited glaze (scrapped_here=false) */
+  glazeOutput: number;
+  /** F: Tiles that exited digital printer (scrapped_here=false) */
+  digitalOutput: number;
+  /** G: Tiles that reached kiln (any kiln snapshot — they arrived) */
+  kilnInput: number;
+  /** G_clean: Tiles that transited conveyor without jam damage */
+  conveyorCleanOutput: number;
+  /** H: Tiles that exited kiln (scrapped_here=false) */
+  kilnOutput: number;
+  /** I: First quality + second quality (usable output from sorting) */
+  sortingUsableOutput: number;
+  /** J: Tiles that exited packaging (scrapped_here=false) */
+  packagingOutput: number;
+  /** A: Press theoretical output for elapsed time */
+  theoreticalA: number;
+  /** B: Kiln theoretical output for elapsed time */
+  theoreticalB: number;
+  /** Elapsed simulation minutes */
+  elapsedMinutes: number;
+  /**
+   * Tiles scrapped due to conveyor damage (passport: conveyor_jam_damage at sorting).
+   * Separated from sorting's scrappedHere to avoid double-counting between
+   * the Conveyor and Sorting OEE machines.
+   */
+  conveyorScrapped: number;
+  /** Per-station detailed IN/OUT/scrapped for diagnostics */
+  perStation: Record<string, { in: number; out: number; scrappedHere: number }>;
+}
+
+/** Per-machine OEE breakdown (P × Q model) */
+export interface MachineOEE {
+  /** Machine identifier (one of 8 OEE machines including conveyor) */
+  machineId: string;
+  /** Bilingual display name */
+  name: { tr: string; en: string };
+  /** Performance component (0-1): actual output / theoretical capacity */
+  performance: number;
+  /** Quality component (0-1): output / input (yield per machine) */
+  quality: number;
+  /** OEE percentage (0-100): P × Q × 100 */
+  oee: number;
+  /** Tiles that entered this machine */
+  actualInput: number;
+  /** Tiles that exited this machine successfully */
+  actualOutput: number;
+  /** Tiles scrapped at this machine */
+  scrappedHere: number;
+}
+
+/** Per-station energy consumption breakdown */
+export interface StationEnergy {
+  /** Station or machine identifier */
+  stationId: string;
+  /** Cumulative electrical consumption (kWh) */
+  kWh: number;
+  /** Cumulative gas consumption (m³) */
+  gas: number;
+  /** Derived CO₂ emissions (kg) */
+  co2: number;
+  /** Tiles processed at this station */
+  tilesProcessed: number;
+  /** Energy efficiency: kWh per tile */
+  kWhPerTile: number;
+}
+
+/** Per-line OEE + energy result */
+export interface LineOEE {
+  /** Line identifier: 'line1', 'line2', or 'line3' */
+  lineId: string;
+  /** Bilingual display name */
+  name: { tr: string; en: string };
+  /** Line-level Performance component (0-1) */
+  performance: number;
+  /** Line-level Quality component (0-1) */
+  quality: number;
+  /** OEE percentage (0-100) */
+  oee: number;
+  /** Constituent machine OEEs */
+  machines: MachineOEE[];
+  /** Energy aggregation for this line */
+  energy: {
+    totalKwh: number;
+    totalGas: number;
+    totalCo2: number;
+    kWhPerTile: number;
+  };
+}
+
+/** Factory-level OEE + energy (top of the hierarchy) */
+export interface FactoryOEE {
+  /** Factory OEE percentage (0-100) */
+  oee: number;
+  /** Which theoretical rate is constraining: 'A' (press) or 'B' (kiln) */
+  bottleneck: 'A' | 'B';
+  /** The constraining rate value: min(A, B) × elapsed */
+  bottleneckRate: number;
+  /** J: Final packaging output count */
+  finalOutput: number;
+  /** All 3 line OEEs */
+  lines: LineOEE[];
+  /** Factory-wide energy totals */
+  energy: {
+    totalKwh: number;
+    totalGas: number;
+    totalCo2: number;
+    kWhPerTile: number;
+    perStation: Record<string, StationEnergy>;
+  };
+}

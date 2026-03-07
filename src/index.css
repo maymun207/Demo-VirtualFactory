@@ -1,0 +1,167 @@
+/**
+ * index.css — Global Styles and Design System Utilities
+ *
+ * This file serves as the entry point for the "Sentient Factory" styling.
+ * It integrates Tailwind CSS v4 and defines the core design system tokens,
+ * glassmorphic effects, and motion dynamics used throughout the application.
+ *
+ * Highlights:
+ *  - Responsive root font scaling (vw/vh based)
+ *  - Glassmorphic "Sentient Dark" background system
+ *  - Global animations for panels and overlays
+ *  - Custom scrollbar styling for a premium aesthetic
+ */
+
+@import "tailwindcss"; /* Core Tailwind CSS v4 directives */
+
+/* ── Control Panel slide-in animation ── */
+@keyframes slideInRight {
+  from {
+    opacity: 0; /* Starting invisible */
+    transform: translateX(30px); /* Starting 30px to the right */
+  }
+  to {
+    opacity: 1; /* Ending fully opaque */
+    transform: translateX(0); /* Ending at original position */
+  }
+}
+
+/* ── Control Panel drop-down animation (from header) ── */
+@keyframes slideDown {
+  from {
+    opacity: 0; /* Starting invisible */
+    transform: translateY(-10px); /* Starting 10px above */
+  }
+  to {
+    opacity: 1; /* Ending fully opaque */
+    transform: translateY(0); /* Ending at original position */
+  }
+}
+
+/* ── Tailwind v4 Theme Configuration ── */
+@theme {
+  --animate-pulse-shadow: pulse-shadow 2s infinite; /* Custom pulse animation variable */
+
+  @keyframes pulse-shadow {
+    0% {
+      box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.8); /* Starting with small shadow */
+    }
+
+    70% {
+      box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); /* Expanding and fading */
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); /* Ending invisible */
+    }
+  }
+}
+
+/* ── Global Base Styles ── */
+@layer base {
+  html {
+    /* 
+     * Scale root font with the SMALLER of width or height.
+     * 0.833333vw = 16px at 1920w. 1.481vh = 16px at 1080h.
+     * min() ensures UI shrinks when EITHER dimension shrinks,
+     * matching the 3D canvas scaling behavior.
+     */
+    font-size: clamp(8px, min(0.833333vw, 1.481vh), 24px); /* Dynamic font sizing system */
+  }
+
+  body {
+    @apply bg-black text-white m-0 p-0 overflow-hidden font-sans; /* Base body styles from Tailwind utility */
+  }
+}
+
+/* Scrollbar hiding for cleaner UI */
+::-webkit-scrollbar {
+  width: 6px; /* Vertical scrollbar width */
+  height: 6px; /* Horizontal scrollbar height */
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05); /* Track color (subtle transparency) */
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2); /* Scroll handle color */
+  border-radius: 3px; /* Rounded corners for the handle */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3); /* Brighten handle on hover */
+}
+
+/* CWF Chat Panel — message fade-in animation */
+@keyframes cwfFadeIn {
+  from {
+    opacity: 0; /* Starting invisible */
+    transform: translateY(8px); /* Starting slightly below */
+  }
+  to {
+    opacity: 1; /* Ending fully opaque */
+    transform: translateY(0); /* Ending at original position */
+  }
+}
+.cwf-fade-in {
+  animation: cwfFadeIn 0.3s ease-out forwards; /* Apply fade-in to chat elements */
+}
+
+/* CWF Side Panel — slide-in from right animation */
+@keyframes cwfSlideIn {
+  from {
+    opacity: 0; /* Starting invisible */
+    transform: translateX(20px); /* Starting 20px to the right */
+  }
+  to {
+    opacity: 1; /* Ending fully opaque */
+    transform: translateX(0); /* Ending at original position */
+  }
+}
+.cwf-slide-in {
+  animation: cwfSlideIn 0.3s ease-out forwards; /* Apply slide-in to CWF panel */
+}
+
+/* CWF Side Panel — resize handle cursor and hover effect */
+.cwf-resize-handle {
+  cursor: col-resize; /* Horizontal resize cursor indication */
+  touch-action: none; /* Disable default touch behaviors for dragging */
+  background: transparent; /* No default background */
+  transition: background-color 0.2s ease; /* Smooth hover transition */
+}
+.cwf-resize-handle:hover {
+  background-color: rgba(255, 255, 255, 0.03); /* Subtle highlight on hover */
+}
+.cwf-resize-handle:active {
+  background-color: rgba(0, 210, 255, 0.05); /* Color shift when active */
+}
+
+/* DTXFR Side Panel — slide-in from left animation */
+@keyframes dtxfrSlideIn {
+  from {
+    opacity: 0; /* Starting invisible */
+    transform: translateX(-20px); /* Starting 20px to the left */
+  }
+  to {
+    opacity: 1; /* Ending fully opaque */
+    transform: translateX(0); /* Ending at original position */
+  }
+}
+.dtxfr-slide-in {
+  animation: dtxfrSlideIn 0.3s ease-out forwards; /* Apply slide-in to DTXFR panel */
+}
+
+/* DTXFR Side Panel — resize handle cursor and hover effect */
+.dtxfr-resize-handle {
+  cursor: col-resize; /* Horizontal resize cursor indication */
+  touch-action: none; /* Disable default touch behaviors for dragging */
+  background: transparent; /* No default background */
+  transition: background-color 0.2s ease; /* Smooth hover transition */
+}
+.dtxfr-resize-handle:hover {
+  background-color: rgba(255, 255, 255, 0.03); /* Subtle highlight on hover */
+}
+.dtxfr-resize-handle:active {
+  background-color: rgba(0, 200, 100, 0.05); /* Color shift when active */
+}
