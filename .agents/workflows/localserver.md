@@ -15,13 +15,13 @@ pkill -f "cwf-dev-server" 2>/dev/null || true
 1. Start the CWF API dev server:
 
 ```bash
-cd "/Users/tunckahveci/Desktop/New VirtualFactory/virtual-factory-demo" && npm run dev:cwf
+cd "/Users/tunckahveci/Desktop/Demo VirtualFactory/virtual-factory-demo" && npm run dev:cwf
 ```
 
 1. Start the Vite frontend dev server (in a separate terminal):
 
 ```bash
-cd "/Users/tunckahveci/Desktop/New VirtualFactory/virtual-factory-demo" && npx vite
+cd "/Users/tunckahveci/Desktop/Demo VirtualFactory/virtual-factory-demo" && npx vite
 ```
 
 ## MANDATORY RESTART RULE
@@ -41,5 +41,5 @@ cd "/Users/tunckahveci/Desktop/New VirtualFactory/virtual-factory-demo" && npx v
 ### How to restart
 
 ```bash
-pkill -f "cwf-dev-server" 2>/dev/null; sleep 1; cd "/Users/tunckahveci/Desktop/New VirtualFactory/virtual-factory-demo" && npm run dev:cwf
+pkill -f "cwf-dev-server" 2>/dev/null; sleep 1; cd "/Users/tunckahveci/Desktop/Demo VirtualFactory/virtual-factory-demo" && npm run dev:cwf
 ```
