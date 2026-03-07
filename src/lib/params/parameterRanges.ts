@@ -21,7 +21,7 @@
  *   - Ranges must satisfy: min < max for every entry.
  */
 
-import type { StationName } from '../../store/types';
+import type { StationName } from '../../store/types.js';
 
 // =============================================================================
 // TYPE DEFINITION
