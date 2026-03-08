@@ -1138,39 +1138,37 @@ ${knowledgeBase}` : ''}
 
 ## CONVEYOR PARAMETERS — How to Read and Change Them
 
-The conveyor belt is the **8th controllable station** (station name: `conveyor`). Unlike the 7 production machines, it does NOT have its own `machine_conveyor_states` table. Instead:
+The conveyor belt is the **8th controllable station** (station name: "conveyor"). Unlike the 7 production machines, it does NOT have its own machine_conveyor_states table. Instead:
 
-- **Read** conveyor parameters from the `conveyor_states` table (latest row per session)
-  or from `simulation_sessions` metadata, or ask the user what the current setting is.
-- **Change** conveyor parameters using `update_parameter` with `station = "conveyor"`.
+- **Read** conveyor parameters from the conveyor_states table (latest row per session)
+  or ask the user what the current setting is.
+- **Change** conveyor parameters using update_parameter with station = "conveyor".
 
 ### Conveyor Parameter Reference:
 
 | Parameter Key | Display Name | Type | Valid Range | Meaning |
 |---|---|---|---|---|
-| `jammed_time` | Jam Duration | Numeric | 1–30 cycles | How long each jam lasts (normal: 6–10) |
-| `impacted_tiles` | Tiles Scrapped Per Jam | Numeric | 0–20 tiles | Scrap tiles per jam event (normal: 1–5) |
-| `scrap_probability` | Scrap Probability (%) | Numeric | 0–3 % | Global tile scrap probability at all stations |
-| `speed_change` | Speed Change Events | Boolean as 0/1 | 0 = off, 1 = on | Whether speed-change events occur |
-| `jammed_events` | Jam Events Enabled | Boolean as 0/1 | 0 = off, 1 = on | Whether jam events occur on the belt |
+| jammed_time | Jam Duration | Numeric | 1–30 cycles | How long each jam lasts (normal: 6–10) |
+| impacted_tiles | Tiles Scrapped Per Jam | Numeric | 0–20 tiles | Scrap tiles per jam event (normal: 1–5) |
+| scrap_probability | Scrap Probability (%) | Numeric | 0–3 % | Global tile scrap probability at all stations |
+| speed_change | Speed Change Events | Boolean as 0/1 | 0 = off, 1 = on | Whether speed-change events occur |
+| jammed_events | Jam Events Enabled | Boolean as 0/1 | 0 = off, 1 = on | Whether jam events occur on the belt |
 
 ### Boolean Parameters (speed_change, jammed_events):
 - These are toggles. The database column stores them as numbers: **0 = disabled / false**, **1 = enabled / true**.
-- When the user says "enable", propose `new_value = 1`. When they say "disable" or "no", propose `new_value = 0`.
+- When the user says "enable", propose new_value = 1. When they say "disable" or "no", propose new_value = 0.
 - Always show the current state as "Enabled" or "Disabled", NEVER as "1" or "0".
 
 ### Querying Current Conveyor State:
-```sql
-SELECT speed, jam_count, fault_count FROM conveyor_states
-WHERE simulation_id = '<id>' ORDER BY sim_tick DESC LIMIT 1
-        ```
-For conveyor parameter VALUES (jammed_time etc.), they are stored in the frontend Zustand store — not in Supabase. When you need to know the current value before proposing a change, ask the user: "What is the current value you see in the Demo Settings → Conveyor tab?"
+  SELECT speed, jam_count, fault_count FROM conveyor_states
+  WHERE simulation_id = '<session_id>' ORDER BY sim_tick DESC LIMIT 1
+For conveyor parameter VALUES (jammed_time etc.), they are stored in the frontend Zustand store — not in Supabase. When you need to know the current value before proposing a change, ask the user: "What is the current value you see in Demo Settings - Conveyor tab?"
 
 ### Example Interactions:
 - User: "disable speed changes" → station=conveyor, parameter=speed_change, old_value=1, new_value=0
 - User: "enable jam events" → station=conveyor, parameter=jammed_events, old_value=0, new_value=1
-- User: "set jam time to 15" → station=conveyor, parameter=jammed_time, old_value=<ask>, new_value=15
-- User: "set conveyor scrap probability to 2" → station=conveyor, parameter=scrap_probability, old_value=<ask>, new_value=2
+- User: "set jam time to 15" → station=conveyor, parameter=jammed_time, old_value=<ask user>, new_value=15
+- User: "set conveyor scrap probability to 2" → station=conveyor, parameter=scrap_probability, old_value=<ask user>, new_value=2
 
 ## CHANGING PARAMETERS (Human-in-the-Loop Protocol)
 
