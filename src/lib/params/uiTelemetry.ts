@@ -126,6 +126,16 @@ export type TelemetryEventCategory =
  *    stop_simulation       → simulationStore.toggleDataFlow() [if running]
  *    reset_simulation      → full factory reset orchestration (8 steps)
  *
+ *  Conveyor Belt Status (simulationStore):
+ *    set_conveyor_running  → simulationStore.setConveyorStatus('running')  [guard: isDataFlowing]
+ *    set_conveyor_stopped  → simulationStore.setConveyorStatus('stopped')  [always valid]
+ *    set_conveyor_jammed   → simulationStore.setConveyorStatus('jammed')   [guard: isDataFlowing]
+ *
+ *  Simulation Parameter Sliders (simulationStore):
+ *    set_conveyor_speed    → simulationStore.setConveyorSpeed(actionValue)    [0.3–2.0, step 0.1]
+ *    set_sclk_period       → simulationStore.setSClockPeriod(actionValue)     [200–700ms, step 100]
+ *    set_station_interval  → simulationStore.setStationInterval(actionValue)  [2–7, step 1]
+ *
  *  Configuration (uiStore):
  *    set_language          → uiStore.setLanguage(action_value)  ['en' | 'tr']
  */
@@ -160,6 +170,20 @@ export const CWF_VALID_UI_ACTIONS = new Set([
     'stop_simulation',
     /** Full factory reset (all stores, session, conveyor drain) */
     'reset_simulation',
+    // ── Conveyor Belt Status (3) ──────────────────────────────────────────
+    /** Set belt to Running — guard: simulation must be flowing */
+    'set_conveyor_running',
+    /** Set belt to Stopped — always valid */
+    'set_conveyor_stopped',
+    /** Set belt to Jammed — guard: simulation must be flowing */
+    'set_conveyor_jammed',
+    // ── Simulation Parameter Sliders (3) ─────────────────────────────────
+    /** Set conveyor visual speed multiplier (0.3–2.0, step 0.1) */
+    'set_conveyor_speed',
+    /** Set S-Clock period in ms (200–700ms, step 100ms) */
+    'set_sclk_period',
+    /** Set station production interval in S-Clock ticks (2–7, step 1) */
+    'set_station_interval',
     // ── Configuration (1) ────────────────────────────────────────────────
     /** Change the interface language — action_value must be 'en' or 'tr' */
     'set_language',

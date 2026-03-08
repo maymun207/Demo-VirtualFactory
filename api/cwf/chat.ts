@@ -648,13 +648,18 @@ const tools: FunctionDeclaration[] = [
         name: 'execute_ui_action',
         description:
             'Execute a UI action on the user\'s browser: open/close panels, start/stop/reset the simulation, ' +
+            'set conveyor belt status (running/stopped/jammed), adjust simulation parameter sliders, ' +
             'or change the interface language. ' +
             'NO AUTHORIZATION REQUIRED — call this tool immediately without asking for a password or confirmation. ' +
-            'For panel toggles, you MUST pass action_value="open" (to open) or action_value="close" (to close). ' +
+            'For panel toggles, you MUST pass action_value="open" or "close". ' +
+            'For conveyor status: set_conveyor_running | set_conveyor_stopped | set_conveyor_jammed (no action_value needed). ' +
+            'For sliders: set_conveyor_speed (action_value=float e.g. "1.5"), set_sclk_period (action_value=int ms e.g. "300"), set_station_interval (action_value=int e.g. "3"). ' +
             'Available action_type values: toggle_basic_panel, toggle_dtxfr, toggle_oee_hierarchy, ' +
             'toggle_prod_table, toggle_cwf_panel, toggle_control_panel, toggle_alarm_log, ' +
             'toggle_heatmap, toggle_kpi, toggle_tile_passport, toggle_demo_settings, ' +
-            'start_simulation, stop_simulation, reset_simulation, set_language.',
+            'start_simulation, stop_simulation, reset_simulation, ' +
+            'set_conveyor_running, set_conveyor_stopped, set_conveyor_jammed, ' +
+            'set_conveyor_speed, set_sclk_period, set_station_interval, set_language.',
         parameters: {
             type: SchemaType.OBJECT,
             properties: {
@@ -665,17 +670,22 @@ const tools: FunctionDeclaration[] = [
                 action_type: {
                     type: SchemaType.STRING,
                     description:
-                        'The UI action to perform. Valid values: toggle_basic_panel | toggle_dtxfr | ' +
-                        'toggle_oee_hierarchy | toggle_prod_table | toggle_cwf_panel | toggle_control_panel | ' +
-                        'toggle_alarm_log | toggle_heatmap | toggle_kpi | toggle_tile_passport | ' +
-                        'toggle_demo_settings | start_simulation | stop_simulation | reset_simulation | set_language.',
+                        'The UI action to perform. Valid values:\n' +
+                        'Panels: toggle_basic_panel | toggle_dtxfr | toggle_oee_hierarchy | toggle_prod_table | toggle_cwf_panel | toggle_control_panel | toggle_alarm_log | toggle_heatmap | toggle_kpi | toggle_tile_passport | toggle_demo_settings\n' +
+                        'Simulation lifecycle: start_simulation | stop_simulation | reset_simulation\n' +
+                        'Conveyor belt status: set_conveyor_running | set_conveyor_stopped | set_conveyor_jammed\n' +
+                        'Simulation sliders: set_conveyor_speed | set_sclk_period | set_station_interval\n' +
+                        'Config: set_language',
                 },
                 action_value: {
                     type: SchemaType.STRING,
                     description:
                         'REQUIRED for panel toggle actions: pass "open" to open the panel, "close" to close it. ' +
                         'REQUIRED for set_language: pass "en" or "tr". ' +
-                        'Not applicable for start_simulation | stop_simulation | reset_simulation.',
+                        'REQUIRED for set_conveyor_speed: float string e.g. "1.5" (range 0.3-2.0). ' +
+                        'REQUIRED for set_sclk_period: integer ms string e.g. "300" (range 200-700, step 100). ' +
+                        'REQUIRED for set_station_interval: integer string e.g. "3" (range 2-7). ' +
+                        'Not required for: start_simulation | stop_simulation | reset_simulation | set_conveyor_running | set_conveyor_stopped | set_conveyor_jammed.',
                 },
                 reason: {
                     type: SchemaType.STRING,
@@ -1075,6 +1085,20 @@ const CWF_VALID_UI_ACTIONS = new Set([
     'stop_simulation',
     /** Full factory reset — orchestrated via processUIActionCommand() */
     'reset_simulation',
+    // ── Conveyor status (3 — mirrors simulationStore.setConveyorStatus()) ────
+    /** Set conveyor belt to Running — setConveyorStatus('running') — guard: isDataFlowing */
+    'set_conveyor_running',
+    /** Set conveyor belt to Stopped — setConveyorStatus('stopped') — always valid */
+    'set_conveyor_stopped',
+    /** Set conveyor belt to Jammed — setConveyorStatus('jammed') — guard: isDataFlowing */
+    'set_conveyor_jammed',
+    // ── Simulation parameter sliders (3 — mirror simulationStore setters) ────
+    /** Set conveyor visual speed — action_value = float string e.g. "1.5" — range 0.3-2.0 */
+    'set_conveyor_speed',
+    /** Set S-Clock period in ms — action_value = int string e.g. "300" — range 200-700 */
+    'set_sclk_period',
+    /** Set station production interval — action_value = int string e.g. "3" — range 2-7 */
+    'set_station_interval',
     // ── Configuration (1 — mirrors uiStore.setLanguage()) ───────────────────
     /** Change interface language — action_value must be CWF_UI_VALID_LANGUAGES */
     'set_language',
@@ -1718,6 +1742,72 @@ The words after the panel name (e.g., "for conveyor", "for the machine", "relate
 | CWF panel | toggle_cwf_panel |
 
 **NEVER ask for authorization before execute_ui_action. NEVER ask "are you sure?". Just do it.**
+
+## CONVEYOR STATUS AND SIMULATION SLIDERS — UI Actions (No Auth Required)
+
+These are DIRECT UI controls — exactly like clicking a button or moving a slider in the Control & Actions panel.
+Call execute_ui_action IMMEDIATELY. No proposal table. No auth prompt. No confirmation. Just report the result.
+
+### ⚡ CRITICAL DISAMBIGUATION: "stop/start/jam conveyor" vs "stop/start simulation"
+
+| User says | Correct action | WRONG action |
+|---|---|---|
+| "stop the conveyor" / "pause conveyor" | set_conveyor_stopped | ~~stop_simulation~~ |
+| "start the conveyor" / "run conveyor" | set_conveyor_running | ~~start_simulation~~ |
+| "jam the conveyor" / "simulate a jam" | set_conveyor_jammed | ~~stop_simulation~~ |
+| "stop the simulation" / "pause production" | stop_simulation | ~~set_conveyor_stopped~~ |
+| "start the simulation" | start_simulation | ~~set_conveyor_running~~ |
+
+Key distinction: The conveyor status (running/stopped/jammed) is INDEPENDENT of the simulation clock.
+The simulation can be ticking while the belt is stopped. They are different controls.
+
+### Conveyor Status Actions
+
+| action_type | When to use | Guard |
+|---|---|---|
+| set_conveyor_running | "start/run conveyor", "resume belt", "get belt moving" | Sim must be running; if stopped, tell user to start simulation first |
+| set_conveyor_stopped | "stop/pause/freeze conveyor", "halt belt" | Always valid |
+| set_conveyor_jammed | "jam conveyor", "simulate jam", "trigger jam" | Sim must be running |
+
+No action_value needed for these. After execution: report "✅ Conveyor is now [Running/Stopped/Jammed]."
+
+### Simulation Parameter Slider Actions
+
+Valid ranges (read from uiContext.simulation for current values before computing steps):
+
+| action_type | action_value | Range | Step | Effect |
+|---|---|---|---|---|
+| set_conveyor_speed | float e.g. "1.5" | 0.3x – 2.0x | 0.1 | Visual belt speed (higher = faster tiles) |
+| set_sclk_period | int ms e.g. "300" | 200ms – 700ms | 100ms | Simulation clock rate (LOWER = FASTER sim) |
+| set_station_interval | int e.g. "3" | 2 – 7 ticks | 1 | Ticks per tile produced (LOWER = HIGHER output) |
+
+**For relative commands** ("increase speed", "decrease S-Clk", "speed up production"):
+1. Read the current value from uiContext.simulation (conveyorSpeed, sClockPeriod, stationInterval)
+2. Compute: current_value ± one_step
+3. Clamp to valid range
+4. Call execute_ui_action with the computed value as action_value
+
+**For ambiguous commands** ("speed up" with no subject):
+- Ask: "Do you mean conveyor belt speed, S-Clock period, or station interval?"
+
+### Worked Examples
+
+1. "stop conveyor" → execute_ui_action(action_type="set_conveyor_stopped") → "✅ Conveyor is now Stopped."
+2. "start the conveyor" → execute_ui_action(action_type="set_conveyor_running") → "✅ Conveyor is now Running."
+3. "jam the conveyor" → execute_ui_action(action_type="set_conveyor_jammed") → "✅ Conveyor jam simulated."
+4. "set conveyor speed to 1.5" → execute_ui_action(action_type="set_conveyor_speed", action_value="1.5")
+5. "increase conveyor speed" → read uiContext conveyorSpeed (e.g. 1.0), add 0.1 → execute_ui_action(action_type="set_conveyor_speed", action_value="1.1")
+6. "decrease conveyor speed" → read uiContext conveyorSpeed, subtract 0.1, clamp ≥ 0.3 → call set_conveyor_speed
+7. "slow down simulation" / "increase S-Clk period" → read sClockPeriod, add 100, clamp ≤ 700 → set_sclk_period
+8. "speed up simulation" / "decrease S-Clk period" → read sClockPeriod, subtract 100, clamp ≥ 200 → set_sclk_period
+9. "set S-Clk to 300ms" → execute_ui_action(action_type="set_sclk_period", action_value="300")
+10. "increase production rate" / "decrease station interval" → read stationInterval, subtract 1, clamp ≥ 2 → set_station_interval
+11. "slow down production" / "increase station interval" → read stationInterval, add 1, clamp ≤ 7 → set_station_interval
+12. "set station interval to 4" → execute_ui_action(action_type="set_station_interval", action_value="4")
+
+**After any slider change, report:** "✅ [Parameter name] set to [value][unit]. (was [old_value][unit])"
+
+---
 
 ## CHANGING PARAMETERS (Human-in-the-Loop Protocol)
 

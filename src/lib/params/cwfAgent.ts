@@ -143,6 +143,77 @@ export const CWF_UI_ACTION_CLOSE = 'close';
  */
 export const CWF_UI_ACTION_BYPASS_AUTH = 'system:ui_action_no_auth_required';
 
+// =============================================================================
+// UI ACTION — CONVEYOR STATUS CONTROL
+// =============================================================================
+
+/**
+ * action_type for setting the conveyor belt status to "running".
+ *
+ * This is a direct write to simulationStore.setConveyorStatus('running').
+ * It is a UI-level action that changes the belt's operational mode without
+ * affecting whether the simulation (S-Clock) is ticking.
+ *
+ * Guard: Only valid when isDataFlowing === true (simulation must be running).
+ */
+export const CWF_UI_ACTION_SET_CONVEYOR_RUNNING = 'set_conveyor_running';
+
+/**
+ * action_type for setting the conveyor belt status to "stopped".
+ *
+ * Freezes tiles in place on the belt without stopping the simulation clock.
+ * Always valid — can be called even when the simulation is stopped.
+ */
+export const CWF_UI_ACTION_SET_CONVEYOR_STOPPED = 'set_conveyor_stopped';
+
+/**
+ * action_type for setting the conveyor belt status to "jammed".
+ *
+ * Simulates a conveyor jam: logs a fault alarm, freezes tiles at the jam
+ * location, and triggers the jam auto-resume timer.
+ *
+ * Guard: Only valid when isDataFlowing === true (simulation must be running).
+ */
+export const CWF_UI_ACTION_SET_CONVEYOR_JAMMED = 'set_conveyor_jammed';
+
+// =============================================================================
+// UI ACTION — SIMULATION PARAMETER SLIDERS
+// =============================================================================
+
+/**
+ * action_type for setting the conveyor belt visual speed multiplier.
+ *
+ * Range: 0.3× to 2.0× (step 0.1).
+ * action_value must be a valid float string (e.g. "1.5").
+ * Values outside the range are clamped by simulationStore.setConveyorSpeed().
+ *
+ * This changes the visual belt speed — NOT a machine behavioral parameter.
+ * NO authorization required.
+ */
+export const CWF_UI_ACTION_SET_CONVEYOR_SPEED = 'set_conveyor_speed';
+
+/**
+ * action_type for setting the S-Clock period in milliseconds.
+ *
+ * Range: 200 ms to 700 ms (step 100 ms). Lower = faster simulation clock.
+ * action_value must be a valid integer string (e.g. "300").
+ * Values outside the range are clamped; non-multiples of 100 are rounded.
+ *
+ * NO authorization required.
+ */
+export const CWF_UI_ACTION_SET_SCLK_PERIOD = 'set_sclk_period';
+
+/**
+ * action_type for setting the station production interval.
+ *
+ * Range: 2 to 7 S-Clock ticks per tile (step 1). Lower = higher output rate.
+ * action_value must be a valid integer string (e.g. "3").
+ * Values outside the range are clamped.
+ *
+ * NO authorization required.
+ */
+export const CWF_UI_ACTION_SET_STATION_INTERVAL = 'set_station_interval';
+
 /**
  * Substring fingerprint used to detect forced-summary contamination in
  * ASSISTANT messages. When Gemini responds to the forced-summary prompt,

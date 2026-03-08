@@ -334,6 +334,165 @@ async function processUIActionCommand(command: {
                 }
                 break;
 
+            // ── Conveyor Status Control ──────────────────────────────────────────
+            case 'set_conveyor_running': {
+                /**
+                 * Set the conveyor belt to RUNNING state.
+                 *
+                 * Guard: the simulation must be actively flowing (isDataFlowing=true).
+                 * If the simulation is stopped, the belt cannot be set to running —
+                 * the user must start the simulation first.
+                 *
+                 * Unlike stop_simulation, this only changes the belt's operational
+                 * mode — the S-Clock continues ticking at its usual rate.
+                 */
+                if (!sim.isDataFlowing) {
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: 'Cannot set conveyor to Running while the simulation is stopped. Start the simulation first.',
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        '⚠️ Cannot set conveyor to Running while simulation is stopped. Start the simulation first.',
+                    );
+                    return;
+                }
+                /** Set belt status to running */
+                sim.setConveyorStatus('running');
+                break;
+            }
+
+            case 'set_conveyor_stopped': {
+                /**
+                 * Set the conveyor belt to STOPPED state.
+                 *
+                 * Freezes tiles in place on the belt. The simulation S-Clock keeps
+                 * ticking. Always valid — can be applied whether the simulation is
+                 * running or stopped.
+                 */
+                sim.setConveyorStatus('stopped');
+                break;
+            }
+
+            case 'set_conveyor_jammed': {
+                /**
+                 * Set the conveyor belt to JAMMED state.
+                 *
+                 * Simulates a jam event: logs a fault alarm, tiles freeze at the
+                 * jam location, and the jam auto-resume timer starts.
+                 *
+                 * Guard: the simulation must be actively flowing (isDataFlowing=true).
+                 * Jamming a stopped simulation has no meaningful effect and would
+                 * create a confusing state.
+                 */
+                if (!sim.isDataFlowing) {
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: 'Cannot simulate a jam while the simulation is stopped. Start the simulation first.',
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        '⚠️ Cannot simulate a jam while simulation is stopped. Start the simulation first.',
+                    );
+                    return;
+                }
+                /** Trigger jam state — setConveyorStatus handles fault counting and alarm logging */
+                sim.setConveyorStatus('jammed');
+                break;
+            }
+
+            // ── Simulation Parameter Sliders ─────────────────────────────────────
+            case 'set_conveyor_speed': {
+                /**
+                 * Set the conveyor belt visual speed multiplier.
+                 *
+                 * action_value must be a valid float string (e.g. "1.5").
+                 * Range: CONVEYOR_SPEED_RANGE.min (0.3) to CONVEYOR_SPEED_RANGE.max (2.0).
+                 * setConveyorSpeed() clamps out-of-range values automatically.
+                 */
+                const parsedSpeed = parseFloat(actionValue ?? '');
+                if (isNaN(parsedSpeed)) {
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: `set_conveyor_speed requires a numeric action_value (e.g. "1.5"); got '${actionValue ?? 'undefined'}'.`,
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        `⚠️ set_conveyor_speed failed: invalid value '${actionValue}'. Provide a number between 0.3 and 2.0.`,
+                    );
+                    return;
+                }
+                /** Clamp to valid range — setConveyorSpeed clamps internally, but log the clamped value */
+                const clampedSpeed = Math.max(0.3, Math.min(2.0, parsedSpeed));
+                sim.setConveyorSpeed(clampedSpeed);
+                break;
+            }
+
+            case 'set_sclk_period': {
+                /**
+                 * Set the S-Clock period in milliseconds.
+                 *
+                 * action_value must be a valid integer string (e.g. "300").
+                 * Range: S_CLOCK_RANGE.min (200 ms) to S_CLOCK_RANGE.max (700 ms), step 100 ms.
+                 * Non-multiples of 100 are rounded to the nearest 100 ms before clamping.
+                 * Lower value = faster simulation clock (ticks fire more often).
+                 */
+                const parsedPeriod = parseInt(actionValue ?? '', 10);
+                if (isNaN(parsedPeriod)) {
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: `set_sclk_period requires an integer action_value in ms (e.g. "300"); got '${actionValue ?? 'undefined'}'.`,
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        `⚠️ set_sclk_period failed: invalid value '${actionValue}'. Provide an integer between 200 and 700 (ms).`,
+                    );
+                    return;
+                }
+                /** Round to nearest 100 ms, then clamp to [200, 700] */
+                const roundedPeriod = Math.round(parsedPeriod / 100) * 100;
+                const clampedPeriod = Math.max(200, Math.min(700, roundedPeriod));
+                sim.setSClockPeriod(clampedPeriod);
+                break;
+            }
+
+            case 'set_station_interval': {
+                /**
+                 * Set the station production interval (S-Clock ticks per tile).
+                 *
+                 * action_value must be a valid integer string (e.g. "3").
+                 * Range: STATION_INTERVAL_RANGE.min (2) to STATION_INTERVAL_RANGE.max (7), step 1.
+                 * Lower value = higher production throughput rate.
+                 * setStationInterval() clamps out-of-range values automatically.
+                 */
+                const parsedInterval = parseInt(actionValue ?? '', 10);
+                if (isNaN(parsedInterval)) {
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: `set_station_interval requires an integer action_value (e.g. "3"); got '${actionValue ?? 'undefined'}'.`,
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        `⚠️ set_station_interval failed: invalid value '${actionValue}'. Provide an integer between 2 and 7.`,
+                    );
+                    return;
+                }
+                /** Clamp to valid range — setStationInterval clamps internally */
+                const clampedInterval = Math.max(2, Math.min(7, parsedInterval));
+                sim.setStationInterval(clampedInterval);
+                break;
+            }
+
             default:
                 /** Unknown action_type — reject with descriptive reason */
                 await supabase

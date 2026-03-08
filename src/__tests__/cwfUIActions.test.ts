@@ -45,6 +45,10 @@ const CWF_VALID_UI_ACTIONS = new Set([
     'toggle_demo_settings',
     // Simulation lifecycle
     'start_simulation', 'stop_simulation', 'reset_simulation',
+    // Conveyor belt status
+    'set_conveyor_running', 'set_conveyor_stopped', 'set_conveyor_jammed',
+    // Simulation parameter sliders
+    'set_conveyor_speed', 'set_sclk_period', 'set_station_interval',
     // Configuration
     'set_language',
 ]);
@@ -284,12 +288,12 @@ describe('execute_ui_action — CWF_VALID_UI_ACTIONS completeness', () => {
         });
     });
 
-    it('should contain exactly 15 total actions', () => {
+    it('should contain exactly 21 total actions', () => {
         /**
-         * 11 panel toggles + 3 simulation + 1 config = 15 total.
-         * Any addition/removal must be explicitly documented.
+         * 11 panel toggles + 3 simulation + 3 conveyor status + 3 sliders + 1 config = 21 total.
+         * Any addition/removal must be explicitly documented and this test updated.
          */
-        expect(CWF_VALID_UI_ACTIONS.size).toBe(15);
+        expect(CWF_VALID_UI_ACTIONS.size).toBe(21);
     });
 
     it('should contain all expected panel toggles', () => {
@@ -431,6 +435,14 @@ describe('processUIActionCommand — UI action routing dispatch', () => {
             case 'start_simulation': return 'sim.toggleDataFlow() [if not running]';
             case 'stop_simulation': return 'sim.toggleDataFlow() [if running]';
             case 'reset_simulation': return 'full factory reset orchestration';
+            // Conveyor status
+            case 'set_conveyor_running': return 'sim.setConveyorStatus(running)';
+            case 'set_conveyor_stopped': return 'sim.setConveyorStatus(stopped)';
+            case 'set_conveyor_jammed': return 'sim.setConveyorStatus(jammed)';
+            // Simulation sliders
+            case 'set_conveyor_speed': return 'sim.setConveyorSpeed(actionValue)';
+            case 'set_sclk_period': return 'sim.setSClockPeriod(actionValue)';
+            case 'set_station_interval': return 'sim.setStationInterval(actionValue)';
             case 'set_language': return 'ui.setLanguage(actionValue)';
             default: return 'REJECTED: unknown action';
         }
@@ -460,7 +472,7 @@ describe('processUIActionCommand — UI action routing dispatch', () => {
         expect(simulateDispatch('destroy_everything')).toBe('REJECTED: unknown action');
     });
 
-    it('all 15 valid actions have a non-REJECTED dispatch route', () => {
+    it('all 21 valid actions have a non-REJECTED dispatch route', () => {
         /**
          * Regression guard: every action in the whitelist must have
          * a corresponding case in the switch statement.
@@ -470,4 +482,181 @@ describe('processUIActionCommand — UI action routing dispatch', () => {
             expect(result).not.toContain('REJECTED');
         }
     });
+
+    // ── Conveyor status routing ───────────────────────────────────────────
+    it('set_conveyor_running routes to sim.setConveyorStatus(running)', () => {
+        expect(simulateDispatch('set_conveyor_running')).toBe('sim.setConveyorStatus(running)');
+    });
+
+    it('set_conveyor_stopped routes to sim.setConveyorStatus(stopped)', () => {
+        expect(simulateDispatch('set_conveyor_stopped')).toBe('sim.setConveyorStatus(stopped)');
+    });
+
+    it('set_conveyor_jammed routes to sim.setConveyorStatus(jammed)', () => {
+        expect(simulateDispatch('set_conveyor_jammed')).toBe('sim.setConveyorStatus(jammed)');
+    });
+
+    // ── Slider parameter routing ──────────────────────────────────────────
+    it('set_conveyor_speed routes to sim.setConveyorSpeed(actionValue)', () => {
+        expect(simulateDispatch('set_conveyor_speed')).toBe('sim.setConveyorSpeed(actionValue)');
+    });
+
+    it('set_sclk_period routes to sim.setSClockPeriod(actionValue)', () => {
+        expect(simulateDispatch('set_sclk_period')).toBe('sim.setSClockPeriod(actionValue)');
+    });
+
+    it('set_station_interval routes to sim.setStationInterval(actionValue)', () => {
+        expect(simulateDispatch('set_station_interval')).toBe('sim.setStationInterval(actionValue)');
+    });
 });
+
+// =============================================================================
+// Tests: Conveyor status action validation
+// =============================================================================
+
+describe('execute_ui_action — conveyor status action validation', () => {
+
+    /**
+     * Mirror of the clamping + parse logic from processUIActionCommand.
+     * Used to verify conveyor speed / sClockPeriod / stationInterval validation.
+     */
+    function validateConveyorSpeed(raw: string | undefined): number | 'invalid' {
+        /**
+         * Parse the raw action_value string as a float and clamp to [0.3, 2.0].
+         * Returns 'invalid' if the value is not a number.
+         */
+        const parsed = parseFloat(raw ?? '');
+        if (isNaN(parsed)) return 'invalid';
+        return Math.max(0.3, Math.min(2.0, parsed));
+    }
+
+    function validateSClkPeriod(raw: string | undefined): number | 'invalid' {
+        /**
+         * Parse the raw action_value as an integer, round to nearest 100ms,
+         * then clamp to [200, 700]. Returns 'invalid' if not a number.
+         */
+        const parsed = parseInt(raw ?? '', 10);
+        if (isNaN(parsed)) return 'invalid';
+        return Math.max(200, Math.min(700, Math.round(parsed / 100) * 100));
+    }
+
+    function validateStationInterval(raw: string | undefined): number | 'invalid' {
+        /**
+         * Parse the raw action_value as an integer and clamp to [2, 7].
+         * Returns 'invalid' if not a number.
+         */
+        const parsed = parseInt(raw ?? '', 10);
+        if (isNaN(parsed)) return 'invalid';
+        return Math.max(2, Math.min(7, parsed));
+    }
+
+    // conveyor status whitelist
+    it('set_conveyor_running should be in CWF_VALID_UI_ACTIONS', () => {
+        /** Verifies the conveyor status action type is registered in the whitelist */
+        expect(CWF_VALID_UI_ACTIONS).toContain('set_conveyor_running');
+    });
+
+    it('set_conveyor_stopped should be in CWF_VALID_UI_ACTIONS', () => {
+        expect(CWF_VALID_UI_ACTIONS).toContain('set_conveyor_stopped');
+    });
+
+    it('set_conveyor_jammed should be in CWF_VALID_UI_ACTIONS', () => {
+        expect(CWF_VALID_UI_ACTIONS).toContain('set_conveyor_jammed');
+    });
+
+    // conveyor speed clamping
+    it('conveyor speed "1.5" should parse to 1.5', () => {
+        /** Normal valid value within range — no clamping needed */
+        expect(validateConveyorSpeed('1.5')).toBe(1.5);
+    });
+
+    it('conveyor speed "0.3" should parse to 0.3 (min boundary)', () => {
+        expect(validateConveyorSpeed('0.3')).toBe(0.3);
+    });
+
+    it('conveyor speed "2.0" should parse to 2.0 (max boundary)', () => {
+        expect(validateConveyorSpeed('2.0')).toBe(2.0);
+    });
+
+    it('conveyor speed "99" should be clamped to 2.0', () => {
+        /**
+         * Out-of-range high values are clamped to the max.
+         * The listener prevents runaway speeds via Math.min(2.0, parsed).
+         */
+        expect(validateConveyorSpeed('99')).toBe(2.0);
+    });
+
+    it('conveyor speed "0" should be clamped to 0.3 (below min)', () => {
+        expect(validateConveyorSpeed('0')).toBe(0.3);
+    });
+
+    it('conveyor speed undefined should return invalid', () => {
+        expect(validateConveyorSpeed(undefined)).toBe('invalid');
+    });
+
+    it('conveyor speed "abc" should return invalid', () => {
+        expect(validateConveyorSpeed('abc')).toBe('invalid');
+    });
+
+    // S-Clock period clamping and rounding
+    it('sClk period "300" should parse to 300', () => {
+        expect(validateSClkPeriod('300')).toBe(300);
+    });
+
+    it('sClk period "200" should parse to 200 (min boundary)', () => {
+        expect(validateSClkPeriod('200')).toBe(200);
+    });
+
+    it('sClk period "700" should parse to 700 (max boundary)', () => {
+        expect(validateSClkPeriod('700')).toBe(700);
+    });
+
+    it('sClk period "100" should be clamped to 200 (below min)', () => {
+        /** Values below minimum are raised to S_CLOCK_RANGE.min=200ms */
+        expect(validateSClkPeriod('100')).toBe(200);
+    });
+
+    it('sClk period "900" should be clamped to 700 (above max)', () => {
+        expect(validateSClkPeriod('900')).toBe(700);
+    });
+
+    it('sClk period "350" should round to 400 (nearest 100ms)', () => {
+        /** Non-multiples of 100 are rounded to prevent partial-tick periods */
+        expect(validateSClkPeriod('350')).toBe(400);
+    });
+
+    it('sClk period undefined should return invalid', () => {
+        expect(validateSClkPeriod(undefined)).toBe('invalid');
+    });
+
+    // Station interval clamping
+    it('stationInterval "3" should parse to 3', () => {
+        expect(validateStationInterval('3')).toBe(3);
+    });
+
+    it('stationInterval "2" should parse to 2 (min boundary)', () => {
+        expect(validateStationInterval('2')).toBe(2);
+    });
+
+    it('stationInterval "7" should parse to 7 (max boundary)', () => {
+        expect(validateStationInterval('7')).toBe(7);
+    });
+
+    it('stationInterval "1" should be clamped to 2 (below min)', () => {
+        /** Values below STATION_INTERVAL_RANGE.min=2 are raised to 2 */
+        expect(validateStationInterval('1')).toBe(2);
+    });
+
+    it('stationInterval "10" should be clamped to 7 (above max)', () => {
+        expect(validateStationInterval('10')).toBe(7);
+    });
+
+    it('stationInterval undefined should return invalid', () => {
+        expect(validateStationInterval(undefined)).toBe('invalid');
+    });
+
+    it('stationInterval "abc" should return invalid', () => {
+        expect(validateStationInterval('abc')).toBe('invalid');
+    });
+});
+
