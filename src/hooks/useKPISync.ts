@@ -135,8 +135,10 @@ export function useKPISync() {
         );
 
         // Step 4: Calculate hierarchical OEE (Machine → Line → Factory)
-        const moees = calculateAllMOEEs(stationCounts);
-        const loees = calculateAllLOEEs(stationCounts, moees, newCumEnergy);
+        // Pass the live conveyorSpeed so the belt's Performance (P) component
+        // reflects the actual belt speed relative to the nominal design speed.
+        const moees = calculateAllMOEEs(stationCounts, simState.conveyorSpeed);
+        const loees = calculateAllLOEEs(stationCounts, moees, newCumEnergy, simState.conveyorSpeed);
         const foee = calculateFOEE(stationCounts, loees, newCumEnergy);
 
         // Step 5: Use FOEE as the OEE value for the KPI card (replaces legacy formula)

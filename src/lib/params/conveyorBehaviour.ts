@@ -44,6 +44,22 @@ export const CB_SPEED_DELTA_MAX = 0.4;
  */
 export const CB_SPEED_CHANGE_PROBABILITY = 0.6;
 
+/**
+ * Nominal (design) conveyor belt speed used as the OEE Performance denominator.
+ *
+ * P_conveyor = clamp(currentSpeed / CONVEYOR_OEE_NOMINAL_SPEED, 0, 1)
+ *
+ * At this speed, P = 1.0 (full performance). Below this speed, P drops
+ * proportionally — a belt running at half the nominal rate contributes
+ * P = 0.5 to the conveyor MOEE. Running *faster* than nominal is capped
+ * at P = 1.0 (excess throughput does not inflate OEE).
+ *
+ * Must be kept in sync with DEFAULT_CONVEYOR_SPEED in simulation.ts.
+ * Defined here (conveyorBehaviour) rather than simulation.ts because it
+ * is the OEE performance reference for the conveyor, not a UI default.
+ */
+export const CONVEYOR_OEE_NOMINAL_SPEED = 1.5;
+
 // ═══════════════════════════════════════════════════════════════════
 // JAM INJECTION — Parameters for automatic jam-event triggering
 // ═══════════════════════════════════════════════════════════════════

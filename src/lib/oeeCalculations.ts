@@ -21,6 +21,8 @@ import {
     LINE_DEFINITIONS,
     OEE_MACHINE_NAMES,
 } from './params/oee';
+import { CONVEYOR_OEE_NOMINAL_SPEED } from './params/conveyorBehaviour';
+
 import type {
     TileSnapshotRecord,
     StationCounts,
@@ -204,16 +206,27 @@ export function countStationExits(
  *
  * Line 1 machines reference theoretical rate A (press capacity).
  * Line 2 machines reference theoretical rate B (kiln capacity).
- * Conveyor is yield-only (P = 1.0).
+ * Conveyor Performance is speed-dependent:
+ *   P_conveyor = clamp(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED, 0, 1)
+ *   A belt running slower than the nominal speed has P < 1.0.
+ *   Running faster than nominal is capped at P = 1.0.
  *
- * @param c - Station counts from countStationExits()
+ * @param c             - Station counts from countStationExits()
+ * @param conveyorSpeed - Current belt speed from simulationStore (live value)
  * @returns Array of 8 MachineOEE objects in production order
  */
-export function calculateAllMOEEs(c: StationCounts): MachineOEE[] {
+export function calculateAllMOEEs(c: StationCounts, conveyorSpeed: number): MachineOEE[] {
     /** A = press theoretical output for elapsed time */
     const A = c.theoreticalA;
     /** B = kiln theoretical output for elapsed time */
     const B = c.theoreticalB;
+
+    /**
+     * Conveyor Performance = ratio of actual speed to the nominal (design) speed.
+     * If the belt runs slower than CONVEYOR_OEE_NOMINAL_SPEED, performance drops.
+     * Clamped to [0, 1] so excess speed never inflates OEE above 100%.
+     */
+    const conveyorP = clamp01(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED);
 
     const machines: MachineOEE[] = [
         // ── LINE 1 machines (reference rate A) ──────────────────────
@@ -258,26 +271,27 @@ export function calculateAllMOEEs(c: StationCounts): MachineOEE[] {
             scrappedHere: c.perStation.printer.scrappedHere,
         },
 
-        // ── LINE 3 (Conveyor — yield-only, P = 1.0) ────────────────
+        // ── LINE 3 (Conveyor — speed-dependent P, yield Q) ────────
         {
             machineId: 'conveyor',
             name: OEE_MACHINE_NAMES.conveyor,
-            performance: 1.0,                                      // P = 1.0 (always)
             /**
-             * Q = G_clean / G   (NOT G_clean / F)
-             * Denominator is kilnInput (G), NOT digitalOutput (F).
+             * P = currentSpeed / CONVEYOR_OEE_NOMINAL_SPEED  (capped at 1.0)
              *
-             * Why kilnInput, not digitalOutput:
-             * At any tick, some tiles have exited the digital printer (F) but
-             * haven't entered the kiln yet — they are still in transit on the
-             * belt. If we use F as denominator those in-transit tiles inflate
-             * the denominator without appearing in G_clean, artificially
-             * reducing Q below the true yield. Using G (kilnInput) restricts
-             * both numerator and denominator to tiles that have COMPLETED the
-             * full conveyor transit, giving an accurate, stable yield metric.
+             * When the belt slows below the nominal operating speed (1.5×),
+             * throughput drops proportionally → P < 1.0.
+             * Running faster than nominal is capped at 1.0 (no OEE inflation).
+             */
+            performance: conveyorP,                                    // P = speed ratio
+            /**
+             * Q = G_clean / G   (denominator = kilnInput, NOT digitalOutput)
+             *
+             * kilnInput (G) only counts tiles that completed conveyor transit.
+             * Using digitalOutput (F) would include in-transit tiles in the
+             * denominator, making Q artificially low mid-simulation.
              */
             quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)), // Q = G_clean / G
-            oee: 0, // calculated below
+            oee: 0, // calculated below from P × Q
             actualInput: c.kilnInput,          // G — tiles that completed transit
             actualOutput: c.conveyorCleanOutput,
             /** Use passport-derived count to avoid double-counting at sorting */
@@ -331,22 +345,26 @@ export function calculateAllMOEEs(c: StationCounts): MachineOEE[] {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Calculate OEE for all 3 lines.
+ * Calculate OEE for all 3 production lines.
  *
  * Each line OEE telescopes: intermediate variables cancel out.
  *   Line 1: LOEE = F / A (digital output / press theoretical)
  *   Line 2: LOEE = J / B (packaging output / kiln theoretical)
- *   Line 3: LOEE = G_clean / F (conveyor yield)
+ *   Line 3: LOEE = P_speed × (G_clean / G)
+ *           where P_speed = clamp(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED, 0, 1)
+ *           and denominator G = kilnInput (completed conveyor transits only)
  *
- * @param c     - Station counts
- * @param moees - All 8 machine OEEs (for grouping into lines)
+ * @param c              - Station counts
+ * @param moees          - All 8 machine OEEs (for grouping into lines)
  * @param cumulativeEnergy - Cumulative per-station energy from kpiStore
+ * @param conveyorSpeed  - Current belt speed from simulationStore
  * @returns Array of 3 LineOEE objects
  */
 export function calculateAllLOEEs(
     c: StationCounts,
     moees: MachineOEE[],
     cumulativeEnergy: Record<string, { kWh: number; gas: number; co2: number }>,
+    conveyorSpeed: number,
 ): LineOEE[] {
     /**
      * Aggregate energy totals for a set of station IDs.
@@ -381,6 +399,14 @@ export function calculateAllLOEEs(
     /** B = kiln theoretical output for elapsed time */
     const B = c.theoreticalB;
 
+    /**
+     * Conveyor belt speed ratio, mirroring calculateAllMOEEs.
+     * P_conveyor = clamp(currentSpeed / nominalSpeed, 0, 1).
+     * Below nominal -> P < 1.0 -> Line 3 LOEE drops accordingly.
+     */
+    const conveyorP = clamp01(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED);
+
+
     return [
         // Line 1: LOEE = F / A (digital output / press theoretical)
         {
@@ -402,22 +428,24 @@ export function calculateAllLOEEs(
             machines: filterMOEEs(LINE_DEFINITIONS.line2.stations),
             energy: aggregateEnergy(LINE_DEFINITIONS.line2.stations, c.packagingOutput),
         },
-        // Line 3: LOEE = G_clean / G (conveyor yield — completed transits only)
+        // Line 3: LOEE = P_speed × Q_yield  (speed-based performance × transit quality)
         {
             lineId: LINE_DEFINITIONS.line3.id,
             name: LINE_DEFINITIONS.line3.name,
-            performance: 1.0,                                                  // Always 1.0 for conveyor
             /**
-             * quality = G_clean / G   (denominator = kilnInput, not digitalOutput)
+             * P = conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED (capped at 1.0).
+             * Mirrors the conveyor MOEE performance calculation.
+             */
+            performance: conveyorP,                                                    // speed ratio
+            /**
+             * Q = G_clean / G   (denominator = kilnInput, not digitalOutput)
              *
              * Using kilnInput (G) — not digitalOutput (F) — as denominator.
-             * In-transit tiles (exited digital, not yet at kiln) would inflate
-             * F without contributing to G_clean, creating a false Q < 1.0 even
-             * when no jam damage exists. G only counts completed transits, so
-             * the yield is accurate at every snapshot tick.
+             * In-transit tiles would inflate F before completing transit.
+             * G only counts completed transits, giving accurate per-tick Q.
              */
-            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)),         // G_clean / G
-            oee: Math.min(100, safeDiv(c.conveyorCleanOutput, c.kilnInput) * 100), // G_clean / G × 100, capped at 100%
+            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)),             // G_clean / G
+            oee: Math.min(100, conveyorP * safeDiv(c.conveyorCleanOutput, c.kilnInput) * 100), // P × Q × 100
             machines: filterMOEEs(LINE_DEFINITIONS.line3.stations),
             energy: aggregateEnergy(['conveyor'], c.conveyorCleanOutput),
         },
