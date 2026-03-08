@@ -77,9 +77,16 @@ const CWF_FORCE_SUMMARY_PROMPT_EN =
 /** Authorization code for CWF parameter changes (human-in-the-loop) */
 const CWF_AUTH_CODE = 'airtk';
 
-/** Valid station names for CWF commands */
+/**
+ * Valid station names for CWF commands.
+ * MIRROR of CWF_VALID_STATIONS in src/lib/params/cwfCommands.ts.
+ * Must be kept in sync — api/ cannot import from src/.
+ * Includes the 7 production stations PLUS the conveyor belt (8th station).
+ */
 const CWF_VALID_STATIONS = [
     'press', 'dryer', 'glaze', 'printer', 'kiln', 'sorting', 'packaging',
+    /** Conveyor belt — controls jammed_time, impacted_tiles, scrap_probability, speed_change, jammed_events */
+    'conveyor',
 ] as const;
 
 /**
@@ -184,6 +191,11 @@ Use the label that matches the session language (EN or TR).
 | stretch_tension_pct | Stretch Tension (%) | Germe Gerilimi (%) |
 | robot_speed_cycles_min | Robot Speed (cycles/min) | Robot Hızı (çevrim/dk) |
 | label_accuracy_pct | Label Accuracy (%) | Etiket Doğruluğu (%) |
+| jammed_time | Jam Duration (cycles) | Sıkışma Süresi (çevrim) |
+| impacted_tiles | Tiles Scrapped Per Jam | Sıkışma Başı Hurda Karo |
+| scrap_probability | Scrap Probability (%) | Hurda Olasılığı (%) |
+| speed_change | Speed Change Events | Hız Değişimi Olayları |
+| jammed_events | Jam Events Enabled | Sıkışma Olayları Etkin |
 `;
 
 // =============================================================================
@@ -510,7 +522,10 @@ const tools: FunctionDeclaration[] = [
                 },
                 station: {
                     type: SchemaType.STRING,
-                    description: 'Target station: press|dryer|glaze|printer|kiln|sorting|packaging',
+                    description:
+                        'Target station: press|dryer|glaze|printer|kiln|sorting|packaging|conveyor. ' +
+                        'Use "conveyor" for conveyor belt parameters (jammed_time, impacted_tiles, ' +
+                        'scrap_probability, speed_change, jammed_events).',
                 },
                 parameter: {
                     type: SchemaType.STRING,
@@ -1120,6 +1135,42 @@ The following knowledge documents are maintained by the factory team.
 Use them as authoritative reference when analyzing data and answering questions.
 
 ${knowledgeBase}` : ''}
+
+## CONVEYOR PARAMETERS — How to Read and Change Them
+
+The conveyor belt is the **8th controllable station** (station name: `conveyor`). Unlike the 7 production machines, it does NOT have its own `machine_conveyor_states` table. Instead:
+
+- **Read** conveyor parameters from the `conveyor_states` table (latest row per session)
+  or from `simulation_sessions` metadata, or ask the user what the current setting is.
+- **Change** conveyor parameters using `update_parameter` with `station = "conveyor"`.
+
+### Conveyor Parameter Reference:
+
+| Parameter Key | Display Name | Type | Valid Range | Meaning |
+|---|---|---|---|---|
+| `jammed_time` | Jam Duration | Numeric | 1–30 cycles | How long each jam lasts (normal: 6–10) |
+| `impacted_tiles` | Tiles Scrapped Per Jam | Numeric | 0–20 tiles | Scrap tiles per jam event (normal: 1–5) |
+| `scrap_probability` | Scrap Probability (%) | Numeric | 0–3 % | Global tile scrap probability at all stations |
+| `speed_change` | Speed Change Events | Boolean as 0/1 | 0 = off, 1 = on | Whether speed-change events occur |
+| `jammed_events` | Jam Events Enabled | Boolean as 0/1 | 0 = off, 1 = on | Whether jam events occur on the belt |
+
+### Boolean Parameters (speed_change, jammed_events):
+- These are toggles. The database column stores them as numbers: **0 = disabled / false**, **1 = enabled / true**.
+- When the user says "enable", propose `new_value = 1`. When they say "disable" or "no", propose `new_value = 0`.
+- Always show the current state as "Enabled" or "Disabled", NEVER as "1" or "0".
+
+### Querying Current Conveyor State:
+```sql
+SELECT speed, jam_count, fault_count FROM conveyor_states
+WHERE simulation_id = '<id>' ORDER BY sim_tick DESC LIMIT 1
+        ```
+For conveyor parameter VALUES (jammed_time etc.), they are stored in the frontend Zustand store — not in Supabase. When you need to know the current value before proposing a change, ask the user: "What is the current value you see in the Demo Settings → Conveyor tab?"
+
+### Example Interactions:
+- User: "disable speed changes" → station=conveyor, parameter=speed_change, old_value=1, new_value=0
+- User: "enable jam events" → station=conveyor, parameter=jammed_events, old_value=0, new_value=1
+- User: "set jam time to 15" → station=conveyor, parameter=jammed_time, old_value=<ask>, new_value=15
+- User: "set conveyor scrap probability to 2" → station=conveyor, parameter=scrap_probability, old_value=<ask>, new_value=2
 
 ## CHANGING PARAMETERS (Human-in-the-Loop Protocol)
 
