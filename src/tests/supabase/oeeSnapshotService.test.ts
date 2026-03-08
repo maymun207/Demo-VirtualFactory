@@ -56,7 +56,7 @@ function makeStationEnergy(kWh: number, gas: number, co2: number): StationEnergy
  * All values are deterministic for assertion.
  */
 function makeMockFOEE(): FactoryOEE {
-    /** Line 1: press → dryer → glaze → printer */
+    /** Line 1: press → dryer → glaze → printer (Forming & Finishing) */
     const line1: LineOEE = {
         lineId: 'line1',
         name: { tr: 'Line 1', en: 'Line 1' },
@@ -72,21 +72,10 @@ function makeMockFOEE(): FactoryOEE {
         energy: { totalKwh: 40, totalGas: 10, totalCo2: 15, kWhPerTile: 4 },
     };
 
-    /** Line 2: conveyor */
+    /** Line 2: kiln → sorting → packaging (Firing & Dispatch) */
     const line2: LineOEE = {
         lineId: 'line2',
         name: { tr: 'Line 2', en: 'Line 2' },
-        performance: 0.95,
-        quality: 0.98,
-        oee: 93.1,
-        machines: [makeMachine('conveyor', 93.1)],
-        energy: { totalKwh: 5, totalGas: 0, totalCo2: 2, kWhPerTile: 0.5 },
-    };
-
-    /** Line 3: kiln → sorting → packaging */
-    const line3: LineOEE = {
-        lineId: 'line3',
-        name: { tr: 'Line 3', en: 'Line 3' },
         performance: 0.80,
         quality: 0.90,
         oee: 72.0,
@@ -96,6 +85,21 @@ function makeMockFOEE(): FactoryOEE {
             makeMachine('packaging', 90.0),
         ],
         energy: { totalKwh: 60, totalGas: 25, totalCo2: 30, kWhPerTile: 6 },
+    };
+
+    /**
+     * Line 3: conveyor (Conveyor belt — transit between Line 1 and Line 2).
+     * actualInput uses kilnInput (completed transits), not digitalOutput,
+     * to avoid inflating the denominator with in-transit tiles.
+     */
+    const line3: LineOEE = {
+        lineId: 'line3',
+        name: { tr: 'Line 3', en: 'Line 3' },
+        performance: 0.95,
+        quality: 0.98,
+        oee: 93.1,
+        machines: [makeMachine('conveyor', 93.1)],
+        energy: { totalKwh: 5, totalGas: 0, totalCo2: 2, kWhPerTile: 0.5 },
     };
 
     return {
@@ -193,10 +197,14 @@ describe('[OSS] buildSnapshotRow — Row Construction', () => {
         expect(row.moee_sorting).toBe(85.5);
         expect(row.moee_packaging).toBe(90.0);
 
-        /** Line OEEs. */
+        /** Line OEEs.
+         * line1 = Forming & Finishing (press/dryer/glaze/printer) → loee_line1
+         * line2 = Firing & Dispatch  (kiln/sorting/packaging)     → loee_line2
+         * line3 = Conveyor belt                                    → loee_line3
+         */
         expect(row.loee_line1).toBe(78.2);
-        expect(row.loee_line2).toBe(93.1);
-        expect(row.loee_line3).toBe(72.0);
+        expect(row.loee_line2).toBe(72.0);
+        expect(row.loee_line3).toBe(93.1);
 
         /** Factory OEE. */
         expect(row.foee).toBe(68.5);
@@ -249,8 +257,8 @@ describe('[OSS] buildSnapshotRow — Row Construction', () => {
 
         const row = buildSnapshotRow('sim-def', 400, foee, counts);
         expect(row.loee_line1).toBe(78.2);
-        expect(row.loee_line2).toBe(93.1);
-        expect(row.loee_line3).toBe(0); // No line3 → defaults to 0
+        expect(row.loee_line2).toBe(72.0);  // line2 = firing & dispatch
+        expect(row.loee_line3).toBe(0);     // No line3 (conveyor) → defaults to 0
     });
 });
 

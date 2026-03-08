@@ -263,9 +263,22 @@ export function calculateAllMOEEs(c: StationCounts): MachineOEE[] {
             machineId: 'conveyor',
             name: OEE_MACHINE_NAMES.conveyor,
             performance: 1.0,                                      // P = 1.0 (always)
-            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.digitalOutput)), // Q = G_clean / F
-            oee: 0,
-            actualInput: c.digitalOutput,
+            /**
+             * Q = G_clean / G   (NOT G_clean / F)
+             * Denominator is kilnInput (G), NOT digitalOutput (F).
+             *
+             * Why kilnInput, not digitalOutput:
+             * At any tick, some tiles have exited the digital printer (F) but
+             * haven't entered the kiln yet — they are still in transit on the
+             * belt. If we use F as denominator those in-transit tiles inflate
+             * the denominator without appearing in G_clean, artificially
+             * reducing Q below the true yield. Using G (kilnInput) restricts
+             * both numerator and denominator to tiles that have COMPLETED the
+             * full conveyor transit, giving an accurate, stable yield metric.
+             */
+            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)), // Q = G_clean / G
+            oee: 0, // calculated below
+            actualInput: c.kilnInput,          // G — tiles that completed transit
             actualOutput: c.conveyorCleanOutput,
             /** Use passport-derived count to avoid double-counting at sorting */
             scrappedHere: c.conveyorScrapped,
@@ -389,13 +402,22 @@ export function calculateAllLOEEs(
             machines: filterMOEEs(LINE_DEFINITIONS.line2.stations),
             energy: aggregateEnergy(LINE_DEFINITIONS.line2.stations, c.packagingOutput),
         },
-        // Line 3: LOEE = G_clean / F (conveyor yield)
+        // Line 3: LOEE = G_clean / G (conveyor yield — completed transits only)
         {
             lineId: LINE_DEFINITIONS.line3.id,
             name: LINE_DEFINITIONS.line3.name,
             performance: 1.0,                                                  // Always 1.0 for conveyor
-            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.digitalOutput)), // G_clean / F
-            oee: Math.min(100, safeDiv(c.conveyorCleanOutput, c.digitalOutput) * 100), // G_clean / F × 100, capped at 100%
+            /**
+             * quality = G_clean / G   (denominator = kilnInput, not digitalOutput)
+             *
+             * Using kilnInput (G) — not digitalOutput (F) — as denominator.
+             * In-transit tiles (exited digital, not yet at kiln) would inflate
+             * F without contributing to G_clean, creating a false Q < 1.0 even
+             * when no jam damage exists. G only counts completed transits, so
+             * the yield is accurate at every snapshot tick.
+             */
+            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)),         // G_clean / G
+            oee: Math.min(100, safeDiv(c.conveyorCleanOutput, c.kilnInput) * 100), // G_clean / G × 100, capped at 100%
             machines: filterMOEEs(LINE_DEFINITIONS.line3.stations),
             energy: aggregateEnergy(['conveyor'], c.conveyorCleanOutput),
         },

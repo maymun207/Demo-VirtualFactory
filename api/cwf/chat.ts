@@ -1126,13 +1126,13 @@ This factory uses a real-world P × Q OEE model (no synthetic Availability facto
 
 ### 8 Machine OEEs:
 Line 1: Press (C/A), Dryer (D²/AC), Glaze (E²/AD), Digital (F²/AE)
-Line 3: Conveyor (G_clean/F) — yield only, measures transit damage
+Line 3: Conveyor (G_clean/G) — yield only, measures transit damage (denominator = kilnInput, not digitalOutput)
 Line 2: Kiln (GH/BG), Sorting (HI/BH), Packaging (IJ/BI)
 
 ### 3 Line OEEs (telescoped — intermediate variables cancel):
 - Line 1 (Forming & Finishing): LOEE = F/A (digital output / press theoretical)
 - Line 2 (Firing & Dispatch): LOEE = J/B (packaging output / kiln theoretical)
-- Line 3 (Conveyor): LOEE = G_clean/F (clean transit yield)
+- Line 3 (Conveyor): LOEE = G_clean/G (clean transit yield vs completed transits)
 
 ### Factory OEE:
 FOEE = J / min(A, B) — anchored to the bottleneck
