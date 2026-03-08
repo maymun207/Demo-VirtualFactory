@@ -36,25 +36,17 @@ import { useUIStore } from '../store/uiStore';
 import { useSimulationStore } from '../store/simulationStore';
 import { useSimulationDataStore } from '../store/simulationDataStore';
 import { createLogger } from '../lib/logger';
+/** Telemetry configuration constants — all tunable values live in Params, NOT here */
+import {
+    TELEMETRY_BATCH_SIZE,
+    TELEMETRY_FLUSH_DEBOUNCE_MS,
+    TELEMETRY_MAX_QUEUE_SIZE,
+    TELEMETRY_IDLE_DEADLINE_MS,
+    type TelemetryEventCategory,
+} from '../lib/params/uiTelemetry';
 
 /** Module-level logger for telemetry operations */
 const log = createLogger('UITelemetry');
-
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-/**
- * Maximum number of events to send in a single Supabase INSERT batch.
- * Larger batches = fewer network calls but larger payloads.
- */
-const TELEMETRY_BATCH_SIZE = 10;
-
-/**
- * Debounce period in milliseconds before flushing the queue.
- * Rapid UI changes (e.g. slider drag) accumulate into a single batch.
- */
-const TELEMETRY_FLUSH_DEBOUNCE_MS = 300;
 
 // =============================================================================
 // TYPES
@@ -70,12 +62,13 @@ export interface TelemetryEventInput {
     event_type: string;
     /**
      * Broad category for grouping and filtering.
-     *  'ui_action'       — user clicked a button or toggled a panel
-     *  'sim_state'       — simulation state changed automatically
-     *  'cwf_interaction' — user interacted with the CWF chat agent
-     *  'parameter'       — a machine or conveyor parameter was changed
+     * All valid categories are defined in src/lib/params/uiTelemetry.ts.
+     *  'ui_action'          — user clicked a button or toggled a panel
+     *  'sim_state'          — simulation state changed automatically
+     *  'cwf_interaction'    — user interacted with the CWF chat agent
+     *  'parameter'          — a machine or conveyor parameter was changed
      */
-    event_category: 'ui_action' | 'sim_state' | 'cwf_interaction' | 'parameter';
+    event_category: TelemetryEventCategory;
     /** Event-specific key-value payload (optional, defaults to {}) */
     properties?: Record<string, unknown>;
 }
@@ -235,7 +228,8 @@ function scheduleFlush(): void {
         flushTimer = null;
         /** Use requestIdleCallback if available — lets browser prioritize rendering */
         if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => void flushQueue(), { timeout: 2000 });
+            /** TELEMETRY_IDLE_DEADLINE_MS forces flush even if browser stays busy */
+            requestIdleCallback(() => void flushQueue(), { timeout: TELEMETRY_IDLE_DEADLINE_MS });
         } else {
             /** Fallback: defer by one event loop tick for non-supporting browsers */
             setTimeout(() => void flushQueue(), 0);
@@ -292,7 +286,16 @@ function emit(input: TelemetryEventInput): void {
             s_clock_at: simState.sClockCount > 0 ? simState.sClockCount : null,
         };
 
-        /** Push to in-memory queue */
+        /**
+         * Enforce queue capacity — evict oldest event (FIFO) if over TELEMETRY_MAX_QUEUE_SIZE.
+         * Protects against memory growth during extended Supabase outages.
+         */
+        if (eventQueue.length >= TELEMETRY_MAX_QUEUE_SIZE) {
+            /** Drop the oldest element from the front of the array */
+            eventQueue.shift();
+        }
+
+        /** Push new event to the tail of the in-memory queue */
         eventQueue.push(row);
 
         /** Schedule a debounced flush — does NOT block the calling code */

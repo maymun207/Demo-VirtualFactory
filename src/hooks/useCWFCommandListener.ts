@@ -1,15 +1,22 @@
 /**
- * useCWFCommandListener.ts — CWF Parameter Command Realtime Listener
+ * useCWFCommandListener.ts — CWF Parameter Command Realtime Listener + UI Action Dispatcher
  *
  * React hook that subscribes to Supabase Realtime Postgres Changes on the
  * `cwf_commands` table. When the CWF AI agent inserts a new command (after
  * the human-in-the-loop approval flow), this hook:
  *
+ *   Phase 2 (Parameter Commands):
  *   1. Receives the INSERT event via WebSocket (near-instant)
  *   2. Validates the parameter value against CWF_PARAM_RANGES
  *   3. Applies the change to the Zustand simulation data store
  *   4. Updates the command status ('applied' or 'rejected') in Supabase
  *   5. Posts a system message to the CWF chat panel as visual confirmation
+ *
+ *   Phase 3 (UI Action Commands — station=CWF_UI_ACTION_STATION_SENTINEL):
+ *   1. Detects rows with station='ui_action' via CWF_UI_ACTION_STATION_SENTINEL
+ *   2. Routes to processUIActionCommand() module-level function
+ *   3. Dispatches the action to the correct Zustand store (uiStore, simulationStore)
+ *   4. Acknowledges to the server by updating cwf_commands.status
  *
  * FALLBACK POLLING:
  *   Supabase Realtime WebSocket connections can be unreliable on some
@@ -21,16 +28,14 @@
  * Architecture:
  *   CWF serverless fn → INSERT cwf_commands → Supabase Realtime → this hook
  *                                                                    ↓
- *                                                      updateParameter() in Zustand
+ *                                  updateParameter() or processUIActionCommand()
  *                                             (+ fallback polling every 5s)
  *
  * Mount point: App.tsx (alongside useKPISync, useConveyorBehaviour)
  *
- * Dependencies:
- *   - src/lib/supabaseClient.ts  (Supabase client instance)
- *   - src/lib/params/cwfCommands.ts (CWF_PARAM_RANGES, validateCWFParamValue)
- *   - src/store/simulationDataStore.ts (updateParameter action)
- *   - src/store/cwfStore.ts (addSystemMessage for chat notification)
+ * Configuration:
+ *   - src/lib/params/cwfCommands.ts  (CWF_PARAM_RANGES, validateCWFParamValue)
+ *   - src/lib/params/uiTelemetry.ts  (CWF_UI_ACTION_STATION_SENTINEL, CWF_UI_ACTION_VALUE_SEPARATOR)
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -49,6 +54,14 @@ import { useKPIStore } from '../store/kpiStore';
 import { useWorkOrderStore } from '../store/workOrderStore';
 /** syncService — needed for full factory reset orchestration */
 import { syncService } from '../services/syncService';
+/**
+ * Sentinel and separator constants for UI action command routing.
+ * Imported from Params — never hardcode 'ui_action' or '| value:' inline.
+ */
+import {
+    CWF_UI_ACTION_STATION_SENTINEL,
+    CWF_UI_ACTION_VALUE_SEPARATOR,
+} from '../lib/params/uiTelemetry';
 
 /**
  * Conveyor boolean parameter names that are stored as 0/1 numbers in the
@@ -84,12 +97,20 @@ async function processUIActionCommand(command: {
 }): Promise<void> {
     if (!supabase) return;
 
-    /** Extract action_type from the parameter field */
+    /** Extract action_type from the parameter field — always present on ui_action rows */
     const actionType = command.parameter;
 
-    /** Extract optional action_value from the reason field (format: "reason | value: X") */
+    /**
+     * Extract optional action_value from the reason field.
+     * The separator is defined in uiTelemetry.ts as CWF_UI_ACTION_VALUE_SEPARATOR.
+     * Format: "<human reason> | value: <action_value>"
+     * If no separator is found, action_value is undefined (used by non-set_language actions).
+     */
     const reasonStr = command.reason ?? '';
-    const valueMatch = reasonStr.match(/\|\s*value:\s*(.+)$/);
+    /** Escape the separator for RegExp and build the extraction pattern */
+    const sepEscaped = CWF_UI_ACTION_VALUE_SEPARATOR.replace(/[|]/g, '\\|');
+    const valueMatch = reasonStr.match(new RegExp(`${sepEscaped}\\s*(.+)$`));
+    /** Trim whitespace from the extracted value */
     const actionValue = valueMatch ? valueMatch[1].trim() : undefined;
 
     /** Convenient store accessors via getState() — safe outside React */
@@ -368,7 +389,12 @@ export function useCWFCommandListener(): void {
         processedIdsRef.current.add(command.id);
 
         // ── Route to the correct processor based on station type ──────────
-        if (command.station === 'ui_action') {
+        /**
+         * Route to UI action dispatcher if station matches the sentinel value.
+         * CWF_UI_ACTION_STATION_SENTINEL is 'ui_action' (from uiTelemetry.ts).
+         * Never compare against the raw string to avoid silent staleness bugs.
+         */
+        if (command.station === CWF_UI_ACTION_STATION_SENTINEL) {
             /** Route to the UI action dispatcher — does NOT use parameter validation */
             processUIActionCommand(command);
             return;

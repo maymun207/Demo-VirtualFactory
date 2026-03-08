@@ -968,18 +968,66 @@ async function executeUpdateParameter(args: {
 /**
  * Valid UI action types that CWF can dispatch to the browser.
  * These map 1:1 to Zustand uiStore actions or simulation control functions.
+ *
+ * SOURCE OF TRUTH: src/lib/params/uiTelemetry.ts — CWF_VALID_UI_ACTIONS
+ * This API route cannot import from src/, so a mirror is maintained here.
+ * ANY CHANGE to the set of actions MUST be reflected in BOTH files.
  */
 const CWF_VALID_UI_ACTIONS = new Set([
-    // Panel toggles (all 11 panels)
-    'toggle_basic_panel', 'toggle_dtxfr', 'toggle_oee_hierarchy',
-    'toggle_prod_table', 'toggle_cwf_panel', 'toggle_control_panel',
-    'toggle_alarm_log', 'toggle_heatmap', 'toggle_kpi', 'toggle_tile_passport',
+    // ── Panel toggles (11 panels — mirrors uiStore toggle actions) ──────────
+    /** Left Basic side panel (KPI+Heatmap) — uiStore.toggleBasicPanel() */
+    'toggle_basic_panel',
+    /** Digital Transfer side panel — uiStore.toggleDTXFR() */
+    'toggle_dtxfr',
+    /** 3D OEE Hierarchy table — uiStore.toggleOEEHierarchy() */
+    'toggle_oee_hierarchy',
+    /** 3D Production Status table — uiStore.setShowProductionTable(!current) */
+    'toggle_prod_table',
+    /** CWF chat panel — uiStore.toggleCWF() */
+    'toggle_cwf_panel',
+    /** Control & Actions panel — uiStore.toggleControlPanel() */
+    'toggle_control_panel',
+    /** Alarm Log popup — uiStore.toggleAlarmLog() */
+    'toggle_alarm_log',
+    /** FTQ Defect Heatmap panel — uiStore.toggleHeatmap() */
+    'toggle_heatmap',
+    /** KPI panel — uiStore.toggleKPI() */
+    'toggle_kpi',
+    /** Tile Passport panel — uiStore.togglePassport() */
+    'toggle_tile_passport',
+    /** Demo Settings modal — uiStore.toggleDemoSettings() */
     'toggle_demo_settings',
-    // Simulation lifecycle
-    'start_simulation', 'stop_simulation', 'reset_simulation',
-    // Configuration
+    // ── Simulation lifecycle (3 — mirrors simulationStore actions) ──────────
+    /** Start simulation tick — simulationStore.toggleDataFlow() [if not running] */
+    'start_simulation',
+    /** Stop simulation tick — simulationStore.toggleDataFlow() [if running] */
+    'stop_simulation',
+    /** Full factory reset — orchestrated via processUIActionCommand() */
+    'reset_simulation',
+    // ── Configuration (1 — mirrors uiStore.setLanguage()) ───────────────────
+    /** Change interface language — action_value must be CWF_UI_VALID_LANGUAGES */
     'set_language',
 ] as const);
+
+/**
+ * Valid language codes for the set_language action.
+ * SOURCE OF TRUTH: src/lib/params/uiTelemetry.ts — CWF_UI_ACTION_VALID_LANGUAGES
+ */
+const CWF_UI_VALID_LANGUAGES_CHAT = ['en', 'tr'] as const;
+
+/**
+ * Station column sentinel for UI action rows in cwf_commands.
+ * SOURCE OF TRUTH: src/lib/params/uiTelemetry.ts — CWF_UI_ACTION_STATION_SENTINEL
+ * useCWFCommandListener routes commands with this station value to processUIActionCommand.
+ */
+const CWF_UI_ACTION_STATION = 'ui_action' as const;
+
+/**
+ * Separator used when encoding action_value into the reason field.
+ * SOURCE OF TRUTH: src/lib/params/uiTelemetry.ts — CWF_UI_ACTION_VALUE_SEPARATOR
+ * Format: "<reason> | value: <action_value>"
+ */
+const CWF_UI_VALUE_SEP = '| value:' as const;
 
 /**
  * executeUIAction — Queue a UI action command for the browser to execute.
@@ -1014,8 +1062,12 @@ async function executeUIAction(args: {
         };
     }
 
-    /** Step 3: Validate set_language value if applicable */
-    if (args.action_type === 'set_language' && !['en', 'tr'].includes(args.action_value ?? '')) {
+    /** Step 3: Validate set_language requires a supported language code */
+    if (
+        args.action_type === 'set_language' &&
+        /** CWF_UI_VALID_LANGUAGES_CHAT mirrors CWF_UI_ACTION_VALID_LANGUAGES in uiTelemetry.ts */
+        !CWF_UI_VALID_LANGUAGES_CHAT.includes(args.action_value as 'en' | 'tr')
+    ) {
         return { error: 'set_language requires action_value to be "en" or "tr".' };
     }
 
@@ -1023,15 +1075,28 @@ async function executeUIAction(args: {
     const { data, error } = await supabase
         .from('cwf_commands')
         .insert({
+            /** FK to the active simulation session */
             session_id: args.simulation_id,
-            /** Use 'ui_action' sentinel for station — browser differentiates this from param commands */
-            station: 'ui_action',
+            /**
+             * station='ui_action' is the sentinel that routes this row to
+             * processUIActionCommand() in useCWFCommandListener.
+             * SOURCE OF TRUTH: CWF_UI_ACTION_STATION_SENTINEL in uiTelemetry.ts
+             */
+            station: CWF_UI_ACTION_STATION,
+            /** action_type stored in the parameter column (repurposed for UI actions) */
             parameter: args.action_type,
-            /** action_value stored in reason field — repurposed for UI context */
+            /** Numeric value fields are 0 for UI actions (no before/after param value) */
             old_value: 0,
             new_value: 0,
-            reason: `${args.reason}${args.action_value ? ` | value: ${args.action_value}` : ''}`,
+            /**
+             * action_value is encoded into the reason field after the separator.
+             * CWF_UI_VALUE_SEP mirrors CWF_UI_ACTION_VALUE_SEPARATOR in uiTelemetry.ts.
+             * Format: "<reason> | value: <action_value>" (omitted when action_value absent)
+             */
+            reason: `${args.reason}${args.action_value ? ` ${CWF_UI_VALUE_SEP} ${args.action_value}` : ''}`,
+            /** User's authorization code — validated in Step 1 */
             authorized_by: args.authorized_by,
+            /** Initial status — browser listener moves this to 'applied' or 'rejected' */
             status: 'pending',
         })
         .select()

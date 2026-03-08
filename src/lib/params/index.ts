@@ -33,3 +33,6 @@ export * from './jamConfig';
 export * from './oeeHierarchyTable';
 /** CWF command queue: auth code, parameter ranges, validation helpers */
 export * from './cwfCommands';
+/** UI Telemetry queue config + CWF UI action types, ACK timing, and sentinel values */
+export * from './uiTelemetry';
+
