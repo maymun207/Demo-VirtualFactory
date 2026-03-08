@@ -1,0 +1,4 @@
+work_order_id,label,lot_id,order_id,order_tile_count,actual_tile_count,recipe_id,recipe_name,normal_tile_color,defected_tile_color,description_en,description_tr
+WorkID#1,WorkID #1,LOT-2026-001,ORD-7845,500,530,CeramID WEY,CeramID WEY,#F5F0E8,#E8820C,Produced tiles will be ivory cream colour — defected tiles will be orange,Üretilen karoların rengi fildişi krem rengi olacak — defected olarak işaretlenen karoların rengi turuncu olacak
+WorkID#2,WorkID #2,LOT-2026-002,ORD-8210,800,850,CeramID REY,CeramID REY,#9CA3AF,#E8820C,Produced tiles will be grey — defected tiles will be orange,Üretilen karoların rengi gri olacak — defected olarak işaretlenen karoların rengi turuncu olacak
+WorkID#3,WorkID #3,LOT-2026-003,ORD-9033,1000,1100,CeramID OEY,CeramID OEY,#2ECC71,#E8820C,Produced tiles will be green — defected tiles will be orange,Üretilen karoların rengi yeşil olacak — defected olarak işaretlenen karoların rengi turuncu olacak
