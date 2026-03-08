@@ -620,13 +620,15 @@ describe('Zustand ↔ Supabase Table Sync Consistency', () => {
             '20260303_simulation_events.sql',
             // 2026-03-08: Add 5 behavioral param columns to conveyor_states (Option-A)
             '20260308_conveyor_param_columns.sql',
+            // 2026-03-08: CWF Phase 2 — UI telemetry events table for behavioral analytics
+            '20260308120000_ui_telemetry_events.sql',
         ];
 
         it('should have exactly the expected number of migration files', () => {
             /**
              * Ensures no migration files are accidentally added or deleted
              * without updating this test.
-             * COUNT: 12 (was 11 before 20260308_conveyor_param_columns.sql was added)
+             * COUNT: 13 (was 12 before 20260308120000_ui_telemetry_events.sql was added)
              */
             const files = getMigrationFileNames();
             expect(
