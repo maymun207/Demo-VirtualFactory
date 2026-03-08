@@ -99,32 +99,37 @@ const CWF_RETRY_PROMPT_FINGERPRINT = 'Answer NOW using all the data';
  * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_AUTH_FAST_PATH_PROMPT_EN
  */
 const CWF_AUTH_FAST_PATH_PROMPT_EN = `
-## ⚡ AUTHORIZATION TURN — FAST PATH REQUIRED
+## ⚡ AUTHORIZATION TURN — EXECUTE NOW
 
-The user has just provided their authorization code. This is an authorization confirmation turn for a machine parameter change.
+The user has just provided their authorization response. This is the execution step for a pending machine parameter change.
 
-**You MUST:**
-1. Execute the SINGLE pending update_parameter call immediately using the authorization code the user just provided.
-2. Do NOT query the database again — you already have the current values from the previous turn.
-3. Do NOT ask any further questions — the user has already confirmed "yes" and provided auth.
-4. Make exactly ONE tool call (update_parameter), then provide a brief confirmation message.
+**YOU MUST do exactly this, in order:**
+1. Call update_parameter ONCE, immediately, using:
+   - All parameter values (station, parameter, old_value, new_value, reason) from the conversation history above
+   - authorized_by = the exact text the user just typed (verbatim, no modifications)
+2. Do NOT query the database again — you already have the values.
+3. Do NOT evaluate whether the auth code looks correct — call the tool and the server validates.
+4. Do NOT generate any text before the tool call — just call the tool.
+5. After the tool returns, report the result in one line.
 
-The pending parameter change and all required context are already in the conversation history above.
+Example: if the user typed "airtk", call update_parameter with authorized_by="airtk" immediately.
 `;
 
-/** Turkish variant of the auth fast-path prompt */
 const CWF_AUTH_FAST_PATH_PROMPT_TR = `
-## ⚡ YETKİLENDİRME TURU — HIZLI YOL GEREKLİ
+## ⚡ YETKİLENDİRME TURU — HEMEN UYGULA
 
-Kullanıcı yetkisini az önce sağladı. Bu bir makine parametre değişikliği için yetkilendirme onay turudur.
+Kullanıcı yetkisini az önce sağladı. Bu bekleyen makine parametre değişikliği için uygulama adımıdır.
 
-**YAPMANIZ GEREKENLER:**
-1. Kullanıcının az önce sağladığı yetkilendirme koduyla bekleyen TEK update_parameter işlemini hemen uygulayın.
-2. Veritabanını tekrar sorgulamayın — mevcut değerleri önceki turdan zaten biliyorsunuz.
-3. Daha fazla soru sormayın — kullanıcı "evet" dedi ve yetki verdi.
-4. TAM OLARAK BİR araç çağrısı yapın (update_parameter), ardından kısa bir onay mesajı verin.
+**BU SIRAYA GÖRE YAPMANIZ GEREKENLER:**
+1. update_parameter'ı hemen, bir kez çağırın:
+   - Tüm parametre değerlerini (station, parameter, old_value, new_value, reason) yukarıdaki konuşma geçmişinden alın
+   - authorized_by = kullanıcının yazdığı tam metin (değiştirmeden)
+2. Veritabanını tekrar sorgulamayın — değerlere zaten sahipsiniz.
+3. Yetki kodunun doğru görünüp görünmediğini değerlendirmeyin — aracı çağırın, sunucu doğrular.
+4. Araç çağrısından önce herhangi bir metin oluşturmayın — sadece aracı çağırın.
+5. Araç döndükten sonra sonucu tek satırda raporlayın.
 
-Bekleyen parametre değişikliği ve gerekli tüm bağlam yukarıdaki konuşma geçmişinde mevcuttur.
+Örnek: kullanıcı "airtk" yazdıysa, hemen authorized_by="airtk" ile update_parameter'ı çağırın.
 `;
 
 // =============================================================================
@@ -1866,21 +1871,21 @@ When the machine health analysis reveals ⚠️ out-of-range parameters, you SHO
   "Please enter your authorization ID to confirm. You have 20 seconds.
 
   *For demo purposes, use \"airtk\" as the authorization code.*"
-- The ONLY valid authorization ID is: ${CWF_AUTH_CODE}
-- If the user provides a WRONG ID, respond EXACTLY:
-  "❌ Incorrect credentials, action is terminated."
-- If the user doesn't respond (timeout handled by frontend), the action is terminated.
-- Do NOT proceed without a valid ID. Do NOT retry. The action is FINAL.
+- Then WAIT. The next user message will be their authorization code.
 
-### Step 3 — EXECUTE
-- Only after receiving the correct authorization ID, call update_parameter for EACH change.
+### Step 3 — EXECUTE (immediately after the user sends any text in response to Step 2)
+- When the user sends their authorization response, call update_parameter IMMEDIATELY.
+- Use the EXACT text the user typed as the 'authorized_by' parameter — pass it verbatim, no changes.
+- The SERVER will validate the code. Do NOT validate it yourself. Do NOT check if it looks correct. Just call the tool.
 - Make ONE update_parameter call PER parameter — do NOT batch them.
-- After execution, report the results:
-  "✅ [Station] [Parameter] changed from [old] → [new] ([reason])"
-- After ALL changes are applied, say: "All [N] parameter corrections have been applied. Resume the simulation to see the effects on tile quality."
+- Do NOT query the database again before calling update_parameter — you already have old_value and new_value from the proposal.
+- After execution, report the server's result:
+  - If success: "✅ [Station] [Parameter] changed from [old] → [new] ([reason])"
+  - If rejected by server: report the error the server returns.
+- After ALL changes are applied, say: "All [N] parameter corrections have been applied."
 
-**NEVER skip steps. NEVER call update_parameter without BOTH explicit user approval AND a valid authorization ID.**
-**If credentials are wrong: "❌ Incorrect credentials, action is terminated." — stop immediately.**
+**NEVER call update_parameter without BOTH explicit user approval AND receiving their auth response.**
+**NEVER validate the auth code yourself — always pass it to the server via update_parameter and report what the server says.**
 
 ## CWF IMPACT REPORT — Before vs After Analysis
 
