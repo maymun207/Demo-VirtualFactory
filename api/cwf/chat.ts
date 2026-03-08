@@ -632,11 +632,25 @@ async function getSimulationSummary(
     );
 
     if (!rpcError && rpcData) {
-        return rpcData;
+        // Augment the RPC result with the latest OEE snapshot (not included in get_simulation_stats).
+        // oee_snapshots is the single source of truth for all 8 machine OEEs, 3 line OEEs, and FOEE.
+        const { data: oeeData } = await supabase
+            .from('oee_snapshots')
+            .select(
+                'foee, loee_line1, loee_line2, loee_line3, ' +
+                'moee_press, moee_dryer, moee_glaze, moee_digital, ' +
+                'moee_conveyor, moee_kiln, moee_sorting, moee_packaging, sim_tick'
+            )
+            .eq('simulation_id', simulationId)
+            .order('sim_tick', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        return { ...rpcData, latest_oee: oeeData ?? null };
     }
 
     // Fallback: individual queries (works before STEP-4 migration is applied)
-    const [sessionRes, tilesRes, scenarioRes, metricsRes, eventsRes] = await Promise.all([
+    const [sessionRes, tilesRes, scenarioRes, metricsRes, eventsRes, oeeRes] = await Promise.all([
         supabase
             .from('simulation_sessions')
             .select('*')
@@ -665,6 +679,18 @@ async function getSimulationSummary(
             .eq('simulation_id', simulationId)
             .order('sim_tick', { ascending: false })
             .limit(10),
+        /** Fetch latest OEE snapshot for all 8 machine OEEs and 3 line OEEs */
+        supabase
+            .from('oee_snapshots')
+            .select(
+                'foee, loee_line1, loee_line2, loee_line3, ' +
+                'moee_press, moee_dryer, moee_glaze, moee_digital, ' +
+                'moee_conveyor, moee_kiln, moee_sorting, moee_packaging, sim_tick'
+            )
+            .eq('simulation_id', simulationId)
+            .order('sim_tick', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
     ]);
 
     /** Tile grade distribution counters */
@@ -684,6 +710,8 @@ async function getSimulationSummary(
         total_tiles: tilesRes.data?.length ?? 0,
         active_scenario: scenarioRes.data?.[0] ?? null,
         latest_metrics: metricsRes.data?.[0] ?? null,
+        /** Full OEE snapshot: all 8 MOEEs, 3 LOEEs, FOEE */
+        latest_oee: oeeRes.data ?? null,
         /** Number of manual stop/force-stop events during this simulation */
         stop_resume_cycles: eventsRes.data?.filter(
             (e: { event_type: string }) =>
@@ -1114,6 +1142,29 @@ FOEE = J / min(A, B) — anchored to the bottleneck
 
 ### Diagnostic approach:
 When asked about OEE, trace: FOEE → weakest LOEE → weakest MOEE → P vs Q
+
+### MANDATORY OEE PRODUCTION SUMMARY FORMAT:
+Whenever asked for a production summary, overall OEE, or factory performance, you MUST include ALL of the following. The get_simulation_summary response includes a "latest_oee" object with all the values — use them directly:
+
+**Factory OEE:**
+- Factory OEE (FOEE): [foee]%
+
+**Line OEEs:**
+- Line 1 (Forming & Finishing): [loee_line1]%
+- Line 2 (Firing & Dispatch): [loee_line2]%
+- Line 3 (Conveyor): [loee_line3]%   ← YOU MUST ALWAYS INCLUDE THIS
+
+**Machine OEEs:**
+- Press: [moee_press]%
+- Dryer: [moee_dryer]%
+- Glaze: [moee_glaze]%
+- Digital Printer: [moee_digital]%
+- **Conveyor: [moee_conveyor]%**   ← YOU MUST ALWAYS INCLUDE THIS
+- Kiln: [moee_kiln]%
+- Sorting: [moee_sorting]%
+- Packaging: [moee_packaging]%
+
+⚠️ NEVER omit the Conveyor machine OEE or Line 3 OEE from a production summary. They are a critical part of the 8-machine OEE hierarchy and must always appear.
 
 ### IMPORTANT — OEE Data Timing:
 OEE data in the database comes from periodic snapshots (captured every ~10 seconds).
