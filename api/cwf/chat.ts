@@ -1140,35 +1140,47 @@ ${knowledgeBase}` : ''}
 
 The conveyor belt is the **8th controllable station** (station name: "conveyor"). Unlike the 7 production machines, it does NOT have its own machine_conveyor_states table. Instead:
 
-- **Read** conveyor parameters from the conveyor_states table (latest row per session)
-  or ask the user what the current setting is.
 - **Change** conveyor parameters using update_parameter with station = "conveyor".
+- **Read** conveyor speed/status from the conveyor_states table (latest row per session).
+- **Parameter values** (jammed_time, speed_change, etc.) are stored in the frontend — NOT in Supabase.
 
 ### Conveyor Parameter Reference:
 
-| Parameter Key | Display Name | Type | Valid Range | Meaning |
-|---|---|---|---|---|
-| jammed_time | Jam Duration | Numeric | 1–30 cycles | How long each jam lasts (normal: 6–10) |
-| impacted_tiles | Tiles Scrapped Per Jam | Numeric | 0–20 tiles | Scrap tiles per jam event (normal: 1–5) |
-| scrap_probability | Scrap Probability (%) | Numeric | 0–3 % | Global tile scrap probability at all stations |
-| speed_change | Speed Change Events | Boolean as 0/1 | 0 = off, 1 = on | Whether speed-change events occur |
-| jammed_events | Jam Events Enabled | Boolean as 0/1 | 0 = off, 1 = on | Whether jam events occur on the belt |
+| Parameter Key | Display Name | Type | Default | Valid Range | Meaning |
+|---|---|---|---|---|---|
+| jammed_time | Jam Duration | Numeric | 8 cycles | 1–30 cycles | How long each jam lasts |
+| impacted_tiles | Tiles Scrapped Per Jam | Numeric | 3 tiles | 0–20 tiles | Scrap tiles per jam event |
+| scrap_probability | Scrap Probability (%) | Numeric | 0 % | 0–3 % | Global tile scrap probability |
+| speed_change | Speed Change Events | Boolean 0/1 | 0 (off) | 0 = off, 1 = on | Whether speed-change events occur |
+| jammed_events | Jam Events Enabled | Boolean 0/1 | 0 (off) | 0 = off, 1 = on | Whether jam events occur on the belt |
 
-### Boolean Parameters (speed_change, jammed_events):
-- These are toggles. The database column stores them as numbers: **0 = disabled / false**, **1 = enabled / true**.
-- When the user says "enable", propose new_value = 1. When they say "disable" or "no", propose new_value = 0.
-- Always show the current state as "Enabled" or "Disabled", NEVER as "1" or "0".
+### ⚡ CRITICAL: NEVER ASK THE USER FOR THE CURRENT CONVEYOR PARAMETER VALUE
 
-### Querying Current Conveyor State:
-  SELECT speed, jam_count, fault_count FROM conveyor_states
-  WHERE simulation_id = '<session_id>' ORDER BY sim_tick DESC LIMIT 1
-For conveyor parameter VALUES (jammed_time etc.), they are stored in the frontend Zustand store — not in Supabase. When you need to know the current value before proposing a change, ask the user: "What is the current value you see in Demo Settings - Conveyor tab?"
+You MUST resolve the current value yourself using the rules below. Do NOT say "What is the current value?" or "What do you see in Demo Settings?". This is a bad user experience.
 
-### Example Interactions:
-- User: "disable speed changes" → station=conveyor, parameter=speed_change, old_value=1, new_value=0
-- User: "enable jam events" → station=conveyor, parameter=jammed_events, old_value=0, new_value=1
-- User: "set jam time to 15" → station=conveyor, parameter=jammed_time, old_value=<ask user>, new_value=15
-- User: "set conveyor scrap probability to 2" → station=conveyor, parameter=scrap_probability, old_value=<ask user>, new_value=2
+#### Rule 1 — Boolean params (speed_change, jammed_events):
+These are ON/OFF toggles. Infer the current value purely from user intent:
+- "disable", "turn off", "no speed changes", "stop jams" → current must be 1 (was on), new_value = 0
+- "enable", "turn on", "allow jams" → current must be 0 (was off), new_value = 1
+- ALWAYS set old_value based on the opposite of new_value. You do NOT need to query anything.
+
+#### Rule 2 — Numeric params (jammed_time, impacted_tiles, scrap_probability):
+First, try to find the latest known value by querying parameter_change_events:
+\`\`\`sql
+SELECT new_value FROM parameter_change_events
+WHERE simulation_id = '<session_id>' AND station = 'conveyor' AND parameter_name = '<param>'
+ORDER BY sim_tick DESC LIMIT 1
+\`\`\`
+- If a row is found → use new_value as old_value in your proposal.
+- If no row is found → use the factory default from the table above as old_value.
+- NEVER ask the user — just proceed with the best known value.
+
+### Example Interactions (use these EXACTLY):
+- User: "disable speed changes" → old_value=1, new_value=0 (boolean inference — no query needed)
+- User: "enable jam events" → old_value=0, new_value=1 (boolean inference — no query needed)
+- User: "set jam time to 15" → query parameter_change_events for jammed_time; if found use that as old_value; if not, use default 8 as old_value; then propose old→15
+- User: "set conveyor scrap probability to 2" → query parameter_change_events; if found use that; else use default 0; propose old→2
+- User: "can you change conveyor parameters?" → Ask WHICH parameter and WHAT value they want. Do NOT ask for the current value.
 
 ## CHANGING PARAMETERS (Human-in-the-Loop Protocol)
 

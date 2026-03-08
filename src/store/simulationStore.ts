@@ -39,12 +39,12 @@ import {
 import type { JamLocation } from '../lib/params';
 import { eventBus } from '../lib/eventBus';
 import { logSimulationEvent } from '../services/simulationEventLogger';
-// Static import of the sync accessor exported by simulationDataStore.
-// This is safe because this symbol is only *called* inside queueMicrotask
-// callbacks, which run after both stores are fully initialised on the module
-// registry — never during the synchronous module-init phase that would cause
-// the circular-dependency problem.
-import { getActiveSessionIdSync } from './simulationDataStore';
+// Import the session ID accessor from the NEUTRAL bridge module (sessionAccessor.ts).
+// This avoids a circular static import:
+//   simulationStore → simulationDataStore → simulationStore (getState)
+// The bridge has NO top-level store imports — it only holds a getter function
+// registered by simulationDataStore after it is fully initialised.
+import { getActiveSessionId } from './sessionAccessor';
 
 
 
@@ -408,7 +408,7 @@ export const useSimulationStore = create<SimulationState>()(
       queueMicrotask(() => {
         const next = useSimulationStore.getState();
         // getActiveSessionIdSync is safe here: called after module init.
-        const simId = getActiveSessionIdSync();
+        const simId = getActiveSessionId();
         if (!simId) return; /** No active session — skip logging */
         const tick = next.sClockCount;
 
@@ -454,7 +454,7 @@ export const useSimulationStore = create<SimulationState>()(
         queueMicrotask(() => {
           const { sClockCount, pClockCount } = useSimulationStore.getState();
           // Synchronous call — safe inside queueMicrotask.
-          const simId = getActiveSessionIdSync();
+          const simId = getActiveSessionId();
           if (simId) logSimulationEvent(simId, sClockCount, 'stopped', { pClockCount });
         });
       }
@@ -478,7 +478,7 @@ export const useSimulationStore = create<SimulationState>()(
       queueMicrotask(() => {
         const { sClockCount, pClockCount } = useSimulationStore.getState();
         // Synchronous call — safe inside queueMicrotask.
-        const simId = getActiveSessionIdSync();
+        const simId = getActiveSessionId();
         if (simId) logSimulationEvent(simId, sClockCount, 'drain_completed', { pClockCount });
       });
     },
@@ -776,7 +776,7 @@ export const useSimulationStore = create<SimulationState>()(
        *  queueMicrotask ensures the store is settled before reading session ID. */
       queueMicrotask(() => {
         // Synchronous call — safe inside queueMicrotask.
-        const simId = getActiveSessionIdSync();
+        const simId = getActiveSessionId();
         if (simId) logSimulationEvent(simId, sClockCount, 'reset', { pClockCount });
       });
     },
