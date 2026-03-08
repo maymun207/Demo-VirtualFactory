@@ -206,27 +206,52 @@ export function countStationExits(
  *
  * Line 1 machines reference theoretical rate A (press capacity).
  * Line 2 machines reference theoretical rate B (kiln capacity).
- * Conveyor Performance is speed-dependent:
- *   P_conveyor = clamp(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED, 0, 1)
- *   A belt running slower than the nominal speed has P < 1.0.
- *   Running faster than nominal is capped at P = 1.0.
  *
- * @param c             - Station counts from countStationExits()
- * @param conveyorSpeed - Current belt speed from simulationStore (live value)
+ * Conveyor uses the full 3-component OEE model:
+ *   A (Availability) = fraction of ticks NOT jammed  [0–1]
+ *   P (Performance)  = actual speed / nominal speed   [0–1]
+ *   Q (Quality)      = G_clean / G (transit yield)    [0–1]
+ *   MOEE = A × P × Q × 100
+ *
+ *   During a jam:  A drops each tick → MOEE falls continuously
+ *   During slow:   P drops with speed → MOEE falls
+ *   During damage: Q drops (G_clean < G) → MOEE falls
+ *
+ * @param c                    - Station counts from countStationExits()
+ * @param conveyorSpeed        - Current belt speed (live, from simulationStore)
+ * @param conveyorAvailability - Fraction of ticks belt was NOT jammed (0-1)
  * @returns Array of 8 MachineOEE objects in production order
  */
-export function calculateAllMOEEs(c: StationCounts, conveyorSpeed: number): MachineOEE[] {
+export function calculateAllMOEEs(
+    c: StationCounts,
+    conveyorSpeed: number,
+    conveyorAvailability: number,
+): MachineOEE[] {
     /** A = press theoretical output for elapsed time */
     const A = c.theoreticalA;
     /** B = kiln theoretical output for elapsed time */
     const B = c.theoreticalB;
 
     /**
-     * Conveyor Performance = ratio of actual speed to the nominal (design) speed.
-     * If the belt runs slower than CONVEYOR_OEE_NOMINAL_SPEED, performance drops.
-     * Clamped to [0, 1] so excess speed never inflates OEE above 100%.
+     * Conveyor Availability (A): fraction of elapsed ticks the belt was running
+     * (not jammed). Tracked externally in useKPISync via jam-tick counters.
+     * A = 1.0 when never jammed; drops toward 0 as jam time accumulates.
+     */
+    const conveyorA = clamp01(conveyorAvailability);
+
+    /**
+     * Conveyor Performance (P): ratio of actual speed to the nominal design speed.
+     * Below nominal → P < 1.0 (slower belt = reduced throughput).
+     * Above nominal → capped at 1.0 (excess speed doesn’t inflate OEE).
      */
     const conveyorP = clamp01(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED);
+
+    /**
+     * Combined Availability × Performance factor for the conveyor.
+     * This is stored in the MachineOEE.performance field so the standard
+     * oee = performance × quality formula gives A × P × Q.
+     */
+    const conveyorAP = conveyorA * conveyorP;
 
     const machines: MachineOEE[] = [
         // ── LINE 1 machines (reference rate A) ──────────────────────
@@ -271,18 +296,20 @@ export function calculateAllMOEEs(c: StationCounts, conveyorSpeed: number): Mach
             scrappedHere: c.perStation.printer.scrappedHere,
         },
 
-        // ── LINE 3 (Conveyor — speed-dependent P, yield Q) ────────
+        // ── LINE 3 (Conveyor — full 3-component OEE: A × P × Q) ───
         {
             machineId: 'conveyor',
             name: OEE_MACHINE_NAMES.conveyor,
             /**
-             * P = currentSpeed / CONVEYOR_OEE_NOMINAL_SPEED  (capped at 1.0)
+             * performance = A × P (combined into single field).
+             * oee = performance × quality = A × P × Q × 100.
              *
-             * When the belt slows below the nominal operating speed (1.5×),
-             * throughput drops proportionally → P < 1.0.
-             * Running faster than nominal is capped at 1.0 (no OEE inflation).
+             * A = conveyorAvailability: fraction of ticks NOT jammed.
+             *   → during a jam, A falls each tick, making OEE drop continuously.
+             * P = speed / nominal: reduced throughput at low speeds.
+             *   → slow belt reduces OEE proportionally.
              */
-            performance: conveyorP,                                    // P = speed ratio
+            performance: conveyorAP,                                           // A × P combined
             /**
              * Q = G_clean / G   (denominator = kilnInput, NOT digitalOutput)
              *
@@ -290,8 +317,8 @@ export function calculateAllMOEEs(c: StationCounts, conveyorSpeed: number): Mach
              * Using digitalOutput (F) would include in-transit tiles in the
              * denominator, making Q artificially low mid-simulation.
              */
-            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)), // Q = G_clean / G
-            oee: 0, // calculated below from P × Q
+            quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)),     // Q = G_clean / G
+            oee: 0, // calculated below: conveyorAP × Q × 100 = A × P × Q × 100
             actualInput: c.kilnInput,          // G — tiles that completed transit
             actualOutput: c.conveyorCleanOutput,
             /** Use passport-derived count to avoid double-counting at sorting */
@@ -350,14 +377,16 @@ export function calculateAllMOEEs(c: StationCounts, conveyorSpeed: number): Mach
  * Each line OEE telescopes: intermediate variables cancel out.
  *   Line 1: LOEE = F / A (digital output / press theoretical)
  *   Line 2: LOEE = J / B (packaging output / kiln theoretical)
- *   Line 3: LOEE = P_speed × (G_clean / G)
- *           where P_speed = clamp(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED, 0, 1)
- *           and denominator G = kilnInput (completed conveyor transits only)
+ *   Line 3: LOEE = A × P × Q
+ *           A = conveyorAvailability (fraction of ticks NOT jammed)
+ *           P = clamp(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED, 0, 1)
+ *           Q = G_clean / G (kilnInput — completed transits only)
  *
- * @param c              - Station counts
- * @param moees          - All 8 machine OEEs (for grouping into lines)
- * @param cumulativeEnergy - Cumulative per-station energy from kpiStore
- * @param conveyorSpeed  - Current belt speed from simulationStore
+ * @param c                    - Station counts
+ * @param moees                - All 8 machine OEEs (for grouping into lines)
+ * @param cumulativeEnergy     - Cumulative per-station energy from kpiStore
+ * @param conveyorSpeed        - Current belt speed from simulationStore
+ * @param conveyorAvailability - Fraction of ticks belt was NOT jammed (0-1)
  * @returns Array of 3 LineOEE objects
  */
 export function calculateAllLOEEs(
@@ -365,6 +394,7 @@ export function calculateAllLOEEs(
     moees: MachineOEE[],
     cumulativeEnergy: Record<string, { kWh: number; gas: number; co2: number }>,
     conveyorSpeed: number,
+    conveyorAvailability: number,
 ): LineOEE[] {
     /**
      * Aggregate energy totals for a set of station IDs.
@@ -400,11 +430,11 @@ export function calculateAllLOEEs(
     const B = c.theoreticalB;
 
     /**
-     * Conveyor belt speed ratio, mirroring calculateAllMOEEs.
-     * P_conveyor = clamp(currentSpeed / nominalSpeed, 0, 1).
-     * Below nominal -> P < 1.0 -> Line 3 LOEE drops accordingly.
+     * Conveyor combined Availability × Performance factor, mirrors calculateAllMOEEs.
+     * A = availability fraction; P = speed ratio.
+     * conveyorAP drops when jammed (A decreases) or when speed is slow (P decreases).
      */
-    const conveyorP = clamp01(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED);
+    const conveyorAP = clamp01(conveyorAvailability) * clamp01(conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED);
 
 
     return [
@@ -428,15 +458,18 @@ export function calculateAllLOEEs(
             machines: filterMOEEs(LINE_DEFINITIONS.line2.stations),
             energy: aggregateEnergy(LINE_DEFINITIONS.line2.stations, c.packagingOutput),
         },
-        // Line 3: LOEE = P_speed × Q_yield  (speed-based performance × transit quality)
+        // Line 3: LOEE = A × P × Q  (availability × speed × transit quality)
         {
             lineId: LINE_DEFINITIONS.line3.id,
             name: LINE_DEFINITIONS.line3.name,
             /**
-             * P = conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED (capped at 1.0).
-             * Mirrors the conveyor MOEE performance calculation.
+             * performance = A × P (combined).
+             * A = availability (fraction of ticks not jammed).
+             * P = conveyorSpeed / CONVEYOR_OEE_NOMINAL_SPEED (speed ratio).
+             * During a jam: A drops each tick → LOEE falls continuously.
+             * During slow speed: P drops → LOEE falls.
              */
-            performance: conveyorP,                                                    // speed ratio
+            performance: conveyorAP,                                                    // A × P
             /**
              * Q = G_clean / G   (denominator = kilnInput, not digitalOutput)
              *
@@ -445,7 +478,7 @@ export function calculateAllLOEEs(
              * G only counts completed transits, giving accurate per-tick Q.
              */
             quality: clamp01(safeDiv(c.conveyorCleanOutput, c.kilnInput)),             // G_clean / G
-            oee: Math.min(100, conveyorP * safeDiv(c.conveyorCleanOutput, c.kilnInput) * 100), // P × Q × 100
+            oee: Math.min(100, conveyorAP * safeDiv(c.conveyorCleanOutput, c.kilnInput) * 100), // A × P × Q × 100
             machines: filterMOEEs(LINE_DEFINITIONS.line3.stations),
             energy: aggregateEnergy(['conveyor'], c.conveyorCleanOutput),
         },

@@ -55,6 +55,20 @@ export function useKPISync() {
    */
   const prevSClockRef = useRef(0);
 
+  /**
+   * Cumulative count of all S-Clock ticks since simulation start.
+   * Used as the denominator for conveyor availability calculation.
+   * Resets on factory reset (sClockCount goes to 0).
+   */
+  const totalConveyorTicksRef = useRef(0);
+
+  /**
+   * Cumulative count of S-Clock ticks when conveyorStatus was 'jammed'.
+   * Availability = 1 - (jamTicks / totalTicks).
+   * Resets on factory reset (sClockCount goes to 0).
+   */
+  const jamConveyorTicksRef = useRef(0);
+
   useEffect(() => {
     // Subscribe to sClockCount changes in simulationStore
     const unsub = useSimulationStore.subscribe(
@@ -63,12 +77,28 @@ export function useKPISync() {
         // Guard: skip if clock hasn't advanced (or was reset)
         if (sClockCount <= prevSClockRef.current) {
           prevSClockRef.current = sClockCount;
+          // Full reset detected — clear conveyor availability counters
+          if (sClockCount === 0) {
+            totalConveyorTicksRef.current = 0;
+            jamConveyorTicksRef.current = 0;
+          }
           return;
         }
         prevSClockRef.current = sClockCount;
 
         // ── Read current state from both stores ──────────────────
         const simState = useSimulationStore.getState();
+
+        // ── Conveyor Availability Tracking ───────────────────────
+        // Count every tick that elapses. Count jammed ticks separately.
+        // Availability = fraction of ticks the belt was NOT jammed.
+        totalConveyorTicksRef.current += 1;
+        if (simState.conveyorStatus === 'jammed') {
+          jamConveyorTicksRef.current += 1;
+        }
+        const conveyorAvailability = totalConveyorTicksRef.current > 0
+          ? 1 - (jamConveyorTicksRef.current / totalConveyorTicksRef.current)
+          : 1.0;
         const kpiState = useKPIStore.getState();
 
         // Production is "active" only when data flows AND conveyor runs
@@ -137,8 +167,11 @@ export function useKPISync() {
         // Step 4: Calculate hierarchical OEE (Machine → Line → Factory)
         // Pass the live conveyorSpeed so the belt's Performance (P) component
         // reflects the actual belt speed relative to the nominal design speed.
-        const moees = calculateAllMOEEs(stationCounts, simState.conveyorSpeed);
-        const loees = calculateAllLOEEs(stationCounts, moees, newCumEnergy, simState.conveyorSpeed);
+        // Pass conveyorAvailability (A) so jam events reduce conveyor OEE
+        // exactly as they reduce other machines (whose theoretical output
+        // keeps growing while actual output freezes during a jam).
+        const moees = calculateAllMOEEs(stationCounts, simState.conveyorSpeed, conveyorAvailability);
+        const loees = calculateAllLOEEs(stationCounts, moees, newCumEnergy, simState.conveyorSpeed, conveyorAvailability);
         const foee = calculateFOEE(stationCounts, loees, newCumEnergy);
 
         // Step 5: Use FOEE as the OEE value for the KPI card (replaces legacy formula)
