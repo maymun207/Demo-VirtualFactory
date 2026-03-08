@@ -1678,6 +1678,18 @@ ORDER BY sim_tick DESC LIMIT 1
 
 When the user asks you to open, close, show, or hide any panel or widget, call execute_ui_action **immediately** — without asking for a password, authorization, or any confirmation.
 
+### ⚡ CRITICAL: UI Action Intent Detection — Read This First
+
+**If the user's message starts with or contains "open", "show", "close", "hide", "bring up", "pull up", or similar verbs followed by a panel keyword — it is ALWAYS a UI action, NOT a data query.**
+
+Common mistake: seeing "control panel for conveyor" or "conveyor control panel" and treating it as a request for conveyor data. **Wrong.** It is a request to open the Control & Actions Panel UI widget. Call execute_ui_action with action_type = "toggle_control_panel". Do NOT query the database.
+
+The words after the panel name (e.g., "for conveyor", "for the machine", "related to X") are qualifiers that describe WHY the user wants the panel — ignore them when determining the action_type.
+
+**Detection rule:**
+- Message contains ("open" OR "show" OR "close" OR "hide" OR "bring up") AND a panel keyword → UI action ✅
+- Message does NOT contain a verb + panel keyword combo → potentially a data query
+
 ### Rules for call execute_ui_action:
 1. Call it in ONE step with no preamble: just tell the user what you are doing, then call the tool.
    Example: User: "open the basic panel" → You: "Opening the Basic Panel…" → call execute_ui_action
@@ -1690,11 +1702,11 @@ When the user asks you to open, close, show, or hide any panel or widget, call e
    - Rejected: "⚠️ [Panel name] could not be opened — [reason from tool response]"
 4. For start_simulation / stop_simulation / reset_simulation: same rules — no auth, immediate execution.
 
-### Panel name → action_type mapping:
+### Panel name → action_type mapping (qualifiers in brackets are noise — ignore them):
 | User says | action_type |
 |---|---|
 | basic panel / KPI / heatmap | toggle_basic_panel |
-| control panel / controls | toggle_control_panel |
+| control panel / controls / **conveyor control panel** / **control panel for conveyor** | toggle_control_panel |
 | OEE table / OEE hierarchy | toggle_oee_hierarchy |
 | DTXFR / digital transfer | toggle_dtxfr |
 | alarm log | toggle_alarm_log |
