@@ -2,20 +2,32 @@
  * useDraggablePanel.ts — Shared Drag & Resize Behavior for Floating Panels
  *
  * Provides position, size, and mouse/touch event handlers for any floating
- * panel (TilePassport, KPIContainer, DefectHeatmap). Panels are
+ * panel (TilePassport, KPIContainer, DefectHeatmap, ControlPanel). Panels are
  * positioned with a cascade layout (each subsequent panel offset to
  * the right) and are kept within safe viewport bounds at all times.
  *
  * Architecture:
  *  - Uses TOP/LEFT absolute positioning for header clearance.
- *  - Each panel receives a `panelIndex` (0, 1, 2) for cascade layout.
+ *  - Each panel receives a `panelIndex` (0, 1, 2, 3) for cascade layout.
  *  - Clamping prevents panels from overlapping the header or leaving viewport.
- *  - On mobile (<640px), panels stack vertically at full viewport width.
+ *  - On mobile (<640px), panels stack vertically at full content-area width.
  *  - Resize is optional (controlled via `resizable` parameter).
  *  - Full touch support: touchstart/touchmove/touchend mirror mouse events.
  *    Touch events use { passive: false } to block page scroll while dragging.
  *
- * Used by: DraggablePanel.tsx (which wraps TilePassport, KPIContainer, DefectHeatmap)
+ * --- Content-Area-Aware Positioning (Fix 3) ---
+ *  Docked side panels (CWF on the right, DTXFR and Basic on the left) reduce
+ *  the visible content area. All position calculations now use the effective
+ *  content boundaries (contentLeft … contentRight) so that floating panels
+ *  always cascade inside the visible area, never behind a side panel.
+ *
+ *  computeContentArea() reads the live uiStore state to derive these bounds.
+ *  The hook subscribes to the relevant uiStore fields so that any panel
+ *  change (open/close, resize) automatically triggers a recompute — exactly
+ *  the same as a window resize does.
+ *
+ * Used by: DraggablePanel.tsx (which wraps TilePassport, KPIContainer,
+ *          DefectHeatmap, ControlPanel)
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -35,7 +47,10 @@ import {
   PANEL_FONT_SCALE_MIN,
   PANEL_FONT_SCALE_MAX,
   PANEL_FONT_SCALE_EXPONENT,
+  PANEL_GAP,
+  PANEL_SIDE_REFLOW_DELAY_MS,
 } from '../lib/params';
+import { useUIStore } from '../store/uiStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +60,14 @@ interface PanelPosition {
   top: number;
   /** Distance from viewport left edge (px) */
   left: number;
+}
+
+/** Effective left/right pixel boundaries of the visible content area */
+interface ContentArea {
+  /** Left edge (px from viewport left) — accounts for DTXFR + Basic panels */
+  contentLeft: number;
+  /** Right edge (px from viewport left) — accounts for CWF panel */
+  contentRight: number;
 }
 
 /** Return value of useDraggablePanel hook */
@@ -70,6 +93,33 @@ interface DraggablePanelResult {
   fontScale: number;
 }
 
+// ─── Content-Area Helper ─────────────────────────────────────────────────────
+
+/**
+ * computeContentArea — Derive content-area boundaries from live side-panel state.
+ *
+ * Reads the uiStore directly via getState() (NOT a hook) so it is safe to call
+ * from event handlers and resize callbacks outside of render cycles.
+ *
+ * Left boundary  = width of DTXFR panel (if open) + width of Basic panel (if open).
+ * Right boundary = window.innerWidth − width of CWF panel (if open).
+ *
+ * Floating panels must be positioned and clamped within [contentLeft … contentRight]
+ * so they never slide behind a docked side panel.
+ *
+ * @returns {ContentArea} The current content-area pixel boundaries.
+ */
+function computeContentArea(): ContentArea {
+  const s = useUIStore.getState();
+  /** Sum of all left-docked side-panel widths currently visible */
+  const contentLeft =
+    (s.showDTXFR ? s.dtxfrPanelWidth : 0) +
+    (s.showBasicPanel ? s.basicPanelWidth : 0);
+  /** Right boundary: full viewport width minus the CWF right-docked panel */
+  const contentRight = window.innerWidth - (s.showCWF ? s.cwfPanelWidth : 0);
+  return { contentLeft, contentRight };
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -93,62 +143,73 @@ const getHeaderBottom = (): number => {
 };
 
 /**
- * Clamp a panel's position to keep it within the safe viewport area.
- * Ensures the panel never overlaps the header or exits the screen edges.
+ * clampPosition — Clamp a floating panel's position to the visible content area.
  *
- * Uses dynamic header height detection so panels always clear the full
- * header (including Row 2 info strip) at any viewport size.
+ * Ensures the panel never overlaps the header, exits the screen edges, or slides
+ * behind a docked side panel. Unlike the previous version, this now receives
+ * explicit contentLeft / contentRight bounds instead of using window.innerWidth.
  *
- * @param top        - Desired top position (px)
- * @param left       - Desired left position (px)
- * @param panelWidth - Current panel width (px), used for right-edge clamping
- * @returns Clamped {top, left} position
+ * @param top          - Desired top position (px from viewport top)
+ * @param left         - Desired left position (px from viewport left)
+ * @param panelWidth   - Current panel width (px), used for right-edge clamping
+ * @param contentLeft  - Left boundary of the visible content area (px)
+ * @param contentRight - Right boundary of the visible content area (px)
+ * @returns Clamped {top, left} position guaranteed to be within visible area
  */
 const clampPosition = (
   top: number,
   left: number,
   panelWidth: number,
+  contentLeft: number,
+  contentRight: number,
 ): PanelPosition => {
-  const vw = window.innerWidth;
   const vh = window.innerHeight;
   /** Dynamic minimum top: always clear the full header */
   const minTop = getHeaderBottom();
-
   return {
     top: Math.max(minTop, Math.min(top, vh - PANEL_BOTTOM_CLEARANCE)),
-    left: Math.max(PANEL_EDGE_MARGIN, Math.min(left, vw - panelWidth - PANEL_EDGE_MARGIN)),
+    /** Keep within content area, with PANEL_EDGE_MARGIN padding on each side */
+    left: Math.max(
+      contentLeft + PANEL_EDGE_MARGIN,
+      Math.min(contentRight - panelWidth - PANEL_EDGE_MARGIN, left),
+    ),
   };
 };
 
 /**
- * Compute the default cascade position for a panel based on its index.
+ * getDefaultPosition — Compute the default cascade position for a panel.
+ *
+ * All measurements are now relative to the effective content area
+ * (contentLeft … contentRight) rather than the raw viewport width.
+ * This ensures panels cascade inside the visible region even when side
+ * panels are docked on the left (DTXFR, Basic) or right (CWF).
  *
  * Three layout modes:
- *  1. NARROW (viewport width < PANEL_MOBILE_BREAKPOINT):
- *     Panels are stacked vertically, dividing the available vertical space
- *     into PANEL_MAX_SLOTS equal slots. Each panel takes one slot.
- *     Width = full viewport minus margins. Height = slot height.
- *     This auto-arranges panels so they're all visible simultaneously,
- *     exactly like the user manually arranging them in cramped viewports.
+ *  1. NARROW (effective width < PANEL_MOBILE_BREAKPOINT):
+ *     Panels are stacked vertically within the content area.
  *
- *  2. COMPACT (width is enough but cascade would cause overflow):
- *     Panels use viewport-proportional cascade width and panel width.
- *     If cascade exceeds viewport, wraps with downward shift.
+ *  2. WIDE (default desktop):
+ *     Full cascade with PANEL_GAP separation, left-to-right within the
+ *     content area. COLUMN_OF maps panelIndex → column slot.
  *
- *  3. WIDE (normal desktop):
- *     Full cascade with default panel widths.
- *
- * @param panelIndex - 0-based index determining cascade position
+ * @param panelIndex   - 0-based index determining cascade position
+ * @param contentLeft  - Left boundary of the visible content area (px)
+ * @param contentRight - Right boundary of the visible content area (px)
  * @returns Default {position, width, height?} for the panel
  */
-const getDefaultPosition = (panelIndex: number): {
+const getDefaultPosition = (
+  panelIndex: number,
+  contentLeft: number,
+  contentRight: number,
+): {
   position: PanelPosition;
   width: number;
   height?: number;
 } => {
-  const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const isNarrow = vw < PANEL_MOBILE_BREAKPOINT;
+  /** Effective visible width available between side panels */
+  const effectiveWidth = Math.max(0, contentRight - contentLeft);
+  const isNarrow = effectiveWidth < PANEL_MOBILE_BREAKPOINT;
   /** Dynamic header bottom — adapts to 2-row header and viewport size */
   const headerBottom = getHeaderBottom();
 
@@ -162,8 +223,9 @@ const getDefaultPosition = (panelIndex: number): {
      * Slot height     = (available height - gaps between slots) / MAX_SLOTS.
      *
      * Position: panel N starts at headerBottom + N * (slotHeight + gap).
-     * Width: capped to natural panel width (never wider than needed).
-     * Height: slotHeight (content scrolls internally).
+     * Left:     contentLeft + PANEL_EDGE_MARGIN (starts at content area edge).
+     * Width:    capped to PANEL_DEFAULT_WIDTH but never wider than content area.
+     * Height:   slotHeight (content scrolls internally).
      */
     const bottomMargin = PANEL_EDGE_MARGIN;
     const availableHeight = vh - headerBottom - bottomMargin;
@@ -172,18 +234,15 @@ const getDefaultPosition = (panelIndex: number): {
       PANEL_MIN_HEIGHT,
       Math.floor((availableHeight - totalGaps) / PANEL_MAX_SLOTS),
     );
-    /**
-     * Panel width: use the default compact width, but never exceed
-     * the available viewport width. This prevents the panel from
-     * stretching edge-to-edge and pushing content apart unnaturally.
-     */
-    const maxAvailableWidth = vw - PANEL_EDGE_MARGIN * 2;
+    /** Panel width: never exceed the available content-area width */
+    const maxAvailableWidth = effectiveWidth - PANEL_EDGE_MARGIN * 2;
     const panelWidth = Math.min(maxAvailableWidth, PANEL_DEFAULT_WIDTH);
 
     return {
       position: {
         top: headerBottom + panelIndex * (slotHeight + PANEL_STACK_GAP),
-        left: PANEL_EDGE_MARGIN,
+        /** Pinned to the left edge of the content area */
+        left: contentLeft + PANEL_EDGE_MARGIN,
       },
       width: panelWidth,
       height: slotHeight,
@@ -191,28 +250,28 @@ const getDefaultPosition = (panelIndex: number): {
   }
 
   /**
-   * END-OF-RUN LAYOUT — Edge-to-edge panel positioning.
+   * WIDE MODE — Content-area cascade layout.
    *
    * Panels sit in a fixed column order so each panel's left edge exactly
-   * meets the prior panel's right edge (plus a 2-px visual gap).
-   * Using panelWidth-based arithmetic means the layout is correct at any
-   * viewport width without trial-and-error ratio tuning.
+   * meets the prior panel's right edge (plus PANEL_GAP visual separation).
    *
-   * Column order (left → right):
+   * Column order (left → right within the content area):
    *   col 0: Passport      (panelIndex 0) — top-left, anchored at headerBottom
    *   col 1: FTQ Heatmap   (panelIndex 2) — bottom row, immediately right of Passport
    *   col 2: KPI Panel     (panelIndex 1) — bottom row, immediately right of FTQ
    *   col 3: Control       (panelIndex 3) — bottom row, immediately right of KPI
+   *
+   * The cascade origin is contentLeft (not viewport left = 0), so panels
+   * correctly clear any open DTXFR / Basic panels on the left.
+   * The right-edge clamp uses contentRight, so panels never slide under
+   * an open CWF panel.
    */
 
-  /** Panel width: scale with viewport but never exceed PANEL_DEFAULT_WIDTH */
-  const ratio = Math.max(0.5, vw / 1440);
+  /** Panel width: scale with effective width but never exceed PANEL_DEFAULT_WIDTH */
+  const ratio = Math.max(0.5, effectiveWidth / 1440);
   const panelWidth = Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_DEFAULT_WIDTH, Math.round(PANEL_DEFAULT_WIDTH * ratio)));
 
-  /** 2-px gap between adjacent panels so borders remain distinguishable */
-  const PANEL_GAP = 2;
-
-  /** Column index per panelIndex — determines horizontal slot */
+  /** Column index per panelIndex — determines horizontal slot within content area */
   const COLUMN_OF: Record<number, number> = {
     0: 0, // Passport  → leftmost column (top anchor)
     2: 1, // FTQ       → second column (right of Passport)
@@ -221,8 +280,13 @@ const getDefaultPosition = (panelIndex: number): {
   };
   const col = COLUMN_OF[panelIndex] ?? panelIndex;
 
-  /** Each column starts at: left-margin + col × (panelWidth + gap) */
-  const desiredLeft = PANEL_EDGE_MARGIN + col * (panelWidth + PANEL_GAP);
+  /**
+   * Each column starts at: contentLeft + PANEL_EDGE_MARGIN + col × (panelWidth + PANEL_GAP).
+   *
+   * PANEL_GAP (2px) separates panel borders visually.
+   * Offsetting by contentLeft ensures cascading starts inside the visible area.
+   */
+  const desiredLeft = contentLeft + PANEL_EDGE_MARGIN + col * (panelWidth + PANEL_GAP);
 
   /**
    * Passport (panelIndex 0) stays pinned to headerBottom — top-left.
@@ -231,7 +295,7 @@ const getDefaultPosition = (panelIndex: number): {
   const desiredTop = panelIndex === 0 ? headerBottom : Math.round(vh * 0.63);
 
   return {
-    position: clampPosition(desiredTop, desiredLeft, panelWidth),
+    position: clampPosition(desiredTop, desiredLeft, panelWidth, contentLeft, contentRight),
     width: panelWidth,
     /** No forced height — panels grow to fit content (auto) */
   };
@@ -240,7 +304,13 @@ const getDefaultPosition = (panelIndex: number): {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 /**
- * Custom hook providing drag-and-resize behavior for floating panels.
+ * useDraggablePanel — Content-area-aware drag & resize hook for floating panels.
+ *
+ * Subscribes to the uiStore side-panel state (CWF, DTXFR, Basic) so that
+ * whenever a side panel is opened, closed, or resized, this hook recomputes
+ * the floating panel's default position to stay within the now-updated visible
+ * content area. The recompute logic is identical to the existing window-resize
+ * handler so behaviour is consistent across both triggers.
  *
  * @param panelIndex - 0-based index for cascade positioning (0=leftmost)
  * @param resizable  - Whether the panel supports user resizing (default: false)
@@ -258,12 +328,38 @@ const getDefaultPosition = (panelIndex: number): {
  * ```
  */
 export function useDraggablePanel(panelIndex: number, resizable = false): DraggablePanelResult {
-  const defaults = getDefaultPosition(panelIndex);
-  const [position, setPosition] = useState<PanelPosition>(defaults.position);
-  const [width, setWidth] = useState<number>(defaults.width);
-  /** Height may be set by narrow-mode auto-stacking or user resize */
-  const [height, setHeight] = useState<number | undefined>(defaults.height);
+  // ── Side-panel subscriptions for reactive recomputation ───────────────────
+  /**
+   * Subscribe to each dimension that affects the content area.
+   * When any of these change, a useEffect below triggers a position recompute
+   * — the same behaviour as a window resize — to keep the panel visible.
+   */
+  /** Whether the CWF right-docked panel is currently open */
+  const cwfOpen = useUIStore((s) => s.showCWF);
+  /** Current pixel width of the CWF side panel */
+  const cwfWidth = useUIStore((s) => s.cwfPanelWidth);
+  /** Whether the DTXFR left-docked panel is currently open */
+  const dtxfrOpen = useUIStore((s) => s.showDTXFR);
+  /** Current pixel width of the DTXFR side panel */
+  const dtxfrWidth = useUIStore((s) => s.dtxfrPanelWidth);
+  /** Whether the Basic left-docked panel is currently open */
+  const basicOpen = useUIStore((s) => s.showBasicPanel);
+  /** Current pixel width of the Basic side panel */
+  const basicWidth = useUIStore((s) => s.basicPanelWidth);
 
+  // ── Position state — initialised with content-area-aware defaults ─────────
+  /** Compute content area once at mount time to seed useState */
+  const initArea = computeContentArea();
+  const initDefaults = getDefaultPosition(panelIndex, initArea.contentLeft, initArea.contentRight);
+
+  /** Current top/left position of the floating panel */
+  const [position, setPosition] = useState<PanelPosition>(initDefaults.position);
+  /** Current width of the panel (px) */
+  const [width, setWidth] = useState<number>(initDefaults.width);
+  /** Height may be set by narrow-mode auto-stacking or user resize */
+  const [height, setHeight] = useState<number | undefined>(initDefaults.height);
+
+  // ── Drag/resize refs ──────────────────────────────────────────────────────
   /** True while user is actively dragging the panel */
   const isDragging = useRef(false);
   /** True while user is actively resizing the panel */
@@ -273,37 +369,89 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
   /** Mouse position and panel dimensions at resize start */
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
-  // ── Recalculate default position when window resizes ─────────
-  useEffect(() => {
-    const handleResize = () => {
-      // Only recompute if user isn't actively interacting
-      if (!isDragging.current && !isResizing.current) {
-        const fresh = getDefaultPosition(panelIndex);
-        setPosition(fresh.position);
-        setWidth(fresh.width);
-        /** Apply computed height from auto-stack (narrow) or reset to auto (wide) */
-        setHeight(fresh.height);
-      }
-    };
+  /**
+   * contentAreaRef — keeps event handlers always synchronised with the latest
+   * content area without needing them as effect dependencies.
+   * Updated by every recompute (resize handler or side-panel change effect).
+   */
+  const contentAreaRef = useRef<ContentArea>(initArea);
 
-    window.addEventListener('resize', handleResize);
+  // ── Recompute helper ──────────────────────────────────────────────────────
+  /**
+   * recomputeDefaults — Recompute and apply the default panel position/size.
+   *
+   * Guards against recomputing while the user is interacting (dragging/resizing),
+   * to avoid fighting the user's hand. Updates contentAreaRef so that drag
+   * clamping in handlePointerMove uses the latest content boundaries.
+   *
+   * Called by:
+   *  a) The window 'resize' event listener.
+   *  b) The side-panel-change useEffect.
+   */
+  const recomputeDefaults = useCallback(() => {
+    /** Skip recompute while user is actively interacting with the panel */
+    if (isDragging.current || isResizing.current) return;
+    const area = computeContentArea();
+    /** Always refresh the ref so event handlers use fresh boundaries */
+    contentAreaRef.current = area;
+    const fresh = getDefaultPosition(panelIndex, area.contentLeft, area.contentRight);
+    setPosition(fresh.position);
+    setWidth(fresh.width);
+    setHeight(fresh.height);
+  }, [panelIndex]);
+
+  // ── Effect 1: Recompute on window resize ───────────────────────────────────
+  /**
+   * Recalculate default position whenever the browser window is resized.
+   * Also fires once after the first animation frame (to pick up the real header
+   * height after the DOM has been laid out — the useState initialiser above may
+   * use PANEL_HEADER_CLEARANCE as a fallback before the header element exists).
+   */
+  useEffect(() => {
+    /** Attach to window resize so panels track viewport changes */
+    window.addEventListener('resize', recomputeDefaults);
 
     /**
      * Delayed initial recalculation: at mount time the useState
-     * initializer may have used the PANEL_HEADER_CLEARANCE fallback
-     * because the header DOM wasn't painted yet. Wait one animation
-     * frame so the browser has laid out the header, then re-measure
-     * to get the real header height and position panels below it.
+     * initialiser may have used PANEL_HEADER_CLEARANCE because the header
+     * DOM wasn't painted yet. Wait one animation frame so the browser has
+     * laid out the header, then re-measure.
      */
-    const rafId = requestAnimationFrame(() => handleResize());
+    const rafId = requestAnimationFrame(recomputeDefaults);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', recomputeDefaults);
       cancelAnimationFrame(rafId);
     };
-  }, [panelIndex]);
+  }, [recomputeDefaults]);
 
-  // ── Global mouse + touch listeners for drag and resize ───────
+  // ── Effect 2: Recompute on side-panel open / close / resize ──────────────
+  /**
+   * Trigger a full position recompute whenever any docked side panel changes.
+   * This is the core of Fix 3 — without this effect, panels positioned at
+   * their default cascade positions remain at those coordinates even as the
+   * visible content area shrinks or shifts, hiding them behind side panels.
+   *
+   * Dependencies:
+   *   cwfOpen, cwfWidth   — CWF right-docked panel
+   *   dtxfrOpen, dtxfrWidth — DTXFR left-docked panel
+   *   basicOpen, basicWidth — Basic left-docked panel
+   *
+   * PANEL_SIDE_REFLOW_DELAY_MS controls whether reposition is immediate (0)
+   * or waits for the side-panel slide animation to complete.
+   */
+  useEffect(() => {
+    if (PANEL_SIDE_REFLOW_DELAY_MS === 0) {
+      /** Immediate reposition — panels move simultaneously with side panels */
+      recomputeDefaults();
+    } else {
+      /** Delayed reposition — waits for slide animation to settle */
+      const timer = setTimeout(recomputeDefaults, PANEL_SIDE_REFLOW_DELAY_MS);
+      return () => clearTimeout(timer);
+    }
+  }, [cwfOpen, cwfWidth, dtxfrOpen, dtxfrWidth, basicOpen, basicWidth, recomputeDefaults]);
+
+  // ── Global mouse + touch listeners for drag and resize ───────────────────
   useEffect(() => {
     /** Unified handler: move panel position based on pointer coordinates. */
     const handlePointerMove = (clientX: number, clientY: number) => {
@@ -311,7 +459,9 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
         /** Calculate new position from pointer offset. */
         const rawTop = clientY - dragOffset.current.y;
         const rawLeft = clientX - dragOffset.current.x;
-        setPosition(clampPosition(rawTop, rawLeft, width));
+        /** Clamp within the current content area (reads from ref — always fresh) */
+        const { contentLeft, contentRight } = contentAreaRef.current;
+        setPosition(clampPosition(rawTop, rawLeft, width, contentLeft, contentRight));
       } else if (isResizing.current) {
         /** Calculate new dimensions from pointer delta. */
         const dx = clientX - resizeStart.current.x;

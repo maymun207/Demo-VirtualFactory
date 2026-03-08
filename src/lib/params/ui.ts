@@ -145,6 +145,27 @@ export const PANEL_FONT_SCALE_EXPONENT = 0.75;
 export const PANEL_DEFAULT_HEIGHT = 450;
 
 // ═══════════════════════════════════════════════════════════════════
+// PANEL CASCADE LAYOUT — Content-area-aware positioning
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Visual gap in pixels between adjacent cascaded panels so borders stay
+ * visually distinguishable. Previously hard-coded as "2" inside
+ * getDefaultPosition() — extracted here per global coding rules.
+ */
+export const PANEL_GAP = 2;
+
+/**
+ * Delay (ms) before floating panels are repositioned after a docked side-panel
+ * (CWF, DTXFR, Basic) opens or closes.
+ *
+ * Set to 0 so panels move simultaneously with the side-panel slide animation
+ * rather than snapping after it completes. If a short lag looks better visually,
+ * increase this to match CWF_SIDE_PANEL_ANIMATION_MS.
+ */
+export const PANEL_SIDE_REFLOW_DELAY_MS = 0;
+
+// ═══════════════════════════════════════════════════════════════════
 // HEADER UI — Gradient and button config
 // ═══════════════════════════════════════════════════════════════════
 
