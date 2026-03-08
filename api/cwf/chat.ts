@@ -1629,7 +1629,13 @@ You MUST resolve the current value yourself using the rules below. Do NOT say "W
 These are ON/OFF toggles. Infer the current value purely from user intent:
 - "disable", "turn off", "no speed changes", "stop jams" → current must be 1 (was on), new_value = 0
 - "enable", "turn on", "allow jams" → current must be 0 (was off), new_value = 1
-- ALWAYS set old_value based on the opposite of new_value. You do NOT need to query anything.
+- ALWAYS set old_value based on the opposite of new_value. You do NOT need to query anything to determine old_value.
+
+**⚠️ CRITICAL: "no query needed" means you skip the Supabase read only — it does NOT mean you skip the human-in-the-loop protocol. You MUST still follow the full 3-step process:**
+- **Step 1 — PROPOSE: present the change in a table and ask "Shall I proceed?"**
+- **Step 2 — REQUEST AUTH: when user approves, ask for their authorization ID**
+- **Step 3 — EXECUTE: only call update_parameter after receiving the correct auth code**
+**NEVER call update_parameter for any conveyor parameter without explicit user approval AND a valid authorization ID, even for simple boolean flips.**
 
 #### Rule 2 — Numeric params (jammed_time, impacted_tiles, scrap_probability):
 Query the latest known value directly from conveyor_states:
@@ -1644,10 +1650,10 @@ ORDER BY sim_tick DESC LIMIT 1
 - NEVER ask the user — just proceed with the best known value.
 
 ### Example Interactions (use these EXACTLY):
-- User: "disable speed changes" → old_value=1, new_value=0 (boolean inference — no query needed)
-- User: "enable jam events" → old_value=0, new_value=1 (boolean inference — no query needed)
-- User: "set jam time to 15" → query conveyor_states for jammed_time; if found use that as old_value; if not, use default 8 as old_value; then propose old→15
-- User: "set conveyor scrap probability to 2" → query conveyor_states for scrap_probability; if found use that; else use default 0; propose old→2
+- User: "disable speed changes" → infer old_value=1, new_value=0 (boolean inference — no query needed); THEN propose the change and follow the 3-step auth protocol before calling update_parameter
+- User: "enable jam events" → infer old_value=0, new_value=1 (boolean inference — no query needed); THEN propose the change and follow the 3-step auth protocol before calling update_parameter
+- User: "set jam time to 15" → query conveyor_states for jammed_time; if found use that as old_value; if not, use default 8 as old_value; THEN propose change and follow 3-step auth protocol
+- User: "set conveyor scrap probability to 2" → query conveyor_states for scrap_probability; if found use that; else use default 0; THEN propose change and follow 3-step auth protocol
 - User: "what are the current conveyor settings?" → query conveyor_states ORDER BY sim_tick DESC LIMIT 1 and report all 5 param columns
 - User: "can you change conveyor parameters?" → Ask WHICH parameter and WHAT value they want. Do NOT ask for the current value.
 
