@@ -267,6 +267,7 @@ export function calculateAllMOEEs(c: StationCounts): MachineOEE[] {
             oee: 0,
             actualInput: c.digitalOutput,
             actualOutput: c.conveyorCleanOutput,
+            /** Use passport-derived count to avoid double-counting at sorting */
             scrappedHere: c.conveyorScrapped,
         },
 
@@ -289,6 +290,7 @@ export function calculateAllMOEEs(c: StationCounts): MachineOEE[] {
             oee: 0,
             actualInput: c.kilnOutput,
             actualOutput: c.sortingUsableOutput,
+            /** Subtract conveyor scrap to avoid double-counting (conveyor already owns those tiles) */
             scrappedHere: c.perStation.sorting.scrappedHere - c.conveyorScrapped,
         },
         {

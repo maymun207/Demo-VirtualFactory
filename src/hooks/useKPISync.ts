@@ -91,36 +91,19 @@ export function useKPISync() {
           scenarioEnergyMultiplier,
         );
         /**
-         * KPI SINGLE SOURCE OF TRUTH: DERIVE quality counts by iterating
-         * the tiles Map. This guarantees the KPI calculations match the
-         * tiles table in Supabase (which CWF queries). The old cumulative
-         * counters (totalFirstQuality, etc.) diverge from the Map due to
-         * microtask timing issues in moveTilesOnConveyor.
+         * KPI SINGLE SOURCE OF TRUTH: Read quality counters from the data store,
+         * NOT the visual layer. Both layers are now lockstep from a single
+         * counter (workOrderStore.tilesSpawned), so the data store's cumulative
+         * quality counters are the authoritative source for KPI calculations.
+         *
+         * totalScrapGraded = tiles graded as scrap at line exit
+         * totalTilesScrapped = tiles scrapped mid-line (conveyor jam damage)
+         * Total waste = both combined for KPI purposes
          */
         const ds = useSimulationDataStore.getState();
-        let dsShipment = 0;
-        let dsSecondQuality = 0;
-        let dsScrap = 0;
-        for (const tile of ds.tiles.values()) {
-          /**
-           * Only count COMPLETED or SCRAPPED tiles in KPI calculations.
-           * Tiles still in_production may be temporarily tagged as first_quality
-           * before the microtask defect evaluation re-grades them, inflating
-           * the shipment counter and skewing FTQ / scrap / totalKPI.
-           */
-          const done = tile.status === 'completed' || tile.status.startsWith('scrapped_at_');
-          if (!done) continue;
-          if (tile.final_grade === 'first_quality') dsShipment++;
-          else if (tile.final_grade === 'second_quality') dsSecondQuality++;
-          else if (tile.final_grade === 'scrap') dsScrap++;
-        }
-        /**
-         * dsWaste = dsScrap only (Map-derived).
-         * Previously this was `dsScrap + ds.totalTilesScrapped` which
-         * double-counted every scrapped tile because both values track
-         * the same set of tiles from different sources.
-         */
-        const dsWaste = dsScrap;
+        const dsShipment = ds.totalFirstQuality;
+        const dsSecondQuality = ds.totalSecondQuality;
+        const dsWaste = ds.totalScrapGraded + ds.totalTilesScrapped;
         const ftq = calculateFTQ(dsShipment, dsSecondQuality, dsWaste);
         const scrap = calculateScrap(dsShipment, dsSecondQuality, dsWaste);
         const totalKpi = calculateTotalKPI(dsShipment, dsSecondQuality, dsWaste);
@@ -159,35 +142,10 @@ export function useKPISync() {
         // Step 5: Use FOEE as the OEE value for the KPI card (replaces legacy formula)
         const oee = foee.oee;
 
-        // ── Compute cumulative totals from per-station sums ────────
-        // These are the "meter readings" — monotonically increasing
-        // throughout the simulation run, just like real factory meters.
-        let cumulativeKwh = 0;
-        let cumulativeGas = 0;
-        let cumulativeCo2 = 0;
-        for (const e of Object.values(newCumEnergy)) {
-          cumulativeKwh += e.kWh;
-          cumulativeGas += e.gas;
-          cumulativeCo2 += e.co2;
-        }
-
-        // ── Build a cumulative EnergyResult for the KPI card display ─
-        // The KPI cards now show cumulative totals (meter readings)
-        // instead of instantaneous per-tick consumption.
-        const cumulativeEnergy = {
-          ...energy,
-          totalKwh: cumulativeKwh,
-          totalGas: cumulativeGas,
-          totalCO2: cumulativeCo2,
-        };
-
         // ── Update KPI display values (format numbers, set units) ─
-        let newKpis = updateKPIs(kpiState.kpis, { energy: cumulativeEnergy, ftq, totalKpi, scrap, oee });
+        let newKpis = updateKPIs(kpiState.kpis, { energy, ftq, totalKpi, scrap, oee });
 
         // ── Calculate trends (compare current vs. historical) ────
-        // Trends use INSTANTANEOUS values for energy/gas/co2 so arrows
-        // show whether consumption RATE is changing (speeding up / slowing
-        // down), not the cumulative growth which is always "up".
         const currentVals = {
           oee,
           ftq,
@@ -219,8 +177,6 @@ export function useKPISync() {
           factoryOEE: foee,
           stationCounts,
           cumulativeStationEnergy: newCumEnergy,
-          /** Store instantaneous (per-tick) energy for alarm threshold checks */
-          instantaneousEnergyKwh: energy.totalKwh,
         });
       },
     );
