@@ -63,6 +63,11 @@ export interface CWFResponse {
     toolCallCount: number;
     /** Model used */
     model: string;
+    /** Copilot state change that occurred during this request (if any).
+     *  'enabled' — copilot was just activated via enable_copilot tool.
+     *  'disabled' — copilot was just deactivated via disable_copilot tool.
+     *  null/undefined — no copilot state change. */
+    copilotStateChange?: 'enabled' | 'disabled' | null;
 }
 
 // ─── API Call ────────────────────────────────────────────────────────────────

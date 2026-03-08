@@ -104,12 +104,21 @@ for (const envVar of REQUIRED_ENV_VARS) {
 /** Import the handler from the api/cwf/chat.ts module */
 const { default: handler } = await import('../api/cwf/chat.js');
 
+/**
+ * Import the CopilotEngine singleton.
+ * This server manages the engine's lifecycle via HTTP endpoints.
+ */
+const { copilotEngine } = await import('../api/cwf/copilotEngine.js');
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. Create HTTP server that adapts Node.js IncomingMessage to VercelRequest
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Port for the CWF dev server (configurable via env) */
 const PORT = parseInt(process.env.CWF_DEV_PORT || '3001', 10);
+
+/** Ensure CWF_DEV_PORT is set in env so chat.ts tool handlers can detect local dev mode */
+process.env.CWF_DEV_PORT = String(PORT);
 
 /**
  * Collect the full request body from a Node.js IncomingMessage stream.
@@ -255,10 +264,135 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // ─── Copilot API Endpoints ───────────────────────────────────────────────
+
+    /**
+     * POST /api/cwf/copilot/enable — Enable copilot mode for a simulation.
+     * Body: { simulationId: string, activatedBy?: string }
+     * Creates/updates copilot_config row and starts the engine polling loop.
+     */
+    if (req.method === 'POST' && req.url === '/api/cwf/copilot/enable') {
+        try {
+            const body = await collectBody(req) as { simulationId?: string; activatedBy?: string } | null;
+            const simulationId = body?.simulationId;
+
+            if (!simulationId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'simulationId is required' }));
+                return;
+            }
+
+            /** Import createClient for server-side Supabase operations */
+            const { createClient } = await import('@supabase/supabase-js');
+            const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+            /** Upsert copilot_config row (create if not exists, update if exists) */
+            await sb.from('copilot_config').upsert({
+                simulation_id: simulationId,
+                enabled: true,
+                activated_by: body?.activatedBy || 'airtk',
+                last_heartbeat_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'simulation_id' });
+
+            /** Start the copilot engine polling loop */
+            await copilotEngine.start(simulationId);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Copilot enabled' }));
+        } catch (error) {
+            console.error('[Copilot API] Enable error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: (error as Error).message }));
+        }
+        return;
+    }
+
+    /**
+     * POST /api/cwf/copilot/disable — Disable copilot mode.
+     * Body: { simulationId: string }
+     * Updates copilot_config.enabled = false and stops the engine loop.
+     */
+    if (req.method === 'POST' && req.url === '/api/cwf/copilot/disable') {
+        try {
+            const body = await collectBody(req) as { simulationId?: string } | null;
+            const simulationId = body?.simulationId;
+
+            if (!simulationId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'simulationId is required' }));
+                return;
+            }
+
+            /** Import createClient for server-side Supabase operations */
+            const { createClient } = await import('@supabase/supabase-js');
+            const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+            /** Update copilot_config to disabled */
+            await sb.from('copilot_config')
+                .update({ enabled: false, updated_at: new Date().toISOString() })
+                .eq('simulation_id', simulationId);
+
+            /** Stop the engine polling loop */
+            copilotEngine.stop();
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Copilot disabled' }));
+        } catch (error) {
+            console.error('[Copilot API] Disable error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: (error as Error).message }));
+        }
+        return;
+    }
+
+    /**
+     * GET /api/cwf/copilot/status — Get current copilot engine status.
+     * Returns running state, cycle count, action count, last decision.
+     */
+    if (req.method === 'GET' && req.url === '/api/cwf/copilot/status') {
+        const status = copilotEngine.getStatus();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(status));
+        return;
+    }
+
+    /**
+     * POST /api/cwf/copilot/heartbeat — Browser heartbeat for disconnect safety.
+     * Body: { simulationId: string }
+     * Updates last_heartbeat_at in copilot_config so the engine knows the
+     * browser is still connected. If heartbeats stop for 15s, engine auto-disengages.
+     */
+    if (req.method === 'POST' && req.url === '/api/cwf/copilot/heartbeat') {
+        try {
+            const body = await collectBody(req) as { simulationId?: string } | null;
+            const simulationId = body?.simulationId;
+
+            if (!simulationId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'simulationId is required' }));
+                return;
+            }
+
+            /** Delegate to the engine's heartbeat handler */
+            await copilotEngine.handleHeartbeat(simulationId);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true }));
+        } catch (error) {
+            console.error('[Copilot API] Heartbeat error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: (error as Error).message }));
+        }
+        return;
+    }
+
+    // ─── CWF Chat Endpoint ──────────────────────────────────────────────────
+
     /** Only handle POST /api/cwf/chat */
     if (req.method !== 'POST' || !req.url?.startsWith('/api/cwf/chat')) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Not found. Use POST /api/cwf/chat' }));
+        res.end(JSON.stringify({ error: 'Not found. Use POST /api/cwf/chat or /api/cwf/copilot/*' }));
         return;
     }
 

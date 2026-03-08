@@ -37,6 +37,7 @@ import {
   MessageSquarePlus, // Quick actions dropdown trigger icon
   ChevronDown, // Dropdown toggle icon
   CheckCircle2, // Selection marker icon
+  ShieldCheck, // Copilot mode indicator icon
 } from "lucide-react"; // Comprehensive icon library
 import {
   useCWFStore, // Accessing AI agent state and message history
@@ -49,6 +50,13 @@ import {
   CWF_SIDE_PANEL_HANDLE_WIDTH, // Fixed width for the resize interaction area
   CWF_UI_CONFIG, // Centralized styling configuration for gradients/colors
 } from "../../lib/params"; // Parametrization module for all UI constants
+import { useCopilotStore } from "../../store/copilotStore"; // Copilot UI state
+import { useCopilotHeartbeat } from "../../hooks/useCopilotHeartbeat"; // Browser heartbeat sender
+import { useCopilotLifecycle } from "../../hooks/useCopilotLifecycle"; // Auto-disengage + Realtime sync
+import { COPILOT_THEME } from "../../lib/params/copilot"; // Copilot pink theme constants
+import { CopilotToggleButton } from "./copilot/CopilotToggleButton"; // Extracted copilot header button
+import { CopilotStatusBar } from "./copilot/CopilotStatusBar"; // Extracted copilot status bar
+import { CopilotMessageBadge } from "./copilot/CopilotMessageBadge"; // Extracted copilot message badge
 
 // ─── Icon Map for Quick Actions ──────────────────────────────────────────────
 
@@ -207,11 +215,21 @@ function renderMarkdown(text: string): React.ReactNode[] {
  *
  * @param text - Localized thinking message (e.g. "Analyzing...")
  */
-function TypingIndicator({ text }: { text: string }) {
+function TypingIndicator({
+  text,
+  isCopilotActive = false,
+}: {
+  text: string;
+  isCopilotActive?: boolean;
+}) {
+  /** Accent colour class — pink when copilot is active, cyan otherwise */
+  const accentClass = isCopilotActive ? "text-pink-400" : "text-cyan-400";
+  /** Dot background — pink when copilot is active, cyan otherwise */
+  const dotClass = isCopilotActive ? "bg-pink-400" : "bg-cyan-400";
   return (
     <div className="flex items-center gap-2 px-4 py-3">
       {/* Bot icon to indicate AI response origin */}
-      <Bot size={16} className="text-cyan-400 shrink-0" />{" "}
+      <Bot size={16} className={`${accentClass} shrink-0`} />{" "}
       {/* Assistant identity icon */}
       {/* thinking text (e.g., "Analyzing...") */}
       <span className="text-white/50 text-sm">{text}</span>{" "}
@@ -221,7 +239,7 @@ function TypingIndicator({ text }: { text: string }) {
         {[0, 1, 2].map((i) => (
           <span
             key={i}
-            className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce"
+            className={`w-1.5 h-1.5 ${dotClass} rounded-full animate-bounce`}
             style={{
               animationDelay: `${i * 0.15}s`, // Staggered start times
               animationDuration: "0.6s", // Consistent jump speed
@@ -247,28 +265,19 @@ function TypingIndicator({ text }: { text: string }) {
 function MessageBubble({
   message,
   language: _language,
+  isCopilotActive = false,
 }: {
   message: CWFMessage;
   language: "tr" | "en";
+  isCopilotActive?: boolean;
 }) {
   const t = useTranslation("cwf"); // Localized strings for CWF context
 
-  // Handle System messages (status updates, diagnostic info)
+  // Handle System messages — delegated to CopilotMessageBadge component
+  // which handles both copilot (pink) and normal (grey) system messages.
   if (message.role === "system") {
     return (
-      <div className="flex justify-center my-2">
-        {" "}
-        {/* Center system info in chat */}
-        <div
-          className={`text-xs px-3 py-1.5 rounded-full ${
-            message.error
-              ? "bg-red-500/20 text-red-300 border border-red-500/30" // Critical state styling
-              : "bg-white/5 text-white/40 border border-white/10" // Normal state styling
-          }`}
-        >
-          {message.content} {/* Display system-generated message */}
-        </div>
-      </div>
+      <CopilotMessageBadge content={message.content} isError={message.error} />
     );
   }
 
@@ -283,21 +292,31 @@ function MessageBubble({
           {/* Limit width for readability */}
           {/* User message bubble with gradient background from configuration */}
           <div
-            className={`${CWF_UI_CONFIG.userBubbleGradient} border rounded-2xl rounded-tr-sm px-2 py-2.5 select-text cursor-text`}
+            className={`${isCopilotActive ? "bg-linear-to-br from-pink-500/20 to-pink-600/10 border-pink-500/30" : CWF_UI_CONFIG.userBubbleGradient} border rounded-2xl rounded-tr-sm px-2 py-2.5 select-text cursor-text`}
           >
             {" "}
-            {/* Apply user branding */}
+            {/* Apply user branding — pink variant when copilot is active */}
             <p
               className={`text-white/90 ${CWF_UI_CONFIG.messageFontSize} leading-relaxed`}
             >
               {message.content} {/* Display message payload */}
             </p>
           </div>
-          {/* User avatar circle with static cyan styling */}
-          <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0 mt-0.5">
+          {/* User avatar circle — pink when copilot is active, cyan default */}
+          <div
+            className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 border ${
+              isCopilotActive
+                ? "bg-pink-500/20 border-pink-500/40"
+                : "bg-cyan-500/20 border-cyan-500/40"
+            }`}
+          >
             {" "}
             {/* Profile placeholder */}
-            <User size={14} className="text-cyan-400" /> {/* Identity symbol */}
+            <User
+              size={14}
+              className={isCopilotActive ? "text-pink-400" : "text-cyan-400"}
+            />{" "}
+            {/* Identity symbol */}
           </div>
         </div>
       </div>
@@ -305,7 +324,10 @@ function MessageBubble({
   }
 
   // Handle Assistant messages (incoming AI responses)
-  if (message.isStreaming) return <TypingIndicator text={t("thinking")} />; // Show motion during arrival
+  if (message.isStreaming)
+    return (
+      <TypingIndicator text={t("thinking")} isCopilotActive={isCopilotActive} />
+    ); // Show motion during arrival
 
   return (
     <div className="flex justify-start mb-3 cwf-fade-in">
@@ -314,13 +336,20 @@ function MessageBubble({
       <div className="max-w-[98%] flex gap-2 items-start">
         {" "}
         {/* Allow more width for complex tables/markdown */}
-        {/* Assistant avatar with accent gradient from configuration */}
+        {/* Assistant avatar with accent gradient — pink when copilot active */}
         <div
-          className={`w-7 h-7 rounded-full ${CWF_UI_CONFIG.accentGradient} border flex items-center justify-center shrink-0 mt-0.5`}
+          className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+            isCopilotActive
+              ? "bg-linear-to-br from-pink-500/30 to-pink-600/20 border-pink-500/40"
+              : CWF_UI_CONFIG.accentGradient
+          }`}
         >
           {" "}
           {/* Agent presence */}
-          <Sparkles size={14} className="text-cyan-300" />{" "}
+          <Sparkles
+            size={14}
+            className={isCopilotActive ? "text-pink-300" : "text-cyan-300"}
+          />{" "}
           {/* Intelligence symbol */}
         </div>
         <div className="flex-1">
@@ -331,7 +360,9 @@ function MessageBubble({
             className={`bg-white/5 border rounded-2xl rounded-tl-sm px-2 py-3 select-text cursor-text ${
               message.error
                 ? "border-red-500/30 bg-red-500/5" // Negative state aesthetic
-                : "border-white/10" // Default state aesthetic
+                : isCopilotActive
+                  ? "border-pink-500/20 bg-pink-500/5" // Copilot pink accent
+                  : "border-white/10" // Default state aesthetic
             }`}
           >
             {renderMarkdown(message.content)}{" "}
@@ -670,6 +701,19 @@ export function CWFChatPanel() {
   const sendMessage = useCWFStore((s) => s.sendMessage); // Access send logic
   const clearMessages = useCWFStore((s) => s.clearMessages); // Access purge logic
 
+  /** ── Copilot State ───────────────────────────────────────────────────── */
+  const isCopilotEnabled = useCopilotStore((s) => s.isEnabled); // Whether copilot is active
+  const copilotTotalActions = useCopilotStore((s) => s.totalActions); // Corrective action count
+
+  /**
+   * Mount copilot lifecycle hooks:
+   * - useCopilotHeartbeat: sends POST every 5s while copilot is active
+   * - useCopilotLifecycle: syncs copilot_config/copilot_actions via Realtime,
+   *   auto-disengages on simulation stop
+   */
+  useCopilotHeartbeat();
+  useCopilotLifecycle();
+
   const [input, setInput] = useState(""); // Managed state for message text
   const messagesEndRef = useRef<HTMLDivElement>(null); // Anchor pointer for scroll lock
   const inputRef = useRef<HTMLTextAreaElement>(null); // DOM pointer for focus capture
@@ -774,38 +818,83 @@ export function CWFChatPanel() {
         onMouseDown={handleResizeStart} // Direct mouse entry point
         onTouchStart={handleResizeTouchStart} // Direct touch entry point
       >
-        {/* Visual vertical marker with dynamic glow on interaction */}
-        <div className="w-[2px] h-12 rounded-full bg-white/10 group-hover:bg-cyan-400/50 transition-colors duration-200" />{" "}
+        {/* Visual vertical marker with dynamic glow on interaction — pink when copilot active */}
+        <div
+          className={`w-[2px] h-12 rounded-full transition-colors duration-200 ${
+            isCopilotEnabled
+              ? "bg-pink-400/30 group-hover:bg-pink-400/60"
+              : "bg-white/10 group-hover:bg-cyan-400/50"
+          }`}
+        />{" "}
         {/* Centered aesthetic marker */}
       </div>
       {/* ── Panel Content Container ─────────────────────────────────── */}
-      <div className="flex-1 h-full flex flex-col bg-black/80 backdrop-blur-2xl border-l border-white/10 shadow-2xl shadow-cyan-500/10 overflow-hidden cwf-slide-in">
+      <div
+        className={`flex-1 h-full flex flex-col backdrop-blur-2xl border-l shadow-2xl overflow-hidden cwf-slide-in transition-all duration-500 ${
+          isCopilotEnabled
+            ? "border-pink-500/40 shadow-pink-500/20 bg-linear-to-b from-pink-950/40 via-black/80 to-pink-950/30" // Bright pink theme
+            : "border-white/10 shadow-cyan-500/10 bg-black/80" // Default cyan glow
+        }`}
+      >
         {" "}
-        {/* Main glass viewport */}
+        {/* Main glass viewport — switches to pink accent when copilot is active */}
         {/* ── Header Area ────────────────────────────────────────────── */}
         <div
-          className={`flex items-center justify-between px-4 py-3 ${CWF_UI_CONFIG.headerGradient} border-b border-white/10`}
+          className={`flex items-center justify-between px-4 py-3 border-b transition-all duration-500 ${
+            isCopilotEnabled
+              ? "border-pink-500/30" // Pink border glow when copilot is active
+              : "border-white/10" // Default subtle border
+          }`}
+          style={isCopilotEnabled ? { background: COPILOT_THEME.headerBg } : {}}
         >
           {" "}
-          {/* Top bar structure */}
+          {/* Top bar structure — applies copilot pink theme when active */}
           <div className="flex items-center gap-2">
             {" "}
             {/* Left grouping: ID + Status + History Dropdown */}
-            {/* Branding Sparkle with accent gradient from config */}
+            {/* Branding Sparkle with accent gradient from config — pink when copilot active */}
             <div
-              className={`w-8 h-8 rounded-lg ${CWF_UI_CONFIG.accentGradient} flex items-center justify-center`}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${
+                isCopilotEnabled
+                  ? "" // Use inline style for pink gradient
+                  : CWF_UI_CONFIG.accentGradient
+              }`}
+              style={
+                isCopilotEnabled
+                  ? {
+                      background: `linear-gradient(135deg, ${COPILOT_THEME.primary}40, ${COPILOT_THEME.primaryDark}60)`,
+                      border: `1px solid ${COPILOT_THEME.primary}60`,
+                    }
+                  : {}
+              }
             >
               {" "}
               {/* Mini-logo container */}
-              <Sparkles size={16} className="text-cyan-300" />{" "}
-              {/* Vibrant AI symbol */}
+              {isCopilotEnabled ? (
+                <ShieldCheck
+                  size={16}
+                  className="text-pink-300"
+                /> /* Copilot shield icon */
+              ) : (
+                <Sparkles
+                  size={16}
+                  className="text-cyan-300"
+                /> /* Default AI symbol */
+              )}
             </div>
             <SimulationHistoryDropdown />
           </div>
           {/* Header Actions: Reset Conversation and Close Panel */}
           <div className="flex items-center gap-1">
             {" "}
-            {/* Right grouping: Quick Actions + Clear + Close */}
+            {/* ── Copilot Toggle Button — Extracted Component ────────── */}
+            <CopilotToggleButton
+              isEnabled={isCopilotEnabled}
+              totalActions={copilotTotalActions}
+              language={language}
+              isLoading={isLoading}
+              onSendMessage={sendMessage}
+            />
             {/* Quick Actions dropdown — always accessible for predefined queries */}
             <QuickActionsDropdown
               language={language}
@@ -847,15 +936,31 @@ export function CWFChatPanel() {
             <>
               {/* Map current messages to styled segments */}
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} language={language} /> // Individual bubble unit
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  language={language}
+                  isCopilotActive={isCopilotEnabled}
+                /> // Individual bubble unit
               ))}
               {/* Scrolling anchor: ensures visibility of latest messages */}
               <div ref={messagesEndRef} /> {/* Auto-scroller Target */}
             </>
           )}
         </div>
+        {/* ── Copilot Status Bar — Extracted Component ─────────────── */}
+        {isCopilotEnabled && (
+          <CopilotStatusBar
+            totalActions={copilotTotalActions}
+            language={language}
+          />
+        )}
         {/* ── Input Interaction Area ─────────────────────────────────── */}
-        <div className="border-t border-white/10 px-1 py-2">
+        <div
+          className={`border-t px-1 py-2 transition-all duration-300 ${
+            isCopilotEnabled ? "border-pink-500/20" : "border-white/10"
+          }`}
+        >
           {" "}
           {/* Composer wrap */}
           <div className="flex items-center gap-2">
@@ -870,13 +975,21 @@ export function CWFChatPanel() {
               placeholder={t("placeholder")} // localized CTA
               disabled={isLoading} // lock-down during processing
               rows={1} // initial compact height
-              className={`flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white/90 ${CWF_UI_CONFIG.messageFontSize} placeholder-white/30 focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 resize-none max-h-24 transition-all h-[46px] disabled:opacity-50`} // Stylized form element
+              className={`flex-1 bg-white/5 border rounded-xl px-3 py-2 text-white/90 ${CWF_UI_CONFIG.messageFontSize} placeholder-white/30 focus:outline-none resize-none max-h-24 transition-all h-[46px] disabled:opacity-50 ${
+                isCopilotEnabled
+                  ? "border-pink-500/30 focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/30"
+                  : "border-white/10 focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
+              }`} // Pink focus ring when copilot is active
             />
-            {/* Elevated Send Button with animated processing indicator toggle */}
+            {/* Elevated Send Button — pink gradient when copilot active */}
             <button
               onClick={handleSend} // click trigger
               disabled={isLoading || !input.trim()} // dynamic eligibility logic
-              className={`flex items-center justify-center w-[46px] h-[46px] ${CWF_UI_CONFIG.sendButtonGradient} disabled:from-white/10 disabled:to-white/10 disabled:text-white/30 text-white rounded-xl transition-all duration-200 shrink-0`} // Dynamic CTA button
+              className={`flex items-center justify-center w-[46px] h-[46px] disabled:from-white/10 disabled:to-white/10 disabled:text-white/30 text-white rounded-xl transition-all duration-200 shrink-0 ${
+                isCopilotEnabled
+                  ? "bg-linear-to-br from-pink-500 to-pink-600 hover:from-pink-400 hover:to-pink-500 shadow-lg shadow-pink-500/20"
+                  : CWF_UI_CONFIG.sendButtonGradient
+              }`} // Dynamic CTA button — pink when copilot is active
             >
               {isLoading ? (
                 <Loader2 size={18} className="animate-spin" /> // Spinner during tool usage

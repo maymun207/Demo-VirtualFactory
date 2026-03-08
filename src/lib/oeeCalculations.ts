@@ -18,6 +18,7 @@
 import {
     THEORETICAL_RATE_HEADROOM,
     KILN_BOTTLENECK_FACTOR,
+    FOEE_CONVEYOR_WEIGHT_EXPONENT,
     LINE_DEFINITIONS,
     OEE_MACHINE_NAMES,
 } from './params/oee';
@@ -490,30 +491,58 @@ export function calculateAllLOEEs(
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Calculate factory-level OEE anchored to the bottleneck rate.
+ * Calculate factory-level OEE anchored to the bottleneck rate,
+ * weighted by conveyor health.
  *
- * FOEE = J / min(A, B)
+ * FOEE = (J / min(A, B)) × conveyorWeightFactor × 100
  *
- * Since kiln is typically the bottleneck (B < A): FOEE ≈ J/B = LOEE₂
- * If press becomes constraint (A < B): FOEE = J/A
+ * Where conveyorWeightFactor = (conveyorOee / 100) ^ FOEE_CONVEYOR_WEIGHT_EXPONENT
  *
- * @param c     - Station counts
- * @param loees - All 3 line OEEs
+ * The exponent (from params/oee.ts) softens the conveyor's impact:
+ *   exp 0.0 → factor = 1.00 (legacy: conveyor ignored)
+ *   exp 0.5 → factor = sqrt(conveyorOee/100) (recommended)
+ *   exp 1.0 → factor = conveyorOee/100 (linear, aggressive)
+ *
+ * Since kiln is typically the bottleneck (B < A): base FOEE ≈ J/B = LOEE₂
+ * If press becomes constraint (A < B): base FOEE = J/A
+ *
+ * @param c               - Station counts
+ * @param loees           - All 3 line OEEs
  * @param cumulativeEnergy - Cumulative per-station energy
+ * @param conveyorOee     - Conveyor machine OEE (0-100%) for weighted factor
  * @returns FactoryOEE with all lines, energy, and bottleneck info
  */
 export function calculateFOEE(
     c: StationCounts,
     loees: LineOEE[],
     cumulativeEnergy: Record<string, { kWh: number; gas: number; co2: number }>,
+    conveyorOee: number = 100,
 ): FactoryOEE {
     /** Bottleneck rate = min(A, B) — the constraining theoretical capacity */
     const bottleneckRate = Math.min(c.theoreticalA, c.theoreticalB);
     /** Which rate is constraining: 'A' (press) or 'B' (kiln).
      *  When equal (A = B), defaults to 'B' since kiln is the real-world bottleneck. */
     const bottleneck: 'A' | 'B' = c.theoreticalA < c.theoreticalB ? 'A' : 'B';
-    /** Factory OEE = J / min(A, B) × 100, capped at 100% */
-    const oee = Math.min(100, safeDiv(c.packagingOutput, bottleneckRate) * 100);
+
+    /**
+     * Conveyor weight factor: softens conveyor OEE impact on Factory OEE.
+     * Uses the configurable exponent from params/oee.ts.
+     *
+     * At exp=0: factor = 1.0 always (legacy behaviour, conveyor ignored)
+     * At exp=0.5: factor = sqrt(conveyorOee/100) — 20% OEE → 0.45
+     * At exp=1.0: factor = conveyorOee/100 — 20% OEE → 0.20
+     *
+     * Clamped to [0, 1] to prevent NaN from negative OEE or inflation > 100%.
+     */
+    const conveyorRatio = clamp01(conveyorOee / 100);
+    const conveyorWeightFactor = (FOEE_CONVEYOR_WEIGHT_EXPONENT as number) === 0
+        ? 1.0  // Short-circuit: exponent=0 means conveyor has no impact
+        : Math.pow(conveyorRatio, FOEE_CONVEYOR_WEIGHT_EXPONENT);
+
+    /** Base Factory OEE = J / min(A, B), before conveyor weighting */
+    const baseOee = safeDiv(c.packagingOutput, bottleneckRate);
+    /** Factory OEE = base × conveyorWeight × 100, capped at 100% */
+    const oee = Math.min(100, baseOee * conveyorWeightFactor * 100);
 
     // Factory energy = sum of all station energy
     let totalKwh = 0;

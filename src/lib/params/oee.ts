@@ -49,6 +49,26 @@ export const THEORETICAL_RATE_HEADROOM = 1.05;
 export const KILN_BOTTLENECK_FACTOR = 1.0;
 
 /**
+ * Conveyor weight exponent for Factory OEE (Option A: weighted model).
+ *
+ * Factory OEE formula:
+ *   FOEE = (J / min(A, B)) × (conveyor_OEE / 100) ^ EXPONENT × 100
+ *
+ * The exponent softens the conveyor's impact on Factory OEE:
+ *   0.0 = conveyor has NO impact (legacy behaviour)
+ *   0.5 = square-root softening (recommended — 20% conveyor → factor ≈ 0.45)
+ *   1.0 = linear multiplier (aggressive — 20% conveyor → FOEE drops to 20%)
+ *
+ * Examples at conveyor OEE = 20%:
+ *   exp 0.0 → factor = 1.00 → FOEE unchanged
+ *   exp 0.5 → factor = 0.45 → FOEE ≈ 45% (recommended)
+ *   exp 1.0 → factor = 0.20 → FOEE = 20% (very harsh)
+ *
+ * Set to 0 to disable conveyor influence entirely (reverts to legacy formula).
+ */
+export const FOEE_CONVEYOR_WEIGHT_EXPONENT = 0.5;
+
+/**
  * @deprecated — kept for backward compatibility (OEE panel display, etc.)
  * The OEE calculation engine (oeeCalculations.ts) uses tick-based
  * THEORETICAL_RATE_HEADROOM and KILN_BOTTLENECK_FACTOR directly.

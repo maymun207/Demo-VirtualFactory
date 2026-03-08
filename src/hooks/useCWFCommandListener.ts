@@ -622,6 +622,32 @@ export function useCWFCommandListener(): void {
 
         // ── Route to the correct processor based on station type ──────────
         /**
+         * COPILOT MESSAGES — Handle autonomous copilot action notifications.
+         * The CopilotEngine inserts commands with station='copilot_message'
+         * to inject status updates into the CWF chat panel.
+         *
+         * The command's `reason` field contains the human-readable message
+         * that should be displayed with a 🤖 COPILOT badge.
+         */
+        if (command.station === 'copilot_message') {
+            /** Inject copilot message into CWF chat as a system message with 🤖 badge */
+            const chatMsg = command.reason || '🤖 Copilot took an action.';
+            useCWFStore.getState().addSystemMessage(`🤖 ${chatMsg}`);
+
+            /** Mark command as applied (fire-and-forget) */
+            supabase!
+                .from('cwf_commands')
+                .update({ status: 'applied' })
+                .eq('id', command.id)
+                .then(({ error }) => {
+                    if (error) console.error('[CWF Listener] Failed to mark copilot message as applied:', error.message);
+                });
+
+            console.log(`[CWF Listener] 🤖 Copilot message injected: ${chatMsg.substring(0, 80)}`);
+            return;
+        }
+
+        /**
          * Route to UI action dispatcher if station matches the sentinel value.
          * CWF_UI_ACTION_STATION_SENTINEL is 'ui_action' (from uiTelemetry.ts).
          * Never compare against the raw string to avoid silent staleness bugs.

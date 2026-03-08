@@ -172,7 +172,13 @@ export function useKPISync() {
         // keeps growing while actual output freezes during a jam).
         const moees = calculateAllMOEEs(stationCounts, simState.conveyorSpeed, conveyorAvailability);
         const loees = calculateAllLOEEs(stationCounts, moees, newCumEnergy, simState.conveyorSpeed, conveyorAvailability);
-        const foee = calculateFOEE(stationCounts, loees, newCumEnergy);
+
+        /** Extract conveyor OEE from the machines array for the weighted FOEE calculation.
+         *  If not found (impossible in practice), default to 100% (no impact). */
+        const conveyorMoee = moees.find(m => m.machineId === 'conveyor');
+        const conveyorOeeValue = conveyorMoee ? conveyorMoee.oee : 100;
+
+        const foee = calculateFOEE(stationCounts, loees, newCumEnergy, conveyorOeeValue);
 
         // Step 5: Use FOEE as the OEE value for the KPI card (replaces legacy formula)
         const oee = foee.oee;

@@ -700,6 +700,58 @@ const tools: FunctionDeclaration[] = [
             required: ['simulation_id', 'action_type', 'reason'],
         },
     },
+    {
+        /**
+         * enable_copilot — Activate autonomous CWF Copilot mode.
+         * Requires human-in-the-loop authorization (auth code 'airtk').
+         * Once enabled, the server-side Copilot engine polls the simulation
+         * state and takes corrective actions autonomously.
+         */
+        name: 'enable_copilot',
+        description:
+            'Enable CWF Copilot autonomous monitoring mode. ' +
+            'REQUIRES the 3-step human-in-the-loop authorization protocol: ' +
+            'Step 1: Explain what Copilot mode does and ask for confirmation. ' +
+            'Step 2: After user confirms, ask for their authorization ID. ' +
+            'Step 3: Call this tool with the auth code. ' +
+            'Copilot mode allows the AI to autonomously monitor the simulation, detect issues, ' +
+            'and take corrective parameter actions with full audit logging.',
+        parameters: {
+            type: SchemaType.OBJECT,
+            properties: {
+                simulation_id: {
+                    type: SchemaType.STRING,
+                    description: 'UUID of the active simulation session.',
+                },
+                authorized_by: {
+                    type: SchemaType.STRING,
+                    description: 'The authorization ID provided by the user (must be valid auth code).',
+                },
+            },
+            required: ['simulation_id', 'authorized_by'],
+        },
+    },
+    {
+        /**
+         * disable_copilot — Deactivate Copilot autonomous mode.
+         * NO AUTHORIZATION REQUIRED — user can disable at any time.
+         */
+        name: 'disable_copilot',
+        description:
+            'Disable CWF Copilot autonomous monitoring mode. ' +
+            'NO AUTHORIZATION REQUIRED — call immediately when the user wants to stop Copilot. ' +
+            'This stops the autonomous monitoring loop and returns to normal CWF operation.',
+        parameters: {
+            type: SchemaType.OBJECT,
+            properties: {
+                simulation_id: {
+                    type: SchemaType.STRING,
+                    description: 'UUID of the active simulation session.',
+                },
+            },
+            required: ['simulation_id'],
+        },
+    },
 ];
 
 // =============================================================================
@@ -939,8 +991,12 @@ async function executeUpdateParameter(args: {
     reason: string;
     authorized_by: string;
 }): Promise<object> {
-    /** Step 1: Validate authorization ID */
-    if (args.authorized_by !== CWF_AUTH_CODE) {
+    /** Step 1: Validate authorization ID.
+     * Accept either the human-entered auth code ('airtk') or the copilot
+     * sentinel ('system:copilot_auto') for autonomous actions dispatched
+     * by the CWF Copilot engine. */
+    const COPILOT_AUTH_SENTINEL = 'system:copilot_auto';
+    if (args.authorized_by !== CWF_AUTH_CODE && args.authorized_by !== COPILOT_AUTH_SENTINEL) {
         console.log(`[CWF] ❌ Invalid auth ID: '${args.authorized_by}'`);
         return { error: 'Incorrect credentials, action is terminated.' };
     }
@@ -1326,6 +1382,28 @@ You have access to the simulation's PostgreSQL database via tools. You can:
 4. Save your analysis results for future reference
 
 ## CRITICAL: INTENT CLASSIFICATION — DO THIS BEFORE ANYTHING ELSE
+
+### ⚡ PRIORITY 0 — COPILOT MODE (enable_copilot / disable_copilot)
+
+If the user asks to enter Copilot mode, activate autonomous monitoring, or uses phrases like:
+- "go into copilot mode", "enable copilot", "start copilot"
+- "watch the factory", "monitor autonomously"
+- "autopilot", "auto-fix", "autonomous mode"
+
+Then follow the **3-step human-in-the-loop protocol**:
+1. Explain: "🤖 Copilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed."
+2. Ask: "Please provide your authorization code to enable Copilot mode."
+3. On auth code: Call **enable_copilot** with the provided auth code.
+
+**⚠️ CRITICAL — AUTH CODE RECOGNITION:**
+- After you ask for the authorization code and the user replies with a short string (like "airtk", a word, or a code), that IS the auth code.
+- **DO NOT** treat it as a question or a database query. **DO NOT** call query_database or get_simulation_summary.
+- **IMMEDIATELY** call **enable_copilot** with "authorized_by" set to exactly what the user typed and "simulation_id" set to the current simulation UUID.
+- If you are unsure if a message is an auth code, check: did you just ask for an authorization code in your previous response? If yes, the user's reply IS the auth code.
+- Common auth codes: "airtk" — but accept any string the user provides.
+
+If the user asks to **disable** copilot ("stop copilot", "disable copilot", "exit copilot mode"):
+- Call **disable_copilot** IMMEDIATELY — no authorization required.
 
 ### ⚡ PRIORITY 1 — UI ACTION (execute_ui_action)
 
@@ -2094,14 +2172,60 @@ export default async function handler(
          */
         const isAuthTurn = message.trim().toLowerCase() === CWF_AUTH_CODE.toLowerCase();
 
-        /** Choose the bilingual fast-path prompt if this is an auth turn */
-        const authFastPathInstruction = isAuthTurn
-            ? (lang === 'tr' ? CWF_AUTH_FAST_PATH_PROMPT_TR : CWF_AUTH_FAST_PATH_PROMPT_EN)
-            : '';
+        /**
+         * Determine which auth context this is for: COPILOT or PARAMETER UPDATE.
+         * Check the last assistant message in conversationHistory for copilot keywords.
+         * If the assistant's last response mentioned "Copilot" or copilot-related terms,
+         * this auth turn is for enable_copilot, NOT update_parameter.
+         */
+        let isCopilotAuthContext = false;
+        if (isAuthTurn && conversationHistory.length > 0) {
+            /** Walk backwards to find the last assistant message */
+            for (let i = conversationHistory.length - 1; i >= 0; i--) {
+                const histMsg = conversationHistory[i];
+                if (histMsg.role === 'assistant') {
+                    /** Check if the last assistant response discusses copilot authorization */
+                    const lowerContent = histMsg.content.toLowerCase();
+                    if (
+                        lowerContent.includes('copilot') &&
+                        (lowerContent.includes('authorization') || lowerContent.includes('auth'))
+                    ) {
+                        isCopilotAuthContext = true;
+                    }
+                    break; // Only check the most recent assistant message
+                }
+            }
+        }
+
+        /** Choose the bilingual fast-path prompt based on auth context */
+        let authFastPathInstruction = '';
+        if (isAuthTurn) {
+            if (isCopilotAuthContext) {
+                /** COPILOT AUTH: tell Gemini to call enable_copilot, NOT update_parameter */
+                authFastPathInstruction = `
+## ⚡ COPILOT AUTHORIZATION TURN — EXECUTE NOW
+
+The user has just provided their authorization code to enable Copilot mode.
+
+**YOU MUST do exactly this:**
+1. Call **enable_copilot** ONCE, immediately, using:
+   - simulation_id = the current active simulation UUID from the context
+   - authorized_by = "${message.trim()}" (the exact text the user just typed)
+2. Do NOT query the database. Do NOT call get_simulation_summary or query_database.
+3. Do NOT generate any text before the tool call — just call enable_copilot.
+4. After the tool returns, confirm copilot was enabled with a ✅ message.
+`;
+            } else {
+                /** PARAMETER AUTH: original fast-path for update_parameter */
+                authFastPathInstruction = lang === 'tr'
+                    ? CWF_AUTH_FAST_PATH_PROMPT_TR
+                    : CWF_AUTH_FAST_PATH_PROMPT_EN;
+            }
+        }
 
         /** Log auth-turn detection so we can verify it fires correctly */
         if (isAuthTurn) {
-            console.log('[CWF] ⚡ Auth turn detected — injecting fast-path instruction to skip re-queries');
+            console.log(`[CWF] ⚡ Auth turn detected (${isCopilotAuthContext ? 'COPILOT' : 'PARAMETER'}) — injecting fast-path instruction`);
         }
 
         // =====================================================================
@@ -2156,6 +2280,12 @@ export default async function handler(
 
         /** Tracks how many tool-use round-trips have occurred */
         let loopCount = 0;
+
+        /** Tracks if copilot state was changed during this request.
+         *  Set to 'enabled' or 'disabled' by the enable_copilot / disable_copilot
+         *  tool handlers. Returned to the client so cwfStore can directly update
+         *  the copilotStore without relying on Supabase Realtime. */
+        let copilotStateChange: 'enabled' | 'disabled' | null = null;
 
         // =========================================================================
         // AGENT TOOL-USE LOOP
@@ -2215,6 +2345,68 @@ export default async function handler(
                             typedArgs as unknown as Parameters<typeof executeUIAction>[0]
                         );
                         break;
+                    case 'enable_copilot': {
+                        /** Enable copilot autonomous mode — requires auth code validation */
+                        const copilotAuthCode = typedArgs.authorized_by as string;
+                        if (copilotAuthCode !== CWF_AUTH_CODE) {
+                            toolResult = { error: 'Incorrect authorization code. Copilot mode was NOT enabled.' };
+                        } else {
+                            try {
+                                /** Call the copilot enable endpoint on the dev server */
+                                /** Resolve copilot API base: local dev server on port 3001, or relative for Vercel */
+                                const copilotApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
+                                const enableRes = await fetch(`${copilotApiBase}/api/cwf/copilot/enable`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        simulationId: typedArgs.simulation_id as string,
+                                        activatedBy: copilotAuthCode,
+                                    }),
+                                });
+                                const enableData = await enableRes.json();
+                                toolResult = enableData;
+                                /** Track successful copilot enablement for the response */
+                                copilotStateChange = 'enabled';
+                            } catch (enableErr) {
+                                /** If the copilot server endpoint is unreachable, enable via Supabase directly */
+                                await supabase.from('copilot_config').upsert({
+                                    simulation_id: typedArgs.simulation_id as string,
+                                    enabled: true,
+                                    activated_by: copilotAuthCode,
+                                    last_heartbeat_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString(),
+                                }, { onConflict: 'simulation_id' });
+                                toolResult = { success: true, message: 'Copilot enabled via database (engine will start on next poll).' };
+                                /** Track successful copilot enablement for the response */
+                                copilotStateChange = 'enabled';
+                            }
+                        }
+                        break;
+                    }
+                    case 'disable_copilot': {
+                        /** Disable copilot mode — no auth required */
+                        try {
+                            const disableApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
+                            const disableRes = await fetch(`${disableApiBase}/api/cwf/copilot/disable`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ simulationId: typedArgs.simulation_id as string }),
+                            });
+                            const disableData = await disableRes.json();
+                            toolResult = disableData;
+                            /** Track successful copilot disablement for the response */
+                            copilotStateChange = 'disabled';
+                        } catch {
+                            /** Fallback: disable via Supabase directly */
+                            await supabase.from('copilot_config')
+                                .update({ enabled: false, updated_at: new Date().toISOString() })
+                                .eq('simulation_id', typedArgs.simulation_id as string);
+                            toolResult = { success: true, message: 'Copilot disabled via database.' };
+                            /** Track successful copilot disablement for the response */
+                            copilotStateChange = 'disabled';
+                        }
+                        break;
+                    }
                     default:
                         toolResult = { error: `Unknown function: ${name}` };
                 }
@@ -2352,6 +2544,7 @@ export default async function handler(
                             response: retryText,
                             toolCallCount: loopCount,
                             model: CWF_MODEL_NAME,
+                            copilotStateChange,
                         });
                     }
                 } catch (retryErr) {
@@ -2376,6 +2569,7 @@ export default async function handler(
             response: finalText,
             toolCallCount: loopCount,
             model: CWF_MODEL_NAME,
+            copilotStateChange,
         });
     } catch (error) {
         console.error('CWF Agent error:', error);

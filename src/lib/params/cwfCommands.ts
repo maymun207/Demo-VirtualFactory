@@ -30,6 +30,18 @@ export const CWF_AUTH_CODE = 'airtk';
  */
 export const CWF_AUTH_TIMEOUT_MS = 20_000;
 
+/**
+ * Sentinel value for authorized_by when the CWF Copilot autonomously
+ * dispatches parameter changes. Commands bearing this sentinel bypass
+ * the interactive human-in-the-loop flow because the user already
+ * authorized copilot mode via the 3-step auth flow at activation time.
+ *
+ * Used by:
+ *   - api/cwf/copilotEngine.ts (writes this value into cwf_commands.authorized_by)
+ *   - src/hooks/useCWFCommandListener.ts (accepts commands with this sentinel)
+ */
+export const COPILOT_AUTH_SENTINEL = 'system:copilot_auto';
+
 // =============================================================================
 // ACK VERIFICATION — Server-Side Wait for Client Acknowledgment
 // =============================================================================

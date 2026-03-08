@@ -32,6 +32,8 @@ import { useUIStore } from './uiStore';
 import { useWorkOrderStore } from './workOrderStore';
 /** UIContext type for the real-time UI snapshot attached to every CWF request */
 import type { UIContext } from '../lib/types/cwfTypes';
+/** Copilot store — direct state sync when API reports copilot enable/disable */
+import { useCopilotStore } from './copilotStore';
 
 // =============================================================================
 // TYPES
@@ -408,6 +410,18 @@ export const useCWFStore = create<CWFState>((set, get) => ({
                 ),
                 isLoading: false,
             }));
+
+            /** Direct copilot state sync — the API returns copilotStateChange
+             *  ('enabled' | 'disabled' | null) when a copilot tool was called.
+             *  This bypasses the Supabase Realtime subscription which can be
+             *  unreliable, ensuring the pink theme activates immediately. */
+            if (result.copilotStateChange === 'enabled') {
+                useCopilotStore.getState().enableCopilot();
+                console.log('[CWF Store] 🟢 Copilot enabled via API response flag');
+            } else if (result.copilotStateChange === 'disabled') {
+                useCopilotStore.getState().disableCopilot();
+                console.log('[CWF Store] 🔴 Copilot disabled via API response flag');
+            }
         } catch (error) {
             /** Format error message in the user's language */
             const errorMsg =
