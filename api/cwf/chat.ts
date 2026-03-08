@@ -67,6 +67,66 @@ const CWF_FORCE_SUMMARY_PROMPT_EN =
     'Please provide your best answer now using ONLY the data you have already collected. ' +
     'Do NOT request any more tool calls. Summarise your findings clearly.';
 
+/**
+ * Unique sentinel prefix prepended to every force-summary / retry injection.
+ * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_FORCE_SUMMARY_SENTINEL
+ * The history sanitizer detects this prefix in user turns and removes them.
+ */
+const CWF_FORCE_SUMMARY_SENTINEL = '[[CWF_FORCE_SUMMARY]]';
+
+/**
+ * Fingerprint substring used to detect force-summary contamination in
+ * ASSISTANT messages. When Gemini quotes the force-summary instruction back
+ * (e.g. "as per your instruction to 'Do NOT call any tools'"), this fingerprint
+ * identifies those contaminated assistant turns for removal from history.
+ * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_FORCE_SUMMARY_FINGERPRINT
+ */
+const CWF_FORCE_SUMMARY_FINGERPRINT = 'Do NOT';
+
+/**
+ * Fingerprint for the retry prompt contamination path.
+ * The retry prompt text "Answer NOW using all the data you already collected"
+ * can also appear quoted back in Gemini assistant responses.
+ * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_RETRY_PROMPT_FINGERPRINT
+ */
+const CWF_RETRY_PROMPT_FINGERPRINT = 'Answer NOW using all the data';
+
+/**
+ * Auth-turn fast-path system instruction injected when the user message
+ * is the authorization code. Tells Gemini to execute immediately with ONE
+ * tool call rather than re-querying state (which burns loops and can hit
+ * CWF_MAX_TOOL_LOOPS before the actual execution tool is called).
+ * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_AUTH_FAST_PATH_PROMPT_EN
+ */
+const CWF_AUTH_FAST_PATH_PROMPT_EN = `
+## ⚡ AUTHORIZATION TURN — FAST PATH REQUIRED
+
+The user has just provided their authorization code. This is an authorization confirmation turn.
+
+**You MUST:**
+1. Execute the SINGLE pending action (update_parameter OR execute_ui_action) immediately using the authorization code the user just provided.
+2. Do NOT query the database again — you already have the current values from the previous turn.
+3. Do NOT ask any further questions — the user has already confirmed "yes" and provided auth.
+4. Make exactly ONE tool call (the execution tool), then provide a brief confirmation message.
+
+The pending action and all required context are already in the conversation history above.
+`;
+
+/** Turkish variant of the auth fast-path prompt */
+const CWF_AUTH_FAST_PATH_PROMPT_TR = `
+## ⚡ YETKİLENDİRME TURU — HIZLI YOL GEREKLİ
+
+Kullanıcı yetkisini az önce sağladı. Bu bir yetkilendirme onay turudur.
+
+**YAPMANIZ GEREKENLER:**
+1. Kullanıcının az önce sağladığı yetkilendirme koduyla bekleyen TEK işlemi (update_parameter VEYA execute_ui_action) hemen uygulayın.
+2. Veritabanını tekrar sorgulamayın — mevcut değlerleri önceki turdan zaten biliyorsunuz.
+3. Daha fazla soru sormayın — kullanıcı "evet" dedi ve yetki verdi.
+4. TAM OLARAK BİR araç çağrısı yapın (uygulama aracı), ardından kısa bir onay mesajı verin.
+
+Bekleyen işlem ve gerekli tüm bağlam yukarıdaki konuşma geçmişinde mevcuttur.
+`;
+
 // =============================================================================
 // CWF PARAMETER CONTROL — Human-in-the-Loop Auth Code
 // Mirror of CWF_AUTH_CODE from src/lib/params/cwfCommands.ts.
@@ -1748,27 +1808,118 @@ export default async function handler(
             historyContext = `\n\n[Simulation History (newest first):\n${historyLines}\nCurrent session: code=${sessionCode}]`;
         }
 
-        // Initialize Gemini model with function-calling tools
+
         /** Resolve language for bilingual prompt / fallback selection */
         const lang = language as 'tr' | 'en';
 
-        const model = genAI.getGenerativeModel({
-            model: CWF_MODEL_NAME,
-            /** Pass uiContext so the prompt builder can inject the CURRENT UI STATE section */
-            systemInstruction: await buildSystemPrompt(lang, uiContext),
-            tools: [{ functionDeclarations: tools }],
-        });
 
-        // Build conversation history for multi-turn context
+        // =====================================================================
+        // HISTORY SANITIZATION
+        // Strip any conversation turns that contain force-summary / retry prompt
+        // pollution before feeding history to Gemini. This prevents the
+        // "as per your instruction to 'Do NOT call any tools'" self-reinforcing
+        // loop where Gemini treats a prior emergency control signal as a
+        // standing user instruction.
+        //
+        // Two contamination vectors are removed:
+        //   1. USER turns that start with CWF_FORCE_SUMMARY_SENTINEL
+        //      (these are the injected force-summary / retry prompts themselves)
+        //   2. ASSISTANT turns whose text contains CWF_FORCE_SUMMARY_FINGERPRINT
+        //      or CWF_RETRY_PROMPT_FINGERPRINT (Gemini quoting the instruction back)
+        // =====================================================================
+
+        /**
+         * Removes sentinel-tagged and fingerprint-contaminated turns from the
+         * conversation history before it is mapped to Gemini Content objects.
+         *
+         * @param history - Raw history from cwfStore (user + assistant turns)
+         * @returns Cleaned history safe to pass to Gemini
+         */
+        function sanitizeConversationHistory(
+            history: Array<{ role: string; content: string }>
+        ): Array<{ role: string; content: string }> {
+            /** Collect indices of turns to remove */
+            const indicesToRemove = new Set<number>();
+
+            history.forEach((msg, idx) => {
+                /** Remove user turns that are force-summary / retry injections */
+                if (
+                    msg.role === 'user' &&
+                    msg.content.startsWith(CWF_FORCE_SUMMARY_SENTINEL)
+                ) {
+                    /** Mark this injected user turn for removal */
+                    indicesToRemove.add(idx);
+                    /**
+                     * Also remove the ASSISTANT response that followed the injection.
+                     * That response often quotes the forbidden instruction back,
+                     * which is itself a contamination vector in later turns.
+                     */
+                    if (idx + 1 < history.length && history[idx + 1].role !== 'user') {
+                        indicesToRemove.add(idx + 1);
+                    }
+                }
+
+                /**
+                 * Remove assistant turns that quote force-summary or retry fingerprints.
+                 * This catches cases where Gemini's response TEXT repeats the forbidden
+                 * instruction (e.g. "as per your instruction to 'Do NOT call any tools'").
+                 */
+                if (
+                    msg.role === 'assistant' && (
+                        msg.content.includes(CWF_FORCE_SUMMARY_FINGERPRINT) ||
+                        msg.content.includes(CWF_RETRY_PROMPT_FINGERPRINT)
+                    )
+                ) {
+                    /** Mark contaminated assistant turn for removal */
+                    indicesToRemove.add(idx);
+                }
+            });
+
+            /** Filter out all marked turns and return clean history */
+            return history.filter((_, idx) => !indicesToRemove.has(idx));
+        }
+
+        // =====================================================================
+        // AUTH-TURN DETECTION
+        // If the current user message IS the authorization code, this is a
+        // simple execution turn that requires ONE tool call only. Inject the
+        // fast-path instruction to prevent Gemini from burning loops on
+        // re-querying state data it already has from the prior proposal turn.
+        // =====================================================================
+
+        /**
+         * Detects whether the current user message is an authorization code.
+         * We compare the trimmed, lowercase message against the known auth code.
+         * If it matches, the fast-path prompt is appended to the system instruction.
+         */
+        const isAuthTurn = message.trim().toLowerCase() === CWF_AUTH_CODE.toLowerCase();
+
+        /** Choose the bilingual fast-path prompt if this is an auth turn */
+        const authFastPathInstruction = isAuthTurn
+            ? (lang === 'tr' ? CWF_AUTH_FAST_PATH_PROMPT_TR : CWF_AUTH_FAST_PATH_PROMPT_EN)
+            : '';
+
+        /** Log auth-turn detection so we can verify it fires correctly */
+        if (isAuthTurn) {
+            console.log('[CWF] ⚡ Auth turn detected — injecting fast-path instruction to skip re-queries');
+        }
+
+        // =====================================================================
+        // Build conversation history for multi-turn context.
+        // Apply sanitization FIRST to remove any forced-summary pollution from
+        // prior turns before those turns are fed to Gemini as context.
+        // =====================================================================
+        const sanitizedHistory = sanitizeConversationHistory(conversationHistory);
+
         const contents: Content[] = [
-            // Map prior conversation turns into Gemini Content format
-            ...conversationHistory.map(
+            /** Map SANITIZED prior conversation turns into Gemini Content format */
+            ...sanitizedHistory.map(
                 (msg: { role: string; content: string }) => ({
                     role: msg.role === 'user' ? ('user' as const) : ('model' as const),
                     parts: [{ text: msg.content }] as Part[],
                 })
             ),
-            // Append the current user message with the active simulation ID
+            /** Append the current user message with the active simulation ID context */
             {
                 role: 'user' as const,
                 parts: [
@@ -1778,6 +1929,19 @@ export default async function handler(
                 ] as Part[],
             },
         ];
+
+        /**
+         * Initialize Gemini model AFTER auth detection so we can append
+         * the fast-path instruction to the system prompt when needed.
+         * Combining the base system prompt + auth fast-path (if any) into
+         * one system instruction sent to Gemini for this single request.
+         */
+        const model = genAI.getGenerativeModel({
+            model: CWF_MODEL_NAME,
+            /** Base system prompt + optional fast-path instruction for auth turns */
+            systemInstruction: (await buildSystemPrompt(lang, uiContext)) + authFastPathInstruction,
+            tools: [{ functionDeclarations: tools }],
+        });
 
         // Start chat session with history (all messages except the latest)
         const chat = model.startChat({
@@ -1887,9 +2051,17 @@ export default async function handler(
 
         if (stillWantsTools) {
             /** Choose the bilingual forced-summary prompt */
-            const forcePrompt = lang === 'tr'
+            const forcePromptText = lang === 'tr'
                 ? CWF_FORCE_SUMMARY_PROMPT_TR
                 : CWF_FORCE_SUMMARY_PROMPT_EN;
+
+            /**
+             * Prefix with CWF_FORCE_SUMMARY_SENTINEL before sending.
+             * This ensures that if this injected turn somehow ends up stored
+             * in conversation history on the client side, the sanitizer will
+             * detect and remove it on the next request.
+             */
+            const forcePrompt = `${CWF_FORCE_SUMMARY_SENTINEL} ${forcePromptText}`;
 
             /** Send one final user turn that forbids further tool calls */
             response = await chat.sendMessage([{ text: forcePrompt }]);
@@ -1945,9 +2117,15 @@ export default async function handler(
                      * This preserves all previous tool results so Gemini can
                      * summarize what it already gathered instead of starting over.
                      */
-                    const retryPrompt = lang === 'tr'
+                    /**
+                     * Prefix the retry prompt with the sentinel tag.
+                     * This ensures it gets sanitized out of history on the next request
+                     * and does not leak "Do NOT call any tools" as a standing instruction.
+                     */
+                    const retryPromptText = lang === 'tr'
                         ? 'Topladığın tüm verileri kullanarak şimdi cevap ver. Araç çağrısı yapma. Verilerle kısa ve net bir özet yaz.'
                         : 'Answer NOW using all the data you already collected. Do NOT call any tools. Write a clear, concise summary with the actual numbers you found.';
+                    const retryPrompt = `${CWF_FORCE_SUMMARY_SENTINEL} ${retryPromptText}`;
 
                     const retryResponse = await chat.sendMessage([{ text: retryPrompt }]);
                     const retryResult = retryResponse.response;

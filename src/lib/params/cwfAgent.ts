@@ -81,6 +81,9 @@ export const CWF_FALLBACK_RESPONSE_TR =
  * of everything it has gathered so far.
  *
  * Bilingual variant is chosen at runtime based on the session language.
+ *
+ * IMPORTANT: Always prefix with CWF_FORCE_SUMMARY_SENTINEL so the
+ * sanitization logic can detect and strip this turn from history.
  */
 export const CWF_FORCE_SUMMARY_PROMPT_EN =
     'You have reached the maximum number of tool calls. ' +
@@ -92,6 +95,91 @@ export const CWF_FORCE_SUMMARY_PROMPT_TR =
     'Maksimum araç çağrısı sayısına ulaştınız. ' +
     'Lütfen şu ana kadar topladığınız verilerle en iyi yanıtınızı verin. ' +
     'Daha fazla araç çağrısı yapmayın. Bulgularınızı net bir şekilde özetleyin.';
+
+// =============================================================================
+// FORCED-SUMMARY HISTORY SANITIZATION
+// =============================================================================
+
+/**
+ * Unique sentinel prefix prepended to every forced-summary injection.
+ * This prefix is added before the force-summary/retry prompt text so
+ * the history sanitizer can identify and strip those turns from the
+ * conversation history sent on subsequent requests.
+ *
+ * Chosen to be distinctive and unlikely to appear in real user messages.
+ */
+export const CWF_FORCE_SUMMARY_SENTINEL = '[[CWF_FORCE_SUMMARY]]';
+
+/**
+ * Substring fingerprint used to detect forced-summary contamination in
+ * ASSISTANT messages. When Gemini responds to the forced-summary prompt,
+ * it often quotes the instruction back in its reply (e.g. "as per your
+ * instruction to 'Do NOT call any tools'").
+ *
+ * The sanitizer scans prior assistant turns for this fingerprint and
+ * removes any that contain it, breaking the self-reinforcing pollution loop.
+ */
+export const CWF_FORCE_SUMMARY_FINGERPRINT = 'Do NOT';
+
+/**
+ * Substring fingerprint for the retry prompt ("Answer NOW using all the
+ * data you already collected. Do NOT call any tools.").  This appears in
+ * the retry path and can also contaminate conversation history.
+ */
+export const CWF_RETRY_PROMPT_FINGERPRINT = 'Answer NOW using all the data';
+
+// =============================================================================
+// AUTH-TURN FAST-PATH PROMPT
+// =============================================================================
+
+/**
+ * Injected into the Gemini system prompt when the current user message
+ * is detected as an authorization code confirmation turn.
+ *
+ * PURPOSE:
+ *   Without this, Gemini re-queries the simulation state (burning 3-5 tool
+ *   loops) before calling update_parameter or execute_ui_action. During a
+ *   simple "airtk" auth-confirmation turn, those queries are wasted — all
+ *   necessary data was gathered in the PREVIOUS turn where the proposal
+ *   was presented.
+ *
+ *   This prompt tells Gemini: "You already have everything you need.
+ *   Execute the pending action NOW using the authorization code provided.
+ *   Do NOT re-query. One tool call only."
+ *
+ *   Result: auth turns use 1 tool loop instead of 5-8, making them
+ *   immune to CWF_MAX_TOOL_LOOPS exhaustion.
+ */
+export const CWF_AUTH_FAST_PATH_PROMPT_EN = `
+## ⚡ AUTHORIZATION TURN — FAST PATH REQUIRED
+
+The user has just provided their authorization code. This is an authorization confirmation turn.
+
+**You MUST:**
+1. Execute the SINGLE pending action (update_parameter OR execute_ui_action) immediately using the authorization code the user just provided.
+2. Do NOT query the database again — you already have the current values from the previous turn.
+3. Do NOT ask any further questions — the user has already confirmed "yes" and provided auth.
+4. Make exactly ONE tool call (the execution tool), then provide a brief confirmation message.
+
+The pending action and all required context are already in the conversation history above.
+`;
+
+/** Turkish translation of the auth fast-path prompt */
+export const CWF_AUTH_FAST_PATH_PROMPT_TR = `
+## ⚡ YETKİLENDİRME TURU — HIZLI YOL GEREKLİ
+
+Kullanıcı yetkisini az önce sağladı. Bu bir yetkilendirme onay turudur.
+
+**YAPMANIZ GEREKENLER:**
+1. Kullanıcının az önce sağladığı yetkilendirme koduyla bekleyen TEK işlemi (update_parameter VEYA execute_ui_action) hemen uygulayın.
+2. Veritabanını tekrar sorgulamayın — mevcut değerleri önceki turdan zaten biliyorsunuz.
+3. Daha fazla soru sormayın — kullanıcı "evet" dedi ve yetki verdi.
+4. TAM OLARAK BİR araç çağrısı yapın (uygulama aracı), ardından kısa bir onay mesajı verin.
+
+Bekleyen işlem ve gerekli tüm bağlam yukarıdaki konuşma geçmişinde mevcuttur.
+`;
+
+
 
 // =============================================================================
 // OEE SYSTEM CONTEXT (Injected into CWF system prompt)
