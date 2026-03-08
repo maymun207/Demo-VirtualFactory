@@ -1148,8 +1148,8 @@ The conveyor belt is the **8th controllable station** (station name: "conveyor")
 
 | Parameter Key | Display Name | Type | Default | Valid Range | Meaning |
 |---|---|---|---|---|---|
-| jammed_time | Jam Duration | Numeric | 8 cycles | 1–30 cycles | How long each jam lasts |
-| impacted_tiles | Tiles Scrapped Per Jam | Numeric | 3 tiles | 0–20 tiles | Scrap tiles per jam event |
+| jammed_time | Jam Duration | Numeric | 7 cycles | 1–30 cycles | How long each jam lasts |
+| impacted_tiles | Tiles Scrapped Per Jam | Numeric | 0 tiles | 0–20 tiles | Scrap tiles per jam event |
 | scrap_probability | Scrap Probability (%) | Numeric | 0 % | 0–3 % | Global tile scrap probability |
 | speed_change | Speed Change Events | Boolean 0/1 | 0 (off) | 0 = off, 1 = on | Whether speed-change events occur |
 | jammed_events | Jam Events Enabled | Boolean 0/1 | 0 (off) | 0 = off, 1 = on | Whether jam events occur on the belt |
