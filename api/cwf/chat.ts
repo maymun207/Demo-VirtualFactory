@@ -1587,18 +1587,34 @@ ${panelLines}
 - S-Clock Period: ${sim?.['sClockPeriod'] ?? 'N/A'} ms per tick
 - Station Interval: ${sim?.['stationInterval'] ?? 'N/A'} ticks
 
+### Conveyor Behavioral Parameters (live store snapshot — ALWAYS current)
+${(() => {
+                    const cp = uiContext?.['conveyorParams'] as Record<string, unknown> | undefined;
+                    if (!cp) return '- Conveyor params not available in this snapshot.';
+                    const speedChangeLabel = cp['speed_change'] ? '✅ ENABLED' : '❌ DISABLED';
+                    const jammedLabel = cp['jammed_events'] ? '✅ ENABLED' : '❌ DISABLED';
+                    return [
+                        `- Speed Change Events: ${speedChangeLabel}`,
+                        `- Jam Events: ${jammedLabel}`,
+                        `- Jam Duration: ${cp['jammed_time']} cycles`,
+                        `- Impacted Tiles per Jam: ${cp['impacted_tiles']} tiles`,
+                        `- Scrap Probability: ${cp['scrap_probability']}%`,
+                    ].join('\n');
+                })()}
+
 ### Session Configuration
 - Interface Language: ${cfg?.['language'] === 'tr' ? 'Turkish (TR)' : 'English (EN)'}
 - Active Scenario: ${cfg?.['activeScenarioCode'] ?? 'None'}
 - Work Order: ${cfg?.['selectedWorkOrderId'] ?? 'None'}
-- Demo Settings Configured: ${cfg?.['isSimConfigured'] ? '\u2705 Yes' : '\u274C No (Start button locked)'}
-- Simulation Completed Naturally: ${cfg?.['simulationEnded'] ? '\u2705 Yes (Reset required)' : '\u274C No'}
+- Demo Settings Configured: ${cfg?.['isSimConfigured'] ? '✅ Yes' : '❌ No (Start button locked)'}
+- Simulation Completed Naturally: ${cfg?.['simulationEnded'] ? '✅ Yes (Reset required)' : '❌ No'}
 
 ### How to use this context
 - If user asks "what panels are open?", use the list above. Do NOT query the DB for this.
 - If user asks "is the simulation running?", answer from Status above.
 - If user asks "what speed is the conveyor?", answer from Conveyor above.
 - If user asks "what scenario is active?", answer from Active Scenario above.
+- **If user asks about ANY conveyor behavioral parameter (speed_change, jammed_events, jammed_time, impacted_tiles, scrap_probability), answer from "Conveyor Behavioral Parameters" above. Do NOT query conveyor_states in Supabase for this — the DB row may be one tick stale immediately after a change.**
 - You CAN still query Supabase for historical or aggregated data (OEE trends, tile defects).
 - This snapshot does NOT replace DB queries for historical or aggregated data.`;
         })() : ''}
@@ -1607,9 +1623,9 @@ ${panelLines}
 
 The conveyor belt is the **8th controllable station** (station name: "conveyor"). Unlike the 7 production machines, it does NOT have its own machine_conveyor_states table. Instead:
 
+- **Read (current values):** always use the **Conveyor Behavioral Parameters** section in the CURRENT UI STATE snapshot above. This reflects the live store state and is ALWAYS immediately current after a CWF parameter change — no query delay.
+- **Read (historical/trend data):** query conveyor_states for trends, history, or if uiContext snapshot is unavailable.
 - **Change** conveyor parameters using update_parameter with station = "conveyor".
-- **Read** conveyor speed/status AND behavioral parameters from the conveyor_states table (latest row per session).
-- Since migration 20260308, all 5 behavioral parameters are stored per-tick in conveyor_states — you can query them directly from Supabase.
 
 ### Conveyor Parameter Reference:
 

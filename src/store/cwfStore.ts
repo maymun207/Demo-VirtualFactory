@@ -290,6 +290,32 @@ export const useCWFStore = create<CWFState>((set, get) => ({
                 /** Whether the simulation has finished naturally */
                 simulationEnded: uiState.simulationEnded,
             },
+            /**
+             * Live conveyor behavioral parameters from the store.
+             *
+             * These are read from simulationDataStore.conveyorNumericParams, which is the
+             * STORE-SIDE source of truth. They are updated immediately when a CWF command
+             * is applied by useCWFCommandListener (via updateConveyorBoolParam / updateConveyorParam).
+             *
+             * Unlike conveyor_states in Supabase (populated each tick by the sync service),
+             * this snapshot is ALWAYS current — it reflects the exact parameter state the
+             * user sees at the moment they send this message.
+             *
+             * CWF should use conveyorParams from uiContext for status questions, and only
+             * fall back to querying conveyor_states when historical/trend data is needed.
+             */
+            conveyorParams: {
+                /** Jam duration per event in simulation clock cycles */
+                jammed_time: simDataState.conveyorNumericParams.jammed_time as number,
+                /** Number of tiles scrapped per jam event */
+                impacted_tiles: simDataState.conveyorNumericParams.impacted_tiles as number,
+                /** Global tile scrap probability (%) */
+                scrap_probability: simDataState.conveyorNumericParams.scrap_probability as number ?? 0,
+                /** Whether random belt speed-change events are enabled */
+                speed_change: !!simDataState.conveyorNumericParams.speed_change,
+                /** Whether jam events are enabled on the belt */
+                jammed_events: !!simDataState.conveyorNumericParams.jammed_events,
+            },
         };
         // ─────────────────────────────────────────────────────────────────
 

@@ -125,6 +125,37 @@ export interface ConfigSnapshot {
 }
 
 // =============================================================================
+// CONVEYOR PARAMETER SNAPSHOT
+// =============================================================================
+
+/**
+ * ConveyorParamSnapshot — Live values of all 5 configurable conveyor
+ * behavioral parameters, read directly from simulationDataStore.conveyorNumericParams
+ * at message-send time.
+ *
+ * These are the STORE-side source of truth and are always immediately consistent
+ * after a CWF parameter change is applied. Unlike conveyor_states in Supabase
+ * (which can lag by one simulation tick), this snapshot reflects the current
+ * parameter state the moment the user's message is sent.
+ *
+ * CWF should prefer this snapshot for status questions about conveyor params
+ * instead of querying Supabase, which may return a stale row immediately after
+ * a parameter change has been applied.
+ */
+export interface ConveyorParamSnapshot {
+    /** Jam duration in clock cycles (range: 1–30) */
+    jammed_time: number;
+    /** Tiles scrapped per jam event (range: 0–20) */
+    impacted_tiles: number;
+    /** Global tile scrap probability percentage (range: 0–3) */
+    scrap_probability: number;
+    /** Whether random speed-change events are enabled (0 = off, 1 = on) */
+    speed_change: boolean;
+    /** Whether jam events are enabled on the belt (0 = off, 1 = on) */
+    jammed_events: boolean;
+}
+
+// =============================================================================
 // FULL UI CONTEXT
 // =============================================================================
 
@@ -147,4 +178,11 @@ export interface UIContext {
     simulation: SimSnapshot;
     /** Session configuration and scenario state */
     config: ConfigSnapshot;
+    /**
+     * Live conveyor behavioral parameter values from the store.
+     * ALWAYS use this snapshot for "what is the current conveyor param value?"
+     * queries — it is immediately consistent after a CWF parameter change,
+     * unlike conveyor_states in Supabase which may lag by one simulation tick.
+     */
+    conveyorParams: ConveyorParamSnapshot;
 }
