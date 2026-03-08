@@ -101,30 +101,30 @@ const CWF_RETRY_PROMPT_FINGERPRINT = 'Answer NOW using all the data';
 const CWF_AUTH_FAST_PATH_PROMPT_EN = `
 ## ⚡ AUTHORIZATION TURN — FAST PATH REQUIRED
 
-The user has just provided their authorization code. This is an authorization confirmation turn.
+The user has just provided their authorization code. This is an authorization confirmation turn for a machine parameter change.
 
 **You MUST:**
-1. Execute the SINGLE pending action (update_parameter OR execute_ui_action) immediately using the authorization code the user just provided.
+1. Execute the SINGLE pending update_parameter call immediately using the authorization code the user just provided.
 2. Do NOT query the database again — you already have the current values from the previous turn.
 3. Do NOT ask any further questions — the user has already confirmed "yes" and provided auth.
-4. Make exactly ONE tool call (the execution tool), then provide a brief confirmation message.
+4. Make exactly ONE tool call (update_parameter), then provide a brief confirmation message.
 
-The pending action and all required context are already in the conversation history above.
+The pending parameter change and all required context are already in the conversation history above.
 `;
 
 /** Turkish variant of the auth fast-path prompt */
 const CWF_AUTH_FAST_PATH_PROMPT_TR = `
 ## ⚡ YETKİLENDİRME TURU — HIZLI YOL GEREKLİ
 
-Kullanıcı yetkisini az önce sağladı. Bu bir yetkilendirme onay turudur.
+Kullanıcı yetkisini az önce sağladı. Bu bir makine parametre değişikliği için yetkilendirme onay turudur.
 
 **YAPMANIZ GEREKENLER:**
-1. Kullanıcının az önce sağladığı yetkilendirme koduyla bekleyen TEK işlemi (update_parameter VEYA execute_ui_action) hemen uygulayın.
-2. Veritabanını tekrar sorgulamayın — mevcut değlerleri önceki turdan zaten biliyorsunuz.
+1. Kullanıcının az önce sağladığı yetkilendirme koduyla bekleyen TEK update_parameter işlemini hemen uygulayın.
+2. Veritabanını tekrar sorgulamayın — mevcut değerleri önceki turdan zaten biliyorsunuz.
 3. Daha fazla soru sormayın — kullanıcı "evet" dedi ve yetki verdi.
-4. TAM OLARAK BİR araç çağrısı yapın (uygulama aracı), ardından kısa bir onay mesajı verin.
+4. TAM OLARAK BİR araç çağrısı yapın (update_parameter), ardından kısa bir onay mesajı verin.
 
-Bekleyen işlem ve gerekli tüm bağlam yukarıdaki konuşma geçmişinde mevcuttur.
+Bekleyen parametre değişikliği ve gerekli tüm bağlam yukarıdaki konuşma geçmişinde mevcuttur.
 `;
 
 // =============================================================================
@@ -136,6 +136,15 @@ Bekleyen işlem ve gerekli tüm bağlam yukarıdaki konuşma geçmişinde mevcut
 
 /** Authorization code for CWF parameter changes (human-in-the-loop) */
 const CWF_AUTH_CODE = 'airtk';
+
+/**
+ * Sentinel value written to cwf_commands.authorized_by for UI actions
+ * (toggle panels, start/stop simulation, etc.) that do NOT require human
+ * authorization. Distinguishes UI-action rows from operator-authorized
+ * parameter-change rows in the audit trail.
+ * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_UI_ACTION_BYPASS_AUTH
+ */
+const CWF_UI_ACTION_BYPASS_AUTH = 'system:ui_action_no_auth_required';
 
 /**
  * Valid station names for CWF commands.
@@ -620,8 +629,13 @@ const tools: FunctionDeclaration[] = [
          * The action is queued via cwf_commands (command_type='ui_action') and the browser
          * listener (useCWFCommandListener) picks it up and dispatches it to the correct Zustand action.
          *
-         * Human-in-the-Loop: SAME 3-step protocol as update_parameter applies.
-         * NEVER call this without explicit user approval AND a valid authorization ID.
+         * ★ NO AUTHORIZATION REQUIRED — call this tool immediately when the user makes a UI request.
+         *   Do NOT ask for a password. Do NOT ask for confirmation.
+         *   Simply execute and report back what happened.
+         *   (Authorization is ONLY required for update_parameter — machine parameter changes.)
+         *
+         * ★ IDEMPOTENT PANEL STATE — always pass action_value="open" or "close".
+         *   The listener sets the panel to the target state directly (never blind-toggles).
          *
          * Available actions:
          *   Panel toggles: toggle_basic_panel | toggle_dtxfr | toggle_oee_hierarchy |
@@ -635,8 +649,8 @@ const tools: FunctionDeclaration[] = [
         description:
             'Execute a UI action on the user\'s browser: open/close panels, start/stop/reset the simulation, ' +
             'or change the interface language. ' +
-            'CRITICAL: Follow the same 3-step human-in-the-loop protocol as update_parameter. ' +
-            'NEVER call without user approval AND a valid authorization ID. ' +
+            'NO AUTHORIZATION REQUIRED — call this tool immediately without asking for a password or confirmation. ' +
+            'For panel toggles, you MUST pass action_value="open" (to open) or action_value="close" (to close). ' +
             'Available action_type values: toggle_basic_panel, toggle_dtxfr, toggle_oee_hierarchy, ' +
             'toggle_prod_table, toggle_cwf_panel, toggle_control_panel, toggle_alarm_log, ' +
             'toggle_heatmap, toggle_kpi, toggle_tile_passport, toggle_demo_settings, ' +
@@ -659,19 +673,16 @@ const tools: FunctionDeclaration[] = [
                 action_value: {
                     type: SchemaType.STRING,
                     description:
-                        'Optional value for the action. Required for set_language (value: "en" or "tr"). ' +
-                        'For toggle actions: optional — omit to toggle, or pass "open" / "close" to force a state.',
+                        'REQUIRED for panel toggle actions: pass "open" to open the panel, "close" to close it. ' +
+                        'REQUIRED for set_language: pass "en" or "tr". ' +
+                        'Not applicable for start_simulation | stop_simulation | reset_simulation.',
                 },
                 reason: {
                     type: SchemaType.STRING,
-                    description: 'User-facing reason for the UI action (shown in chat as confirmation).',
-                },
-                authorized_by: {
-                    type: SchemaType.STRING,
-                    description: 'The authorization ID provided by the user.',
+                    description: 'Short user-facing reason (e.g. "User requested Control & Actions panel").',
                 },
             },
-            required: ['simulation_id', 'action_type', 'reason', 'authorized_by'],
+            required: ['simulation_id', 'action_type', 'reason'],
         },
     },
 ];
@@ -1107,15 +1118,15 @@ async function executeUIAction(args: {
     action_type: string;
     action_value?: string;
     reason: string;
-    authorized_by: string;
 }): Promise<object> {
-    /** Step 1: Validate authorization ID */
-    if (args.authorized_by !== CWF_AUTH_CODE) {
-        console.log(`[CWF UI] ❌ Invalid auth ID: '${args.authorized_by}'`);
-        return { error: 'Incorrect credentials, action is terminated.' };
-    }
+    /**
+     * No authorization check — UI panel actions (open/close panels, start/stop simulation)
+     * do NOT require human authorization. Only update_parameter (machine parameter changes)
+     * requires operator authorization.
+     * The authorized_by field is filled with a system sentinel for audit traceability.
+     */
 
-    /** Step 2: Validate action type */
+    /** Validate action type */
     if (!CWF_VALID_UI_ACTIONS.has(args.action_type as never)) {
         return {
             error: `Unknown UI action: '${args.action_type}'. Valid: ${[...CWF_VALID_UI_ACTIONS].join(', ')}`,
@@ -1154,8 +1165,8 @@ async function executeUIAction(args: {
              * Format: "<reason> | value: <action_value>" (omitted when action_value absent)
              */
             reason: `${args.reason}${args.action_value ? ` ${CWF_UI_VALUE_SEP} ${args.action_value}` : ''}`,
-            /** User's authorization code — validated in Step 1 */
-            authorized_by: args.authorized_by,
+            /** UI actions use a system sentinel in place of a human auth code */
+            authorized_by: CWF_UI_ACTION_BYPASS_AUTH,
             /** Initial status — browser listener moves this to 'applied' or 'rejected' */
             status: 'pending',
         })
@@ -1640,6 +1651,39 @@ ORDER BY sim_tick DESC LIMIT 1
 - User: "what are the current conveyor settings?" → query conveyor_states ORDER BY sim_tick DESC LIMIT 1 and report all 5 param columns
 - User: "can you change conveyor parameters?" → Ask WHICH parameter and WHAT value they want. Do NOT ask for the current value.
 
+
+## UI ACTIONS — No Authorization Required
+
+When the user asks you to open, close, show, or hide any panel or widget, call execute_ui_action **immediately** — without asking for a password, authorization, or any confirmation.
+
+### Rules for call execute_ui_action:
+1. Call it in ONE step with no preamble: just tell the user what you are doing, then call the tool.
+   Example: User: "open the basic panel" → You: "Opening the Basic Panel…" → call execute_ui_action
+2. For all panel toggle actions, you MUST pass:
+   - action_value="open" when opening/showing a panel
+   - action_value="close" when closing/hiding a panel
+   This keeps state-setting idempotent — repeated "open" commands are safe no-ops.
+3. After the tool returns, report the result:
+   - Success: "✅ [Panel name] is now open." (or closed)
+   - Rejected: "⚠️ [Panel name] could not be opened — [reason from tool response]"
+4. For start_simulation / stop_simulation / reset_simulation: same rules — no auth, immediate execution.
+
+### Panel name → action_type mapping:
+| User says | action_type |
+|---|---|
+| basic panel / KPI / heatmap | toggle_basic_panel |
+| control panel / controls | toggle_control_panel |
+| OEE table / OEE hierarchy | toggle_oee_hierarchy |
+| DTXFR / digital transfer | toggle_dtxfr |
+| alarm log | toggle_alarm_log |
+| KPI panel | toggle_kpi |
+| heatmap | toggle_heatmap |
+| tile passport | toggle_tile_passport |
+| production table | toggle_prod_table |
+| demo settings | toggle_demo_settings |
+| CWF panel | toggle_cwf_panel |
+
+**NEVER ask for authorization before execute_ui_action. NEVER ask "are you sure?". Just do it.**
 
 ## CHANGING PARAMETERS (Human-in-the-Loop Protocol)
 

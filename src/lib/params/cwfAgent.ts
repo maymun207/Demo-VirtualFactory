@@ -110,6 +110,39 @@ export const CWF_FORCE_SUMMARY_PROMPT_TR =
  */
 export const CWF_FORCE_SUMMARY_SENTINEL = '[[CWF_FORCE_SUMMARY]]';
 
+// =============================================================================
+// UI ACTION — IDEMPOTENT PANEL STATE CONSTANTS
+// =============================================================================
+
+/**
+ * Canonical action_value for "open a panel" intents sent by the CWF agent.
+ *
+ * When CWF calls execute_ui_action for a panel toggle, it NOW passes an explicit
+ * action_value of "open" or "close" instead of relying on a blind toggle.
+ * The listener (processUIActionCommand) reads this value and sets the panel
+ * directly to the intended state — making the action idempotent regardless of
+ * the panel's current state before the command arrives.
+ *
+ * This eliminates the bug where a "toggle" fired against an already-open panel
+ * would accidentally CLOSE it, causing the next status check to report CLOSED.
+ */
+export const CWF_UI_ACTION_OPEN = 'open';
+
+/**
+ * Canonical action_value for "close a panel" intents sent by the CWF agent.
+ * Mirror of CWF_UI_ACTION_OPEN — see above for full context.
+ */
+export const CWF_UI_ACTION_CLOSE = 'close';
+
+/**
+ * System-generated stand-in written to cwf_commands.authorized_by for all
+ * execute_ui_action rows. UI panel actions no longer require human auth —
+ * only update_parameter (machine parameter changes) does. This string marks
+ * the row in the audit trail so it is distinguishable from operator-auth'd
+ * parameter changes.
+ */
+export const CWF_UI_ACTION_BYPASS_AUTH = 'system:ui_action_no_auth_required';
+
 /**
  * Substring fingerprint used to detect forced-summary contamination in
  * ASSISTANT messages. When Gemini responds to the forced-summary prompt,

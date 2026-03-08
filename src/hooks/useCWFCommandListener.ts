@@ -62,6 +62,9 @@ import {
     CWF_UI_ACTION_STATION_SENTINEL,
     CWF_UI_ACTION_VALUE_SEPARATOR,
 } from '../lib/params/uiTelemetry';
+import {
+    CWF_UI_ACTION_CLOSE,
+} from '../lib/params/cwfAgent';
 
 /**
  * Conveyor boolean parameter names that are stored as 0/1 numbers in the
@@ -124,50 +127,120 @@ async function processUIActionCommand(command: {
          */
         switch (actionType) {
             // ── Panel Toggles ────────────────────────────────────────────────
-            case 'toggle_basic_panel':
-                /** Toggle the Basic KPI + Heatmap side panel */
-                ui.toggleBasicPanel();
+            case 'toggle_basic_panel': {
+                /**
+                 * Idempotent open/close for the Basic KPI + Heatmap side panel.
+                 * actionValue 'close' → ensure panel is closed.
+                 * Anything else (including 'open' or undefined) → ensure panel is open.
+                 * Guard prevents a double-fire from accidentally reversing state.
+                 */
+                const shouldOpenBasic = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showBasicPanel !== shouldOpenBasic) {
+                    ui.toggleBasicPanel();
+                }
                 break;
-            case 'toggle_dtxfr':
-                /** Toggle the Digital Transfer (Passport) side panel */
-                ui.toggleDTXFR();
+            }
+            case 'toggle_dtxfr': {
+                /**
+                 * Idempotent open/close for the Digital Transfer (DTXFR) side panel.
+                 */
+                const shouldOpenDTXFR = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showDTXFR !== shouldOpenDTXFR) {
+                    ui.toggleDTXFR();
+                }
                 break;
-            case 'toggle_oee_hierarchy':
-                /** Toggle the 3D OEE Hierarchy table in scene */
-                ui.toggleOEEHierarchy();
+            }
+            case 'toggle_oee_hierarchy': {
+                /**
+                 * Idempotent open/close for the 3D OEE Hierarchy table.
+                 */
+                const shouldOpenOEE = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showOEEHierarchy !== shouldOpenOEE) {
+                    ui.toggleOEEHierarchy();
+                }
                 break;
-            case 'toggle_prod_table':
-                /** Toggle the 3D Production Status table in scene */
-                ui.setShowProductionTable(!ui.showProductionTable);
+            }
+            case 'toggle_prod_table': {
+                /**
+                 * Idempotent open/close for the 3D Production Status table.
+                 * Uses setShowProductionTable(bool) directly — already idempotent.
+                 */
+                const shouldOpenProd = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showProductionTable !== shouldOpenProd) {
+                    ui.setShowProductionTable(shouldOpenProd);
+                }
                 break;
-            case 'toggle_cwf_panel':
-                /** Toggle the CWF chat panel */
-                ui.toggleCWF();
+            }
+            case 'toggle_cwf_panel': {
+                /**
+                 * Idempotent open/close for the CWF chat sidebar.
+                 */
+                const shouldOpenCWF = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showCWF !== shouldOpenCWF) {
+                    ui.toggleCWF();
+                }
                 break;
-            case 'toggle_control_panel':
-                /** Toggle the Control & Actions floating panel */
-                ui.toggleControlPanel();
+            }
+            case 'toggle_control_panel': {
+                /**
+                 * Idempotent open/close for the Control & Actions floating panel.
+                 */
+                const shouldOpenControl = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showControlPanel !== shouldOpenControl) {
+                    ui.toggleControlPanel();
+                }
                 break;
-            case 'toggle_alarm_log':
-                /** Toggle the Alarm Log popup */
-                ui.toggleAlarmLog();
+            }
+            case 'toggle_alarm_log': {
+                /**
+                 * Idempotent open/close for the Alarm Log popup.
+                 */
+                const shouldOpenAlarm = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showAlarmLog !== shouldOpenAlarm) {
+                    ui.toggleAlarmLog();
+                }
                 break;
-            case 'toggle_heatmap':
-                /** Toggle the FTQ Defect Heatmap floating panel */
-                ui.toggleHeatmap();
+            }
+            case 'toggle_heatmap': {
+                /**
+                 * Idempotent open/close for the FTQ Defect Heatmap floating panel.
+                 */
+                const shouldOpenHeatmap = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showHeatmap !== shouldOpenHeatmap) {
+                    ui.toggleHeatmap();
+                }
                 break;
-            case 'toggle_kpi':
-                /** Toggle the KPI floating panel */
-                ui.toggleKPI();
+            }
+            case 'toggle_kpi': {
+                /**
+                 * Idempotent open/close for the KPI floating panel.
+                 */
+                const shouldOpenKPI = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showKPI !== shouldOpenKPI) {
+                    ui.toggleKPI();
+                }
                 break;
-            case 'toggle_tile_passport':
-                /** Toggle the Tile Passport floating panel */
-                ui.togglePassport();
+            }
+            case 'toggle_tile_passport': {
+                /**
+                 * Idempotent open/close for the Tile Passport floating panel.
+                 */
+                const shouldOpenPassport = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showPassport !== shouldOpenPassport) {
+                    ui.togglePassport();
+                }
                 break;
-            case 'toggle_demo_settings':
-                /** Toggle the Demo Settings modal */
-                ui.toggleDemoSettings();
+            }
+            case 'toggle_demo_settings': {
+                /**
+                 * Idempotent open/close for the Demo Settings modal.
+                 */
+                const shouldOpenDemo = actionValue !== CWF_UI_ACTION_CLOSE;
+                if (ui.showDemoSettings !== shouldOpenDemo) {
+                    ui.toggleDemoSettings();
+                }
                 break;
+            }
 
             // ── Simulation Lifecycle ─────────────────────────────────────────
             case 'start_simulation':
