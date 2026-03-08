@@ -856,6 +856,39 @@ useSimulationStore.subscribe(
 );
 
 // =============================================================================
+// PUBLIC ACCESSOR — Circular-dependency-safe session ID reader
+// =============================================================================
+
+/**
+ * Returns the active simulation session UUID synchronously.
+ *
+ * WHY THIS EXISTS:
+ *   simulationStore needs the active session ID to log events (start, stop,
+ *   drain, reset) to Supabase. A naive top-level static import would create
+ *   a circular dependency at module initialisation time:
+ *
+ *     simulationStore → simulationDataStore → simulationStore (getState)
+ *
+ *   The original workaround was a dynamic `import()` inside an async function,
+ *   which Vite warned about because every other file already imports
+ *   simulationDataStore statically, preventing code-splitting anyway.
+ *
+ * HOW THIS IS SAFE:
+ *   This function is ONLY called inside `queueMicrotask()` callbacks, which
+ *   execute after the current JS task completes. By that point both Zustand
+ *   stores are fully initialised on the module registry. Calling
+ *   `useSimulationDataStore.getState()` at that moment is always safe —
+ *   it never runs during module init.
+ *
+ * @returns The UUID of the active simulation session, or undefined if no
+ *          session is currently active (e.g. before the user starts the sim).
+ */
+export function getActiveSessionIdSync(): string | undefined {
+  // Access the already-initialised Zustand store at call-time, not import-time.
+  return useSimulationDataStore.getState().session?.id;
+}
+
+// =============================================================================
 // HELPER FUNCTIONS (Private to this module)
 // =============================================================================
 

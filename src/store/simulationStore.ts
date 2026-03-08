@@ -39,20 +39,12 @@ import {
 import type { JamLocation } from '../lib/params';
 import { eventBus } from '../lib/eventBus';
 import { logSimulationEvent } from '../services/simulationEventLogger';
-
-/**
- * Lazy accessor for the active simulation session UUID.
- * Uses dynamic import() to avoid a circular dependency at module init:
- *   simulationStore → simulationDataStore → simulationStore (getState at top level).
- * The import() is deferred to call-time (inside queueMicrotask callbacks),
- * so both stores are fully initialized by then.
- *
- * @returns The active simulation session UUID, or undefined if no session
- */
-async function getActiveSessionId(): Promise<string | undefined> {
-  const { useSimulationDataStore } = await import('./simulationDataStore');
-  return useSimulationDataStore.getState().session?.id;
-}
+// Static import of the sync accessor exported by simulationDataStore.
+// This is safe because this symbol is only *called* inside queueMicrotask
+// callbacks, which run after both stores are fully initialised on the module
+// registry — never during the synchronous module-init phase that would cause
+// the circular-dependency problem.
+import { getActiveSessionIdSync } from './simulationDataStore';
 
 
 
@@ -410,10 +402,13 @@ export const useSimulationStore = create<SimulationState>()(
         };
       });
 
-      /** Fire-and-forget event log AFTER synchronous state update */
-      queueMicrotask(async () => {
+      /** Fire-and-forget event log AFTER synchronous state update.
+       *  queueMicrotask guarantees both stores are fully initialised before
+       *  getActiveSessionIdSync() is called — no async/await needed. */
+      queueMicrotask(() => {
         const next = useSimulationStore.getState();
-        const simId = await getActiveSessionId();
+        // getActiveSessionIdSync is safe here: called after module init.
+        const simId = getActiveSessionIdSync();
         if (!simId) return; /** No active session — skip logging */
         const tick = next.sClockCount;
 
@@ -453,11 +448,13 @@ export const useSimulationStore = create<SimulationState>()(
         };
       });
 
-      /** Log 'stopped' event only if we actually transitioned */
+      /** Log 'stopped' event only if we actually transitioned.
+       *  queueMicrotask ensures the store is settled before reading session ID. */
       if (!wasStopped) {
-        queueMicrotask(async () => {
+        queueMicrotask(() => {
           const { sClockCount, pClockCount } = useSimulationStore.getState();
-          const simId = await getActiveSessionId();
+          // Synchronous call — safe inside queueMicrotask.
+          const simId = getActiveSessionIdSync();
           if (simId) logSimulationEvent(simId, sClockCount, 'stopped', { pClockCount });
         });
       }
@@ -476,10 +473,12 @@ export const useSimulationStore = create<SimulationState>()(
         conveyorStatus: 'stopped',
       }));
 
-      /** Log drain completion event */
-      queueMicrotask(async () => {
+      /** Log drain completion event.
+       *  queueMicrotask ensures the store is settled before reading session ID. */
+      queueMicrotask(() => {
         const { sClockCount, pClockCount } = useSimulationStore.getState();
-        const simId = await getActiveSessionId();
+        // Synchronous call — safe inside queueMicrotask.
+        const simId = getActiveSessionIdSync();
         if (simId) logSimulationEvent(simId, sClockCount, 'drain_completed', { pClockCount });
       });
     },
@@ -773,9 +772,11 @@ export const useSimulationStore = create<SimulationState>()(
         sessionId: generateSessionId(),
       }));
 
-      /** Log reset event using pre-reset tick values */
-      queueMicrotask(async () => {
-        const simId = await getActiveSessionId();
+      /** Log reset event using pre-reset tick values.
+       *  queueMicrotask ensures the store is settled before reading session ID. */
+      queueMicrotask(() => {
+        // Synchronous call — safe inside queueMicrotask.
+        const simId = getActiveSessionIdSync();
         if (simId) logSimulationEvent(simId, sClockCount, 'reset', { pClockCount });
       });
     },
