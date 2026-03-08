@@ -26,6 +26,8 @@ import {
   S_CLOCK_RANGE,
   STATION_INTERVAL_RANGE,
 } from "../../lib/params";
+/** Fire-and-forget UI interaction event recorder */
+import { telemetry } from "../../services/telemetryService";
 
 /** Panel index for Control & Actions in the cascade system */
 const CONTROL_PANEL_INDEX = 3;
@@ -126,7 +128,17 @@ export const ControlPanel = () => {
           return (
             <Tip key={status} text={tooltipTextMap[status]}>
               <button
-                onClick={() => !isDisabled && setConveyorStatus(status)}
+                onClick={() => {
+                  if (!isDisabled) {
+                    /** Emit telemetry for manual conveyor status button click */
+                    telemetry.emit({
+                      event_type: "conveyor_status_set",
+                      event_category: "ui_action",
+                      properties: { status, previousStatus: conveyorStatus },
+                    });
+                    setConveyorStatus(status);
+                  }
+                }}
                 disabled={isDisabled}
                 className={`w-full py-1 sm:py-1.5 px-2 sm:px-3 rounded-lg border transition-all duration-200 ${
                   isDisabled

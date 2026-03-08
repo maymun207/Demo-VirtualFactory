@@ -39,6 +39,16 @@ import { validateCWFParamValue } from '../lib/params/cwfCommands';
 import { useSimulationDataStore } from '../store/simulationDataStore';
 import { useCWFStore } from '../store/cwfStore';
 import type { StationName } from '../store/types';
+/** uiStore — panel toggles and language control for CWF UI actions */
+import { useUIStore } from '../store/uiStore';
+/** simulationStore — start/stop/reset actions for CWF UI actions */
+import { useSimulationStore } from '../store/simulationStore';
+/** kpiStore — needed for full factory reset orchestration */
+import { useKPIStore } from '../store/kpiStore';
+/** workOrderStore — needed for full factory reset orchestration */
+import { useWorkOrderStore } from '../store/workOrderStore';
+/** syncService — needed for full factory reset orchestration */
+import { syncService } from '../services/syncService';
 
 /**
  * Conveyor boolean parameter names that are stored as 0/1 numbers in the
@@ -46,6 +56,231 @@ import type { StationName } from '../store/types';
  * All other conveyor params are applied as numeric values directly.
  */
 const CONVEYOR_BOOL_PARAMS = new Set(['speed_change', 'jammed_events']);
+
+// =============================================================================
+// UI ACTION DISPATCHER  (module-level — does NOT need React context)
+// =============================================================================
+
+/**
+ * processUIActionCommand — Dispatch a CWF UI action to the correct Zustand stores.
+ *
+ * Called when the cwf_commands listener receives a row with station='ui_action'.
+ * The command.parameter field contains the action_type string, and the
+ * command.reason field encodes the optional action_value (format: "reason | value: X").
+ *
+ * This function directly calls Zustand store actions via getState() since it runs
+ * outside of React component context (not a hook, not inside a useEffect).
+ *
+ * After executing, it updates the cwf_commands row to 'applied' or 'rejected'
+ * and posts a system message to the CWF chat panel as visual confirmation.
+ *
+ * @param command - The CWF command row with station='ui_action'
+ */
+async function processUIActionCommand(command: {
+    id: string;
+    parameter: string;  // Contains the action_type
+    reason: string | null; // May encode action_value after "| value: "
+    status: string;
+}): Promise<void> {
+    if (!supabase) return;
+
+    /** Extract action_type from the parameter field */
+    const actionType = command.parameter;
+
+    /** Extract optional action_value from the reason field (format: "reason | value: X") */
+    const reasonStr = command.reason ?? '';
+    const valueMatch = reasonStr.match(/\|\s*value:\s*(.+)$/);
+    const actionValue = valueMatch ? valueMatch[1].trim() : undefined;
+
+    /** Convenient store accessors via getState() — safe outside React */
+    const ui = useUIStore.getState();
+    const sim = useSimulationStore.getState();
+
+    try {
+        /**
+         * Dispatch to the correct Zustand action based on action_type.
+         * All 15 supported action_types are handled explicitly.
+         */
+        switch (actionType) {
+            // ── Panel Toggles ────────────────────────────────────────────────
+            case 'toggle_basic_panel':
+                /** Toggle the Basic KPI + Heatmap side panel */
+                ui.toggleBasicPanel();
+                break;
+            case 'toggle_dtxfr':
+                /** Toggle the Digital Transfer (Passport) side panel */
+                ui.toggleDTXFR();
+                break;
+            case 'toggle_oee_hierarchy':
+                /** Toggle the 3D OEE Hierarchy table in scene */
+                ui.toggleOEEHierarchy();
+                break;
+            case 'toggle_prod_table':
+                /** Toggle the 3D Production Status table in scene */
+                ui.setShowProductionTable(!ui.showProductionTable);
+                break;
+            case 'toggle_cwf_panel':
+                /** Toggle the CWF chat panel */
+                ui.toggleCWF();
+                break;
+            case 'toggle_control_panel':
+                /** Toggle the Control & Actions floating panel */
+                ui.toggleControlPanel();
+                break;
+            case 'toggle_alarm_log':
+                /** Toggle the Alarm Log popup */
+                ui.toggleAlarmLog();
+                break;
+            case 'toggle_heatmap':
+                /** Toggle the FTQ Defect Heatmap floating panel */
+                ui.toggleHeatmap();
+                break;
+            case 'toggle_kpi':
+                /** Toggle the KPI floating panel */
+                ui.toggleKPI();
+                break;
+            case 'toggle_tile_passport':
+                /** Toggle the Tile Passport floating panel */
+                ui.togglePassport();
+                break;
+            case 'toggle_demo_settings':
+                /** Toggle the Demo Settings modal */
+                ui.toggleDemoSettings();
+                break;
+
+            // ── Simulation Lifecycle ─────────────────────────────────────────
+            case 'start_simulation':
+                /**
+                 * Start the simulation.
+                 * Guard: only start if isSimConfigured is true (Demo Settings gate).
+                 * If not configured, reject with a descriptive message.
+                 */
+                if (!ui.isSimConfigured) {
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: 'Demo Settings must be configured before starting the simulation. Please open Demo Settings (toggle_demo_settings) first.',
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        '⚠️ Cannot start: Demo Settings must be configured first. Please open Demo Settings.',
+                    );
+                    return;
+                }
+                if (!sim.isDataFlowing) {
+                    /** Only start if not already running */
+                    sim.toggleDataFlow();
+                }
+                break;
+            case 'stop_simulation':
+                /** Stop the simulation if it is currently running */
+                if (sim.isDataFlowing) {
+                    sim.toggleDataFlow();
+                }
+                break;
+            case 'reset_simulation':
+                /**
+                 * Full factory reset — same logic as useFactoryReset hook.
+                 * Replicates the orchestration here since hooks cannot be called
+                 * outside of React component context.
+                 */
+                /** 0. Immediately stop the simulation */
+                sim.stopDataFlow();
+                {
+                    const dataStore = useSimulationDataStore.getState();
+                    /** 1. Drain the logical conveyor */
+                    dataStore.drainConveyor();
+                    /** 2. End session in Supabase (fire-and-forget) */
+                    if (dataStore.session) {
+                        dataStore.endSession().catch(console.warn);
+                    }
+                    /** 3. Stop sync service (fire-and-forget) */
+                    syncService.stop().catch(console.warn);
+                    /** 4. Clear data store */
+                    dataStore.resetDataStore();
+                }
+                /** 5. Reset KPI store */
+                useKPIStore.getState().resetKPIs();
+                /** 6. Close all panels and clear UI flags */
+                useUIStore.setState({
+                    showPassport: false, showHeatmap: false,
+                    showControlPanel: false, showKPI: false,
+                    showProductionTable: false, showAlarmLog: false,
+                    showOEEHierarchy: false, showDemoSettings: false,
+                    isSimConfigured: false, simulationEnded: false,
+                });
+                /** 7. Reset simulation clocks and counters */
+                sim.resetSimulation();
+                /** 8. Reset work order runtime flags */
+                useWorkOrderStore.getState().resetWorkOrderState();
+                break;
+
+            // ── Configuration ─────────────────────────────────────────────────
+            case 'set_language':
+                /**
+                 * Change the interface language.
+                 * action_value must be 'en' or 'tr'.
+                 */
+                if (actionValue === 'en' || actionValue === 'tr') {
+                    ui.setLanguage(actionValue);
+                } else {
+                    /** Reject if action_value is missing or invalid */
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: `set_language requires action_value 'en' or 'tr'; got '${actionValue ?? 'undefined'}'.`,
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        `⚠️ set_language failed: invalid value '${actionValue}'. Use 'en' or 'tr'.`,
+                    );
+                    return;
+                }
+                break;
+
+            default:
+                /** Unknown action_type — reject with descriptive reason */
+                await supabase
+                    .from('cwf_commands')
+                    .update({
+                        status: 'rejected',
+                        rejected_reason: `Unknown UI action type: '${actionType}'.`,
+                    })
+                    .eq('id', command.id);
+                useCWFStore.getState().addSystemMessage(
+                    `⚠️ Unknown CWF UI action: '${actionType}'.`,
+                );
+                return;
+        }
+
+        /** Action dispatched successfully — mark as 'applied' in Supabase */
+        await supabase
+            .from('cwf_commands')
+            .update({ status: 'applied' })
+            .eq('id', command.id);
+
+        /** Post confirmation message to the CWF chat panel */
+        useCWFStore.getState().addSystemMessage(
+            `✅ CWF UI action '${actionType}' executed.`,
+        );
+
+        console.log(`[CWF UI Listener] ✅ Applied UI action: ${actionType}`);
+
+    } catch (err) {
+        /** Catch unexpected errors and mark the command as rejected */
+        const errMsg = (err as Error).message || 'Unknown error';
+        console.error(`[CWF UI Listener] ❌ Error executing '${actionType}':`, errMsg);
+        await supabase
+            .from('cwf_commands')
+            .update({ status: 'rejected', rejected_reason: errMsg })
+            .eq('id', command.id);
+        useCWFStore.getState().addSystemMessage(
+            `⚠️ CWF UI action '${actionType}' failed: ${errMsg}`,
+        );
+    }
+}
 
 // =============================================================================
 // CONSTANTS
@@ -131,6 +366,13 @@ export function useCWFCommandListener(): void {
 
         /** Mark as processed immediately to prevent duplicate execution */
         processedIdsRef.current.add(command.id);
+
+        // ── Route to the correct processor based on station type ──────────
+        if (command.station === 'ui_action') {
+            /** Route to the UI action dispatcher — does NOT use parameter validation */
+            processUIActionCommand(command);
+            return;
+        }
 
         /** Validate the parameter value against CWF_PARAM_RANGES */
         const validation = validateCWFParamValue(

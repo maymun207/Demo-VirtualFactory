@@ -23,10 +23,16 @@ import { Playbook } from "./Playbook";
 import { MachineTooltip } from "./MachineTooltip";
 import { DemoSettingsPanel } from "./DemoSettingsPanel";
 import { useAlarmMonitor } from "../../hooks/useAlarmMonitor";
+/** Auto-detects sim state transitions (jams, starts, speed changes) and emits telemetry events */
+import { useTelemetry } from "../../hooks/useTelemetry";
 
 export const Dashboard = () => {
   // Run KPI/station threshold monitoring for alarm generation
   useAlarmMonitor();
+  // Mount telemetry hook once — subscribes to simulationStore to auto-detect
+  // state transitions (jams, starts, stops, speed changes) and emit events
+  // to the ui_telemetry_events Supabase table. Zero UI overhead.
+  useTelemetry();
 
   return (
     <>

@@ -4,10 +4,19 @@
  * Thin client that calls the Vercel serverless function at /api/cwf/chat.
  * Handles request formatting, error handling, and response parsing.
  *
+ * ## uiContext
+ * Every request includes a `uiContext` snapshot capturing the exact browser
+ * state at the moment the message is sent — which panels are open, what the
+ * simulation is doing, what scenario is active. This is injected into the
+ * Gemini system prompt on the server so the AI has full situational awareness
+ * without needing to query Supabase for current-state information.
+ *
  * Used by: cwfStore.ts (sendMessage action)
  */
 
 import { CWF_CLIENT_TIMEOUT_MS } from './params/cwfAgent';
+/** UIContext type shared between this service and cwfStore.ts */
+import type { UIContext } from './types/cwfTypes';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,6 +42,17 @@ export interface CWFRequest {
         startedAt: string;
         counter: number;
     }>;
+    /**
+     * Real-time UI state snapshot captured at the moment the message is sent.
+     * Provides the Gemini agent with exact knowledge of:
+     *  - Which panels are currently open on screen
+     *  - Current simulation status (running, tick count, conveyor state)
+     *  - Active scenario and Work Order
+     *
+     * Optional for backwards compatibility — absent in older clients.
+     * When present, it is injected into the Gemini system prompt in chat.ts.
+     */
+    uiContext?: UIContext;
 }
 
 /** Response returned from the CWF serverless function */
@@ -50,7 +70,7 @@ export interface CWFResponse {
 /**
  * Call the CWF agent API endpoint.
  *
- * @param request - The chat request payload
+ * @param request - The chat request payload (including optional uiContext)
  * @returns The agent's response
  * @throws Error if the API call fails
  */
@@ -67,6 +87,8 @@ export async function cwfApiCall(request: CWFRequest): Promise<CWFResponse> {
             conversationHistory: request.conversationHistory,
             language: request.language,
             simulationHistory: request.simulationHistory,
+            /** Forward the UI context snapshot to the server for Gemini prompt injection */
+            uiContext: request.uiContext,
         }),
     });
 

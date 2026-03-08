@@ -51,6 +51,8 @@ import { HEADER_GRADIENT, COLORS } from "../../lib/params";
 import { SimulationSessionInfo } from "./SimulationSessionInfo";
 import { ModesMenu } from "./header/ModesMenu";
 import { translations } from "../../lib/translations";
+/** Fire-and-forget UI interaction event recorder */
+import { telemetry } from "../../services/telemetryService";
 
 export const Header = () => {
   /** Current UI language (tr | en) */
@@ -112,12 +114,25 @@ export const Header = () => {
    */
   const handleStartClick = async () => {
     if (isDataFlowing) {
-      /** Always allow stopping the simulation */
+      /** Stop: always allowed — emit before toggle so sim state is still 'running' */
+      telemetry.emit({
+        event_type: "simulation_stopped",
+        event_category: "ui_action",
+        properties: { reason: "manual" },
+      });
       toggleDataFlow();
       return;
     }
     if (isSimConfigured) {
-      /** Gate is clear — start simulation normally */
+      /** Gate is clear — start simulation; emit after confirming config is set */
+      telemetry.emit({
+        event_type: "simulation_started",
+        event_category: "ui_action",
+        properties: {
+          scenario: activeScenarioCode,
+          workOrderId: selectedWorkOrderId,
+        },
+      });
       toggleDataFlow();
     } else {
       /**

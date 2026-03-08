@@ -22,6 +22,16 @@ import {
     CWF_FALLBACK_RESPONSE_EN,
     CWF_FALLBACK_RESPONSE_TR,
 } from '../lib/params/cwfAgent';
+/** Live simulation state used for UIContext snapshot — read at message-send time */
+import { useSimulationStore } from './simulationStore';
+/** Simulation data store — provides active scenario for UIContext snapshot */
+import { useSimulationDataStore } from './simulationDataStore';
+/** Zustand UI store — provides panel visibility state for UIContext snapshot */
+import { useUIStore } from './uiStore';
+/** Work order store — provides selectedWorkOrderId for UIContext config snapshot */
+import { useWorkOrderStore } from './workOrderStore';
+/** UIContext type for the real-time UI snapshot attached to every CWF request */
+import type { UIContext } from '../lib/types/cwfTypes';
 
 // =============================================================================
 // TYPES
@@ -211,6 +221,78 @@ export const useCWFStore = create<CWFState>((set, get) => ({
     sendMessage: async (content, language) => {
         const { simulationId, messages } = get();
 
+        // ── Build real-time UIContext snapshot ─────────────────────────────
+        /**
+         * Capture the exact browser state at the moment the user sends
+         * the message. This is attached to the API request body and
+         * injected into the Gemini system prompt by api/cwf/chat.ts,
+         * giving the AI full situational awareness of what is on screen.
+         *
+         * All reads are synchronous Zustand getState() calls — zero lag,
+         * no async, no re-render triggered.
+         */
+        const uiState = useUIStore.getState();
+        const simState = useSimulationStore.getState();
+        const simDataState = useSimulationDataStore.getState();
+        const workOrderState = useWorkOrderStore.getState();
+
+        /** Complete real-time UI context snapshot */
+        const uiContext: UIContext = {
+            panels: {
+                /** Left KPI + Heatmap side panel */
+                basicPanel: uiState.showBasicPanel,
+                /** Digital Transfer passport side panel */
+                dtxfr: uiState.showDTXFR,
+                /** 3D OEE Hierarchy table in scene */
+                oeeHierarchy: uiState.showOEEHierarchy,
+                /** 3D Production Status table in scene */
+                prodTable: uiState.showProductionTable,
+                /** CWF chat panel (always true when message is sent) */
+                cwf: uiState.showCWF,
+                /** Control & Actions floating panel */
+                controlPanel: uiState.showControlPanel,
+                /** Demo Settings modal */
+                demoSettings: uiState.showDemoSettings,
+                /** Alarm Log popup */
+                alarmLog: uiState.showAlarmLog,
+                /** Tile Passport floating panel */
+                tilePassport: uiState.showPassport,
+                /** FTQ Defect Heatmap floating panel */
+                heatmap: uiState.showHeatmap,
+                /** KPI floating panel */
+                kpi: uiState.showKPI,
+            },
+            simulation: {
+                /** Whether the simulation S-Clock is actively ticking */
+                isRunning: simState.isDataFlowing,
+                /** Whether Phase-2 drain is in progress */
+                isDraining: simState.isDraining,
+                /** Current simulation tick number */
+                sClockCount: simState.sClockCount,
+                /** S-Clock period in ms — lower = faster simulation */
+                sClockPeriod: simState.sClockPeriod,
+                /** Station processing interval in ticks */
+                stationInterval: simState.stationInterval,
+                /** Conveyor belt operational status */
+                conveyorStatus: simState.conveyorStatus,
+                /** Conveyor speed multiplier */
+                conveyorSpeed: simState.conveyorSpeed,
+            },
+            config: {
+                /** Current interface language */
+                language,
+                /** Active scenario code (e.g. "SCN-002") or null */
+                activeScenarioCode: simDataState.activeScenario?.code ?? null,
+                /** Selected Work Order ID or null */
+                selectedWorkOrderId: workOrderState.selectedWorkOrderId ?? null,
+                /** Whether user has completed Demo Settings gate for this run */
+                isSimConfigured: uiState.isSimConfigured,
+                /** Whether the simulation has finished naturally */
+                simulationEnded: uiState.simulationEnded,
+            },
+        };
+        // ─────────────────────────────────────────────────────────────────
+
         /** Guard: require an active simulation before sending */
         if (!simulationId) {
             set((s) => ({
@@ -265,7 +347,7 @@ export const useCWFStore = create<CWFState>((set, get) => ({
                 .slice(-10)
                 .map((m) => ({ role: m.role, content: m.content }));
 
-            /** Call the CWF API endpoint with simulation history */
+            /** Call the CWF API endpoint with simulation history + real-time UI context */
             const result = await cwfApiCall({
                 message: content,
                 simulationId,
@@ -273,6 +355,8 @@ export const useCWFStore = create<CWFState>((set, get) => ({
                 conversationHistory: history,
                 language,
                 simulationHistory: getSimulationHistory(),
+                /** Attach the UI context snapshot built above — injected into Gemini system prompt */
+                uiContext,
             });
 
             /**

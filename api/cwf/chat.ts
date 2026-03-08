@@ -551,6 +551,69 @@ const tools: FunctionDeclaration[] = [
             required: ['simulation_id', 'station', 'parameter', 'old_value', 'new_value', 'reason', 'authorized_by'],
         },
     },
+    {
+        /**
+         * execute_ui_action — Execute a UI-level action on the simulation browser.
+         *
+         * This tool lets CWF control the simulation UI: open/close panels, start or stop the
+         * simulation, reset the factory, change language, or open Demo Settings.
+         * The action is queued via cwf_commands (command_type='ui_action') and the browser
+         * listener (useCWFCommandListener) picks it up and dispatches it to the correct Zustand action.
+         *
+         * Human-in-the-Loop: SAME 3-step protocol as update_parameter applies.
+         * NEVER call this without explicit user approval AND a valid authorization ID.
+         *
+         * Available actions:
+         *   Panel toggles: toggle_basic_panel | toggle_dtxfr | toggle_oee_hierarchy |
+         *                  toggle_prod_table | toggle_cwf_panel | toggle_control_panel |
+         *                  toggle_alarm_log | toggle_heatmap | toggle_kpi |
+         *                  toggle_tile_passport | toggle_demo_settings
+         *   Simulation:    start_simulation | stop_simulation | reset_simulation
+         *   Config:        set_language (value: 'en' | 'tr')
+         */
+        name: 'execute_ui_action',
+        description:
+            'Execute a UI action on the user\'s browser: open/close panels, start/stop/reset the simulation, ' +
+            'or change the interface language. ' +
+            'CRITICAL: Follow the same 3-step human-in-the-loop protocol as update_parameter. ' +
+            'NEVER call without user approval AND a valid authorization ID. ' +
+            'Available action_type values: toggle_basic_panel, toggle_dtxfr, toggle_oee_hierarchy, ' +
+            'toggle_prod_table, toggle_cwf_panel, toggle_control_panel, toggle_alarm_log, ' +
+            'toggle_heatmap, toggle_kpi, toggle_tile_passport, toggle_demo_settings, ' +
+            'start_simulation, stop_simulation, reset_simulation, set_language.',
+        parameters: {
+            type: SchemaType.OBJECT,
+            properties: {
+                simulation_id: {
+                    type: SchemaType.STRING,
+                    description: 'UUID of the active simulation session.',
+                },
+                action_type: {
+                    type: SchemaType.STRING,
+                    description:
+                        'The UI action to perform. Valid values: toggle_basic_panel | toggle_dtxfr | ' +
+                        'toggle_oee_hierarchy | toggle_prod_table | toggle_cwf_panel | toggle_control_panel | ' +
+                        'toggle_alarm_log | toggle_heatmap | toggle_kpi | toggle_tile_passport | ' +
+                        'toggle_demo_settings | start_simulation | stop_simulation | reset_simulation | set_language.',
+                },
+                action_value: {
+                    type: SchemaType.STRING,
+                    description:
+                        'Optional value for the action. Required for set_language (value: "en" or "tr"). ' +
+                        'For toggle actions: optional — omit to toggle, or pass "open" / "close" to force a state.',
+                },
+                reason: {
+                    type: SchemaType.STRING,
+                    description: 'User-facing reason for the UI action (shown in chat as confirmation).',
+                },
+                authorized_by: {
+                    type: SchemaType.STRING,
+                    description: 'The authorization ID provided by the user.',
+                },
+            },
+            required: ['simulation_id', 'action_type', 'reason', 'authorized_by'],
+        },
+    },
 ];
 
 // =============================================================================
@@ -899,6 +962,142 @@ async function executeUpdateParameter(args: {
 }
 
 // =============================================================================
+// UI ACTION EXECUTOR
+// =============================================================================
+
+/**
+ * Valid UI action types that CWF can dispatch to the browser.
+ * These map 1:1 to Zustand uiStore actions or simulation control functions.
+ */
+const CWF_VALID_UI_ACTIONS = new Set([
+    // Panel toggles (all 11 panels)
+    'toggle_basic_panel', 'toggle_dtxfr', 'toggle_oee_hierarchy',
+    'toggle_prod_table', 'toggle_cwf_panel', 'toggle_control_panel',
+    'toggle_alarm_log', 'toggle_heatmap', 'toggle_kpi', 'toggle_tile_passport',
+    'toggle_demo_settings',
+    // Simulation lifecycle
+    'start_simulation', 'stop_simulation', 'reset_simulation',
+    // Configuration
+    'set_language',
+] as const);
+
+/**
+ * executeUIAction — Queue a UI action command for the browser to execute.
+ *
+ * Inserts a row in cwf_commands with command_type='ui_action'. The browser's
+ * useCWFCommandListener hook picks this up via Realtime/polling and dispatches
+ * it to the correct Zustand action (toggle panel, start/stop simulation, etc.).
+ *
+ * Same async ACK-wait pattern as executeUpdateParameter: polls cwf_commands.status
+ * until the browser acknowledges (sets status to 'applied'), or times out.
+ *
+ * @param args - action_type, optional action_value, reason, authorized_by
+ * @returns Success/failure object with verification status
+ */
+async function executeUIAction(args: {
+    simulation_id: string;
+    action_type: string;
+    action_value?: string;
+    reason: string;
+    authorized_by: string;
+}): Promise<object> {
+    /** Step 1: Validate authorization ID */
+    if (args.authorized_by !== CWF_AUTH_CODE) {
+        console.log(`[CWF UI] ❌ Invalid auth ID: '${args.authorized_by}'`);
+        return { error: 'Incorrect credentials, action is terminated.' };
+    }
+
+    /** Step 2: Validate action type */
+    if (!CWF_VALID_UI_ACTIONS.has(args.action_type as never)) {
+        return {
+            error: `Unknown UI action: '${args.action_type}'. Valid: ${[...CWF_VALID_UI_ACTIONS].join(', ')}`,
+        };
+    }
+
+    /** Step 3: Validate set_language value if applicable */
+    if (args.action_type === 'set_language' && !['en', 'tr'].includes(args.action_value ?? '')) {
+        return { error: 'set_language requires action_value to be "en" or "tr".' };
+    }
+
+    /** Step 4: INSERT into cwf_commands with command_type='ui_action' */
+    const { data, error } = await supabase
+        .from('cwf_commands')
+        .insert({
+            session_id: args.simulation_id,
+            /** Use 'ui_action' sentinel for station — browser differentiates this from param commands */
+            station: 'ui_action',
+            parameter: args.action_type,
+            /** action_value stored in reason field — repurposed for UI context */
+            old_value: 0,
+            new_value: 0,
+            reason: `${args.reason}${args.action_value ? ` | value: ${args.action_value}` : ''}`,
+            authorized_by: args.authorized_by,
+            status: 'pending',
+        })
+        .select()
+        .single();
+
+    if (error) {
+        console.error('[CWF UI] Failed to insert ui_action command:', error.message);
+        return { error: `Failed to queue UI action: ${error.message}` };
+    }
+
+    const commandId = data.id;
+    console.log(`[CWF UI] ⏳ UI action ${commandId} queued: ${args.action_type} — waiting for client ACK...`);
+
+    /**
+     * Step 5: Poll for client ACK (same pattern as executeUpdateParameter).
+     * The browser listener sets status to 'applied' after dispatching the action.
+     */
+    const deadline = Date.now() + CWF_ACK_WAIT_MS;
+
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, CWF_ACK_POLL_MS));
+
+        const { data: statusRow, error: statusError } = await supabase
+            .from('cwf_commands')
+            .select('status, rejected_reason')
+            .eq('id', commandId)
+            .single();
+
+        if (statusError) {
+            /** Continue polling — transient DB errors shouldn't cause immediate failure */
+            continue;
+        }
+
+        if (statusRow.status === 'applied') {
+            console.log(`[CWF UI] ✅ VERIFIED: ${args.action_type} executed (ACK received)`);
+            return {
+                success: true,
+                verified: true,
+                command_id: commandId,
+                message: `UI action '${args.action_type}' executed successfully.`,
+            };
+        }
+
+        if (statusRow.status === 'rejected') {
+            const reason = statusRow.rejected_reason || 'Unknown rejection reason';
+            console.log(`[CWF UI] ❌ REJECTED: ${args.action_type} — ${reason}`);
+            return {
+                success: false,
+                verified: true,
+                command_id: commandId,
+                error: `UI action '${args.action_type}' was rejected: ${reason}`,
+            };
+        }
+    }
+
+    /** Timeout: browser never acknowledged */
+    console.warn(`[CWF UI] ⏰ TIMEOUT: ${args.action_type} — no ACK after ${CWF_ACK_WAIT_MS}ms`);
+    return {
+        success: false,
+        verified: false,
+        command_id: commandId,
+        error: `Could not verify '${args.action_type}'. The browser did not acknowledge within ${CWF_ACK_WAIT_MS / 1000}s.`,
+    };
+}
+
+// =============================================================================
 // SYSTEM PROMPT BUILDER
 // =============================================================================
 
@@ -911,7 +1110,23 @@ async function executeUpdateParameter(args: {
  * @param language - 'tr' for Turkish, 'en' for English
  * @returns Complete system prompt string for Gemini
  */
-async function buildSystemPrompt(language: 'tr' | 'en'): Promise<string> {
+/**
+ * Build the Gemini system prompt with language-specific instructions.
+ * Includes the full DB schema context, response format guidelines,
+ * manufacturing domain expertise, dynamically fetched knowledge docs
+ * from Google Drive, and an optional real-time UI state snapshot.
+ *
+ * @param language   - 'tr' for Turkish, 'en' for English
+ * @param uiContext  - Optional real-time UI state snapshot from the browser.
+ *                     When provided, a formatted 'CURRENT UI STATE' section
+ *                     is appended so the AI knows exactly what is on screen
+ *                     at the moment the user sent the message.
+ * @returns Complete system prompt string for Gemini
+ */
+async function buildSystemPrompt(
+    language: 'tr' | 'en',
+    uiContext?: Record<string, unknown>
+): Promise<string> {
     /**
      * Fetch ALL knowledge docs from the Google Drive folder (cached, 5-min TTL).
      * If env var is not set or fetch fails, returns empty string
@@ -1187,6 +1402,71 @@ Use them as authoritative reference when analyzing data and answering questions.
 
 ${knowledgeBase}` : ''}
 
+${uiContext ? (() => {
+            /** Extract nested objects from the uiContext record (typed loosely since api/ cannot import src/ types) */
+            const panels = uiContext['panels'] as Record<string, boolean> | undefined;
+            const sim = uiContext['simulation'] as Record<string, unknown> | undefined;
+            const cfg = uiContext['config'] as Record<string, unknown> | undefined;
+
+            /** Format panel visibility: open panels as checkmark, closed as X */
+            const panelLines = panels ? [
+                `- Basic Panel (KPI + Heatmap): ${panels['basicPanel'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- DTXFR (Digital Transfer): ${panels['dtxfr'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- OEE Hierarchy 3D Table: ${panels['oeeHierarchy'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- Production Status 3D Table: ${panels['prodTable'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- CWF Chat Panel: ${panels['cwf'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- Control & Actions Panel: ${panels['controlPanel'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- Demo Settings Modal: ${panels['demoSettings'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- Alarm Log: ${panels['alarmLog'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- Tile Passport: ${panels['tilePassport'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- Defect Heatmap: ${panels['heatmap'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+                `- KPI Panel: ${panels['kpi'] ? '\u2705 OPEN' : '\u274C CLOSED'}`,
+            ].join('\n') : 'Panel state not available';
+
+            /** Format conveyor status with icon */
+            const cStatus = sim?.['conveyorStatus'];
+            const conveyorStatusLabel = cStatus === 'running' ? '\uD83D\uDFE2 RUNNING'
+                : (cStatus === 'jammed' || cStatus === 'jam_scrapping') ? '\uD83D\uDD34 JAMMED'
+                    : cStatus === 'stopped' ? '\uD83D\UDFE1 STOPPED'
+                        : String(cStatus ?? 'unknown');
+
+            /** Simulation running status label */
+            const simStatus = sim?.['isRunning'] ? '\u25B6\uFE0F RUNNING'
+                : sim?.['isDraining'] ? '\u23F3 DRAINING (winding down)'
+                    : '\u23F8\uFE0F STOPPED';
+
+            return `## CURRENT UI STATE (live snapshot at message send time)
+
+This is the EXACT browser state at the moment the user sent this message.
+Use this to answer questions about what is currently on screen, simulation status, and active configuration.
+NEVER query Supabase just to answer questions that are clearly answered by this snapshot.
+
+### Open Panels
+${panelLines}
+
+### Simulation State
+- Status: ${simStatus}
+- S-Clock Tick: ${sim?.['sClockCount'] ?? 'N/A'}
+- Conveyor: ${conveyorStatusLabel} at ${sim?.['conveyorSpeed'] ?? 'N/A'}x speed
+- S-Clock Period: ${sim?.['sClockPeriod'] ?? 'N/A'} ms per tick
+- Station Interval: ${sim?.['stationInterval'] ?? 'N/A'} ticks
+
+### Session Configuration
+- Interface Language: ${cfg?.['language'] === 'tr' ? 'Turkish (TR)' : 'English (EN)'}
+- Active Scenario: ${cfg?.['activeScenarioCode'] ?? 'None'}
+- Work Order: ${cfg?.['selectedWorkOrderId'] ?? 'None'}
+- Demo Settings Configured: ${cfg?.['isSimConfigured'] ? '\u2705 Yes' : '\u274C No (Start button locked)'}
+- Simulation Completed Naturally: ${cfg?.['simulationEnded'] ? '\u2705 Yes (Reset required)' : '\u274C No'}
+
+### How to use this context
+- If user asks "what panels are open?", use the list above. Do NOT query the DB for this.
+- If user asks "is the simulation running?", answer from Status above.
+- If user asks "what speed is the conveyor?", answer from Conveyor above.
+- If user asks "what scenario is active?", answer from Active Scenario above.
+- You CAN still query Supabase for historical or aggregated data (OEE trends, tile defects).
+- This snapshot does NOT replace DB queries for historical or aggregated data.`;
+        })() : ''}
+
 ## CONVEYOR PARAMETERS — How to Read and Change Them
 
 The conveyor belt is the **8th controllable station** (station name: "conveyor"). Unlike the 7 production machines, it does NOT have its own machine_conveyor_states table. Instead:
@@ -1365,7 +1645,23 @@ export default async function handler(
             conversationHistory = [],
             language = 'en',
             simulationHistory = [],
-        } = req.body;
+            /**
+             * Real-time UI context snapshot from the browser.
+             * Built by cwfStore.sendMessage() and passed via cwfService.cwfApiCall().
+             * When present, injected into the Gemini system prompt to give the AI
+             * full situational awareness of the current browser/simulation state.
+             * Typed as Record<string, unknown> since api/ cannot import from src/.
+             */
+            uiContext = undefined,
+        } = req.body as {
+            message: string;
+            simulationId: string;
+            sessionCode?: string;
+            conversationHistory?: Array<{ role: string; content: string }>;
+            language?: string;
+            simulationHistory?: Array<{ uuid: string; sessionCode: string; startedAt: string; counter: number }>;
+            uiContext?: Record<string, unknown>;
+        };
 
         if (!message || !simulationId) {
             return res.status(400).json({
@@ -1393,7 +1689,8 @@ export default async function handler(
 
         const model = genAI.getGenerativeModel({
             model: CWF_MODEL_NAME,
-            systemInstruction: await buildSystemPrompt(lang),
+            /** Pass uiContext so the prompt builder can inject the CURRENT UI STATE section */
+            systemInstruction: await buildSystemPrompt(lang, uiContext),
             tools: [{ functionDeclarations: tools }],
         });
 
@@ -1481,6 +1778,12 @@ export default async function handler(
                         /** Execute CWF parameter change via cwf_commands queue */
                         toolResult = await executeUpdateParameter(
                             typedArgs as unknown as Parameters<typeof executeUpdateParameter>[0]
+                        );
+                        break;
+                    case 'execute_ui_action':
+                        /** Dispatch a UI action (panel toggle, sim start/stop, etc.) via the browser listener */
+                        toolResult = await executeUIAction(
+                            typedArgs as unknown as Parameters<typeof executeUIAction>[0]
                         );
                         break;
                     default:

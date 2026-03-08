@@ -34,6 +34,8 @@ import {
   MODES_DROPDOWN_MIN_WIDTH, // Configuration for the dropdown's minimum breadth.
   MODES_DROPDOWN_Z_INDEX, // Configuration for the dropdown's vertical stacking order.
 } from "../../../lib/params";
+/** Fire-and-forget UI interaction event recorder */
+import { telemetry } from "../../../services/telemetryService";
 
 /**
  * ModesMenu Functional Component
@@ -57,8 +59,28 @@ export const ModesMenu: React.FC = () => {
    * Executes a store toggle action and ensures the mobile dropdown closes immediately after.
    * @param toggleFn — The specific store action to invoke (e.g., toggleCWF).
    */
-  const toggleMode = (toggleFn: () => void) => {
+  /**
+   * toggleMode — Helper Function
+   * Executes a store toggle action and ensures the mobile dropdown closes immediately after.
+   * Also emits a telemetry event recording which panel was toggled and its new state.
+   * @param toggleFn  — The specific store action to invoke (e.g., toggleCWF).
+   * @param panelName — Unique identifier for the panel being toggled (for telemetry).
+   * @param getCurrentState — Function returning the current open/closed state BEFORE toggle.
+   */
+  const toggleMode = (
+    toggleFn: () => void,
+    panelName: string,
+    getCurrentState: () => boolean,
+  ) => {
+    /** Capture state before toggle to determine the new state that results */
+    const wasClosed = !getCurrentState();
     toggleFn(); // Invoke the panel visibility toggle in the global store.
+    /** Emit telemetry: panel name and its new state (opened if it was closed, closed if it was open) */
+    telemetry.emit({
+      event_type: "panel_toggled",
+      event_category: "ui_action",
+      properties: { panel: panelName, state: wasClosed ? "opened" : "closed" },
+    });
     setIsOpen(false); // Force close the mobile menu to keep the interface clean after selection.
   };
 
@@ -79,7 +101,13 @@ export const ModesMenu: React.FC = () => {
       <div className="hidden lg:flex items-center p-1.5 gap-1.5 border border-white/10 rounded-2xl backdrop-blur-md hover:border-white/20 transition-all duration-300">
         {/* Basic Mode Button */}
         <button
-          onClick={() => useUIStore.getState().toggleBasicPanel()} // Direct store access for the click handler.
+          onClick={() =>
+            toggleMode(
+              () => useUIStore.getState().toggleBasicPanel(),
+              "basic_panel",
+              () => useUIStore.getState().showBasicPanel,
+            )
+          }
           className={`relative flex items-center ${HEADER_BUTTON_ICON_GAP} px-2.5 py-1.5 bg-linear-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 rounded-xl transition-all duration-200 active:scale-95 group`}
           title="Basic — KPI & Defect Heatmap" // Tooltip for detailed functionality description.
         >
@@ -96,7 +124,13 @@ export const ModesMenu: React.FC = () => {
 
         {/* DTXFR Mode Button */}
         <button
-          onClick={() => useUIStore.getState().toggleDTXFR()} // Triggers the Digital Transfer panel view.
+          onClick={() =>
+            toggleMode(
+              () => useUIStore.getState().toggleDTXFR(),
+              "dtxfr",
+              () => useUIStore.getState().showDTXFR,
+            )
+          }
           className={`relative flex items-center ${HEADER_BUTTON_ICON_GAP} px-2.5 py-1.5 bg-linear-to-r from-emerald-500/10 to-green-500/10 hover:from-emerald-500/20 hover:to-green-500/20 border border-emerald-500/30 rounded-xl transition-all duration-200 active:scale-95 group`}
           title="DTXFR — Digital Transfer" // Descriptive title for accessibility.
         >
@@ -113,7 +147,13 @@ export const ModesMenu: React.FC = () => {
 
         {/* OEE Hierarchy Mode Button */}
         <button
-          onClick={() => useUIStore.getState().toggleOEEHierarchy()} // Opens the OEE Hierarchy table panel.
+          onClick={() =>
+            toggleMode(
+              () => useUIStore.getState().toggleOEEHierarchy(),
+              "oee_hierarchy",
+              () => useUIStore.getState().showOEEHierarchy,
+            )
+          }
           className={`relative flex items-center ${HEADER_BUTTON_ICON_GAP} px-2.5 py-1.5 bg-linear-to-r from-indigo-500/10 to-blue-500/10 hover:from-indigo-500/20 hover:to-blue-500/20 border border-indigo-500/30 rounded-xl transition-all duration-200 active:scale-95 group`}
           title="OEE — Factory OEE Hierarchy" // Descriptive title for tooltip.
         >
@@ -132,7 +172,18 @@ export const ModesMenu: React.FC = () => {
         <button
           onClick={() => {
             const s = useUIStore.getState();
-            s.setShowProductionTable(!s.showProductionTable);
+            /** Record whether production table was open before toggling */
+            const wasOpen = s.showProductionTable;
+            s.setShowProductionTable(!wasOpen);
+            telemetry.emit({
+              event_type: "panel_toggled",
+              event_category: "ui_action",
+              properties: {
+                panel: "prod_table",
+                state: wasOpen ? "closed" : "opened",
+              },
+            });
+            setIsOpen(false);
           }}
           className={`relative flex items-center ${HEADER_BUTTON_ICON_GAP} px-2.5 py-1.5 bg-linear-to-r from-cyan-500/10 to-sky-500/10 hover:from-cyan-500/20 hover:to-sky-500/20 border border-cyan-500/30 rounded-xl transition-all duration-200 active:scale-95 group`}
           title="ProdTbl — Production Table" // Descriptive title for tooltip.
@@ -150,7 +201,13 @@ export const ModesMenu: React.FC = () => {
 
         {/* CWF Mode Button */}
         <button
-          onClick={() => useUIStore.getState().toggleCWF()} // Opens the AI Chat interface.
+          onClick={() =>
+            toggleMode(
+              () => useUIStore.getState().toggleCWF(),
+              "cwf",
+              () => useUIStore.getState().showCWF,
+            )
+          }
           className={`relative flex items-center ${HEADER_BUTTON_ICON_GAP} px-2.5 py-1.5 bg-linear-to-r from-cyan-500/10 to-teal-500/10 hover:from-cyan-500/20 hover:to-teal-500/20 border border-cyan-500/30 rounded-xl transition-all duration-200 active:scale-95 group`}
           title="CWF — Chat With your Factory" // User-facing description.
         >
@@ -202,7 +259,11 @@ export const ModesMenu: React.FC = () => {
             {/* Stacked Basic Option */}
             <button
               onClick={() =>
-                toggleMode(() => useUIStore.getState().toggleBasicPanel())
+                toggleMode(
+                  () => useUIStore.getState().toggleBasicPanel(),
+                  "basic_panel",
+                  () => useUIStore.getState().showBasicPanel,
+                )
               } // Selection closes menu automatically.
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 transition-all group"
             >
@@ -217,7 +278,11 @@ export const ModesMenu: React.FC = () => {
             {/* Stacked DTXFR Option */}
             <button
               onClick={() =>
-                toggleMode(() => useUIStore.getState().toggleDTXFR())
+                toggleMode(
+                  () => useUIStore.getState().toggleDTXFR(),
+                  "dtxfr",
+                  () => useUIStore.getState().showDTXFR,
+                )
               } // Selection item in the stack.
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all group"
             >
@@ -234,7 +299,11 @@ export const ModesMenu: React.FC = () => {
             {/* Stacked CWF Option */}
             <button
               onClick={() =>
-                toggleMode(() => useUIStore.getState().toggleCWF())
+                toggleMode(
+                  () => useUIStore.getState().toggleCWF(),
+                  "cwf",
+                  () => useUIStore.getState().showCWF,
+                )
               } // Selection item for AI interface.
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-cyan-500/20 bg-cyan-500/5 hover:bg-cyan-500/10 transition-all group"
             >
@@ -249,7 +318,11 @@ export const ModesMenu: React.FC = () => {
             {/* Stacked OEE Hierarchy Option */}
             <button
               onClick={() =>
-                toggleMode(() => useUIStore.getState().toggleOEEHierarchy())
+                toggleMode(
+                  () => useUIStore.getState().toggleOEEHierarchy(),
+                  "oee_hierarchy",
+                  () => useUIStore.getState().showOEEHierarchy,
+                )
               } // OEE Hierarchy selection item.
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 transition-all group"
             >
