@@ -56,7 +56,9 @@ export const CWF_ACK_POLL_MS = 500;
 
 /**
  * List of station names that CWF is allowed to modify.
- * Must match the station keys in DEFAULT_MACHINE_PARAMS from machineParams.ts.
+ * Includes all 7 production stations plus the conveyor belt (8th station).
+ * Must match the station keys in DEFAULT_MACHINE_PARAMS from machineParams.ts
+ * and the conveyor param keys in CONVEYOR_DEFAULT_NUMERIC_PARAMS.
  */
 export const CWF_VALID_STATIONS = [
     'press',
@@ -66,6 +68,8 @@ export const CWF_VALID_STATIONS = [
     'kiln',
     'sorting',
     'packaging',
+    /** Conveyor belt — controls speed_change, jammed_events, jammed_time, impacted_tiles, scrap_probability_pct */
+    'conveyor',
 ] as const;
 
 /** Type alias for a valid CWF station name. */
@@ -159,6 +163,33 @@ export const CWF_PARAM_RANGES: Record<string, Record<string, { min: number; max:
         stretch_tension_pct: { min: 150, max: 300 },
         robot_speed_cycles_min: { min: 5, max: 15 },
         label_accuracy_pct: { min: 95, max: 100 },
+    },
+
+    /**
+     * Conveyor belt — the 8th CWF-controllable station.
+     *
+     * Boolean params (speed_change, jammed_events) are transmitted as numbers
+     * (0 = off / false, 1 = on / true) because cwf_commands.new_value is a
+     * numeric DB column. The listener converts them back to booleans before
+     * calling updateConveyorBoolParam(). Range [0, 1] enforces valid boolean.
+     *
+     * Numeric params use the same wider-than-optimal bounds pattern as all
+     * other stations, allowing CWF to demonstrate both normal and fault ranges.
+     */
+    conveyor: {
+        /** Speed-change events toggle: 0 = disabled, 1 = enabled */
+        speed_change: { min: 0, max: 1 },
+        /** Jam events toggle: 0 = disabled, 1 = enabled */
+        jammed_events: { min: 0, max: 1 },
+        /** Jam duration in conveyor cycle-time units (normal range: 6–10) */
+        jammed_time: { min: 1, max: 30 },
+        /** Scrap tiles produced per jam event (normal range: 1–5) */
+        impacted_tiles: { min: 0, max: 20 },
+        /**
+         * Global scrap probability stored as whole percentage (0–3%).
+         * Key matches ConveyorNumericParams.scrap_probability in storeHelpers.ts.
+         */
+        scrap_probability: { min: 0, max: 3 },
     },
 };
 

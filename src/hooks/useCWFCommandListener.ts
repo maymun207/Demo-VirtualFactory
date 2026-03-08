@@ -40,6 +40,13 @@ import { useSimulationDataStore } from '../store/simulationDataStore';
 import { useCWFStore } from '../store/cwfStore';
 import type { StationName } from '../store/types';
 
+/**
+ * Conveyor boolean parameter names that are stored as 0/1 numbers in the
+ * cwf_commands table but must be converted to boolean before applying.
+ * All other conveyor params are applied as numeric values directly.
+ */
+const CONVEYOR_BOOL_PARAMS = new Set(['speed_change', 'jammed_events']);
+
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -66,7 +73,7 @@ interface CWFCommand {
     id: string;
     /** Target simulation session */
     session_id: string;
-    /** Target station: press | dryer | glaze | printer | kiln | sorting | packaging */
+    /** Target station: press | dryer | glaze | printer | kiln | sorting | packaging | conveyor */
     station: string;
     /** Parameter column name (e.g. 'pressure_bar') */
     parameter: string;
@@ -156,14 +163,43 @@ export function useCWFCommandListener(): void {
             return;
         }
 
-        /** Apply the parameter change to the Zustand simulation data store */
-        useSimulationDataStore.getState().updateParameter(
-            command.station as StationName,
-            command.parameter,
-            command.new_value,
-            'step',         // changeType: discrete step change from CWF
-            'cwf_agent',    // changeReason: originated from AI agent
-        );
+        /**
+         * Apply the parameter change to the correct store action.
+         *
+         * Conveyor params are stored separately from machine station params:
+         *   - Boolean params (speed_change, jammed_events): updateConveyorBoolParam()
+         *   - Numeric params (jammed_time, impacted_tiles, scrap_probability_pct):
+         *     updateConveyorParam()
+         * All other stations use the standard updateParameter() path.
+         */
+        if (command.station === 'conveyor') {
+            if (CONVEYOR_BOOL_PARAMS.has(command.parameter)) {
+                /** Convert 0/1 number back to boolean (0 = false, any other = true) */
+                useSimulationDataStore.getState().updateConveyorBoolParam(
+                    command.parameter as 'speed_change' | 'jammed_events',
+                    command.new_value !== 0,
+                );
+            } else {
+                /**
+                 * Apply numeric conveyor param (jammed_time, impacted_tiles, scrap_probability).
+                 * Cast to the ConveyorNumericParams key union — validated upstream by
+                 * CWF_PARAM_RANGES, so only valid keys reach this branch.
+                 */
+                useSimulationDataStore.getState().updateConveyorParam(
+                    command.parameter as 'jammed_time' | 'impacted_tiles' | 'scrap_probability',
+                    command.new_value,
+                );
+            }
+        } else {
+            /** Standard 7-station path: apply to simulationDataStore currentParams */
+            useSimulationDataStore.getState().updateParameter(
+                command.station as StationName,
+                command.parameter,
+                command.new_value,
+                'step',         // changeType: discrete step change from CWF
+                'cwf_agent',    // changeReason: originated from AI agent
+            );
+        }
 
         /** Update command status to 'applied' in Supabase */
         supabase!
@@ -175,10 +211,9 @@ export function useCWFCommandListener(): void {
                 if (error) console.error('[CWF Listener] Failed to update applied status:', error.message);
                 /** Post a confirmation message to the CWF chat panel */
                 const changeDirection = command.new_value > command.old_value ? '↑' : '↓';
-                const changePct = (
-                    ((command.new_value - command.old_value) / command.old_value) *
-                    100
-                ).toFixed(1);
+                const changePct = command.old_value !== 0
+                    ? (((command.new_value - command.old_value) / command.old_value) * 100).toFixed(1)
+                    : '∞';
                 useCWFStore.getState().addSystemMessage(
                     `✅ ${command.station}.${command.parameter}: ${command.old_value} → ${command.new_value} (${changeDirection}${changePct}%)`,
                 );

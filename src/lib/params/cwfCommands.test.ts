@@ -89,16 +89,16 @@ describe('CWF_ACK_POLL_MS', () => {
 // =============================================================================
 
 describe('CWF_VALID_STATIONS', () => {
-    it('should contain all 7 factory stations', () => {
-        /** Must match the 7 stations in the ceramic tile production line */
+    it('should contain all 8 factory stations including conveyor', () => {
+        /** Must match the 7 production stations plus the conveyor belt (8th station) */
         expect(CWF_VALID_STATIONS).toEqual([
-            'press', 'dryer', 'glaze', 'printer', 'kiln', 'sorting', 'packaging',
+            'press', 'dryer', 'glaze', 'printer', 'kiln', 'sorting', 'packaging', 'conveyor',
         ]);
     });
 
-    it('should have exactly 7 entries', () => {
-        /** Factory has 7 stations — no more, no less */
-        expect(CWF_VALID_STATIONS).toHaveLength(7);
+    it('should have exactly 8 entries', () => {
+        /** Factory has 7 production stations + conveyor = 8 controllable stations */
+        expect(CWF_VALID_STATIONS).toHaveLength(8);
     });
 });
 
@@ -155,9 +155,13 @@ describe('isValidCWFStation', () => {
         }
     });
 
+    it('should return true for conveyor (8th station)', () => {
+        /** Conveyor is now a valid CWF-controllable station */
+        expect(isValidCWFStation('conveyor')).toBe(true);
+    });
+
     it('should return false for invalid station names', () => {
         /** Non-existent stations must fail validation */
-        expect(isValidCWFStation('conveyor')).toBe(false);
         expect(isValidCWFStation('assembly')).toBe(false);
         expect(isValidCWFStation('')).toBe(false);
         expect(isValidCWFStation('PRESS')).toBe(false); // Case-sensitive
@@ -199,8 +203,8 @@ describe('validateCWFParamValue', () => {
     });
 
     it('should reject unknown stations', () => {
-        /** Non-existent stations must produce an error reason */
-        const result = validateCWFParamValue('conveyor', 'speed', 5);
+        /** Non-existent stations must produce an error reason (conveyor is now valid) */
+        const result = validateCWFParamValue('assembly', 'speed', 5);
         expect(result.valid).toBe(false);
         expect(result.reason).toContain('Unknown station');
     });
@@ -226,8 +230,8 @@ describe('validateCWFParamValue', () => {
         expect(result.reason).toContain('finite number');
     });
 
-    it('should validate across all stations', () => {
-        /** Spot-check one parameter per station for in-range acceptance */
+    it('should validate across all stations including conveyor', () => {
+        /** Spot-check one parameter per station (including conveyor) for in-range acceptance */
         const spotChecks: [string, string, number][] = [
             ['press', 'pressure_bar', 365],
             ['dryer', 'inlet_temperature_c', 200],
@@ -236,10 +240,30 @@ describe('validateCWFParamValue', () => {
             ['kiln', 'max_temperature_c', 1160],
             ['sorting', 'scan_rate_tiles_min', 40],
             ['packaging', 'stack_count', 8],
+            /** Conveyor — numeric param within normal operating range */
+            ['conveyor', 'jammed_time', 7],
+            /** Conveyor — boolean param: 0 (off) is valid */
+            ['conveyor', 'speed_change', 0],
+            /** Conveyor — boolean param: 1 (on) is valid */
+            ['conveyor', 'jammed_events', 1],
         ];
         for (const [station, param, value] of spotChecks) {
             const result = validateCWFParamValue(station, param, value);
             expect(result.valid).toBe(true);
         }
+    });
+
+    it('should reject conveyor jammed_time above max (30)', () => {
+        /** Values above the conveyor jammed_time ceiling must be rejected */
+        const result = validateCWFParamValue('conveyor', 'jammed_time', 99);
+        expect(result.valid).toBe(false);
+        expect(result.reason).toContain('out of range');
+    });
+
+    it('should reject conveyor speed_change above 1 (invalid boolean)', () => {
+        /** Boolean params must be exactly 0 or 1 — 2 is invalid */
+        const result = validateCWFParamValue('conveyor', 'speed_change', 2);
+        expect(result.valid).toBe(false);
+        expect(result.reason).toContain('out of range');
     });
 });
