@@ -826,6 +826,13 @@ export type ConveyorStatus = 'running' | 'stopped' | 'jammed' | 'jam_scrapping';
 /**
  * Records a per-tick snapshot of the conveyor belt's operational state.
  * One record per S-Clock tick per session. Maps to `conveyor_states` table.
+ *
+ * OPTION-A EXTENSION (2026-03-08):
+ *   Fields jammed_time through jammed_events mirror the 5 new columns added to
+ *   `conveyor_states` in migration 20260308_conveyor_param_columns.sql.
+ *   They are populated from `conveyorNumericParams` inside `recordConveyorState()`.
+ *   Fields are optional so existing in-memory records remain valid before
+ *   the session has started (where conveyorNumericParams may not yet be set).
  */
 export interface ConveyorStateRecord {
   /** Locally generated unique ID (nanoid). */
@@ -848,6 +855,22 @@ export interface ConveyorStateRecord {
   created_at: string;
   /** Has this record been synced to Supabase? */
   synced: boolean;
+
+  // ── Conveyor behavioral parameters (Option-A: persisted each tick) ──────────
+  // These 5 fields shadow conveyorNumericParams so CWF and analytics can query
+  // the exact parameter state that was active at any sim_tick — including
+  // scenario overrides and CWF-applied changes — without asking the user.
+
+  /** How long each jam lasts in simulation cycles (maps to conveyorNumericParams.jammed_time). */
+  jammed_time?: number;
+  /** Number of tiles scrapped per jam event (maps to conveyorNumericParams.impacted_tiles). */
+  impacted_tiles?: number;
+  /** Global tile scrap probability in % (maps to conveyorNumericParams.scrap_probability). */
+  scrap_probability?: number;
+  /** Whether random belt speed-change events are enabled (maps to conveyorNumericParams.speed_change). */
+  speed_change?: boolean;
+  /** Whether jam events can occur on the belt (maps to conveyorNumericParams.jammed_events). */
+  jammed_events?: boolean;
 }
 
 /**

@@ -465,6 +465,15 @@ export const useSimulationDataStore = create<
       const master = useSimulationStore.getState();
       const id = generateUUID();
 
+      /**
+       * Read the current conveyor behavioral parameters from the data store.
+       * These are the 5 params managed by Demo Settings → Conveyor tab.
+       * Option-A (2026-03-08): persist these on every tick so Supabase records
+       * the exact parameter state active at each sim_tick — including scenario
+       * overrides and CWF-applied changes — without ever asking the user.
+       */
+      const cp = state.conveyorNumericParams;
+
       /** Build the immutable snapshot record. */
       const record: ConveyorStateRecord = {
         id,
@@ -480,6 +489,23 @@ export const useSimulationDataStore = create<
         active_tiles_on_belt: master.totalPartsRef.current,
         created_at: new Date().toISOString(),
         synced: false,
+
+        // ── Behavioral parameters (Option-A) ────────────────────────────────
+        // Captured from conveyorNumericParams so every row in conveyor_states
+        // reflects the exact settings that were active at this sim_tick.
+        // CWF queries `SELECT jammed_time, … FROM conveyor_states ORDER BY sim_tick DESC LIMIT 1`
+        // instead of prompting the user.
+
+        /** Jam duration in simulation cycles at this tick. */
+        jammed_time: cp.jammed_time,
+        /** Tiles scrapped per jam event at this tick. */
+        impacted_tiles: cp.impacted_tiles,
+        /** Global scrap probability in percent at this tick. */
+        scrap_probability: cp.scrap_probability,
+        /** Whether random speed-change events are enabled at this tick. */
+        speed_change: cp.speed_change,
+        /** Whether jam events are enabled at this tick. */
+        jammed_events: cp.jammed_events,
       };
 
       /** Append to flat array and apply ring-buffer cap to prevent memory growth. */

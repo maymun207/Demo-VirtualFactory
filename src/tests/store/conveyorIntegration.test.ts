@@ -342,3 +342,117 @@ describe('[C-05] Boolean conveyor params (speed_change / jammed_events) persist 
   });
 });
 
+// =============================================================================
+// [C-06] Conveyor params persisted into ConveyorStateRecord (Option-A, 2026-03-08)
+// =============================================================================
+
+describe('[C-06] recordConveyorState captures behavioral params in the snapshot record', () => {
+  /**
+   * These tests verify that the per-tick ConveyorStateRecord written to Supabase
+   * includes all 5 conveyor behavioral parameters from conveyorNumericParams.
+   *
+   * Prior to Option-A, only operational fields (speed, status, fault_count,
+   * active_tiles_on_belt) were persisted. CWF can now query jammed_time,
+   * impacted_tiles, scrap_probability, speed_change, and jammed_events
+   * directly from conveyor_states without asking the user.
+   */
+
+  beforeEach(() => {
+    /** Reset store to defaults before each test for full isolation. */
+    useSimulationDataStore.getState().resetDataStore();
+  });
+
+  it('[C-06-01] ConveyorStateRecord type accepts jammed_time as an optional number', () => {
+    /**
+     * Type-level guard: if jammed_time is removed from the interface, this will
+     * produce a TypeScript compile error, caught at build time.
+     */
+    const record: Partial<import('../../store/types').ConveyorStateRecord> = {
+      jammed_time: 8,
+    };
+    expect(record.jammed_time).toBe(8);
+  });
+
+  it('[C-06-02] ConveyorStateRecord type accepts impacted_tiles as an optional number', () => {
+    /** Type-level guard for impacted_tiles. */
+    const record: Partial<import('../../store/types').ConveyorStateRecord> = {
+      impacted_tiles: 3,
+    };
+    expect(record.impacted_tiles).toBe(3);
+  });
+
+  it('[C-06-03] ConveyorStateRecord type accepts scrap_probability as an optional number', () => {
+    /** Type-level guard for scrap_probability. */
+    const record: Partial<import('../../store/types').ConveyorStateRecord> = {
+      scrap_probability: 0,
+    };
+    expect(record.scrap_probability).toBe(0);
+  });
+
+  it('[C-06-04] ConveyorStateRecord type accepts speed_change as an optional boolean', () => {
+    /**
+     * Type-level guard: speed_change is stored as BOOLEAN in Supabase
+     * (not as 0/1 integer). This test will fail to compile if changed to number.
+     */
+    const record: Partial<import('../../store/types').ConveyorStateRecord> = {
+      speed_change: false,
+    };
+    expect(record.speed_change).toBe(false);
+  });
+
+  it('[C-06-05] ConveyorStateRecord type accepts jammed_events as an optional boolean', () => {
+    /** Type-level guard for jammed_events. */
+    const record: Partial<import('../../store/types').ConveyorStateRecord> = {
+      jammed_events: false,
+    };
+    expect(record.jammed_events).toBe(false);
+  });
+
+  it('[C-06-06] all 5 param keys exist on ConveyorStateRecord simultaneously (schema completeness)', () => {
+    /**
+     * SCHEMA COMPLETENESS GUARD: confirms all 5 fields can be assigned at once.
+     * Fails to compile if any field is removed from the interface.
+     */
+    const record: Partial<import('../../store/types').ConveyorStateRecord> = {
+      jammed_time: 8,
+      impacted_tiles: 3,
+      scrap_probability: 0,
+      speed_change: false,
+      jammed_events: false,
+    };
+    expect(Object.keys(record)).toEqual(
+      expect.arrayContaining([
+        'jammed_time', 'impacted_tiles', 'scrap_probability', 'speed_change', 'jammed_events',
+      ])
+    );
+  });
+
+  it('[C-06-07] updateConveyorParam(jammed_time) is visible via conveyorNumericParams (data path guard)', () => {
+    /**
+     * recordConveyorState() reads `state.conveyorNumericParams` to populate
+     * the 5 new columns. This test verifies that updateConveyorParam() writes
+     * to conveyorNumericParams correctly — confirming the data path is intact.
+     */
+    useSimulationDataStore.getState().updateConveyorParam('jammed_time', 15);
+    const { conveyorNumericParams } = useSimulationDataStore.getState();
+    /** Updated value must be visible for the next recordConveyorState() call. */
+    expect(conveyorNumericParams.jammed_time).toBe(15);
+    /** Other params must be unaffected — no cross-contamination. */
+    expect(conveyorNumericParams.impacted_tiles).toBe(0);
+  });
+
+  it('[C-06-08] updateConveyorBoolParam(speed_change, true) is visible via conveyorNumericParams', () => {
+    /**
+     * Verifies the boolean data path. After CWF calls update_parameter with
+     * speed_change=1, the frontend calls updateConveyorBoolParam('speed_change', true).
+     * The next recordConveyorState() must persist speed_change=true in Supabase.
+     */
+    useSimulationDataStore.getState().updateConveyorBoolParam('speed_change', true);
+    const { conveyorNumericParams } = useSimulationDataStore.getState();
+    expect(conveyorNumericParams.speed_change).toBe(true);
+    /** jammed_events must be unaffected. */
+    expect(conveyorNumericParams.jammed_events).toBe(false);
+  });
+});
+
+

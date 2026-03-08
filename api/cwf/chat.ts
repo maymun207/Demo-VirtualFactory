@@ -1141,8 +1141,8 @@ ${knowledgeBase}` : ''}
 The conveyor belt is the **8th controllable station** (station name: "conveyor"). Unlike the 7 production machines, it does NOT have its own machine_conveyor_states table. Instead:
 
 - **Change** conveyor parameters using update_parameter with station = "conveyor".
-- **Read** conveyor speed/status from the conveyor_states table (latest row per session).
-- **Parameter values** (jammed_time, speed_change, etc.) are stored in the frontend — NOT in Supabase.
+- **Read** conveyor speed/status AND behavioral parameters from the conveyor_states table (latest row per session).
+- Since migration 20260308, all 5 behavioral parameters are stored per-tick in conveyor_states — you can query them directly from Supabase.
 
 ### Conveyor Parameter Reference:
 
@@ -1165,22 +1165,25 @@ These are ON/OFF toggles. Infer the current value purely from user intent:
 - ALWAYS set old_value based on the opposite of new_value. You do NOT need to query anything.
 
 #### Rule 2 — Numeric params (jammed_time, impacted_tiles, scrap_probability):
-First, try to find the latest known value by querying parameter_change_events:
+Query the latest known value directly from conveyor_states:
 \`\`\`sql
-SELECT new_value FROM parameter_change_events
-WHERE simulation_id = '<session_id>' AND station = 'conveyor' AND parameter_name = '<param>'
+SELECT jammed_time, impacted_tiles, scrap_probability, speed_change, jammed_events
+FROM conveyor_states
+WHERE simulation_id = '<session_id>'
 ORDER BY sim_tick DESC LIMIT 1
 \`\`\`
-- If a row is found → use new_value as old_value in your proposal.
-- If no row is found → use the factory default from the table above as old_value.
+- If a row is found → use the relevant column value as old_value in your proposal.
+- If no row is found (simulation just started) → use the factory default from the table above.
 - NEVER ask the user — just proceed with the best known value.
 
 ### Example Interactions (use these EXACTLY):
 - User: "disable speed changes" → old_value=1, new_value=0 (boolean inference — no query needed)
 - User: "enable jam events" → old_value=0, new_value=1 (boolean inference — no query needed)
-- User: "set jam time to 15" → query parameter_change_events for jammed_time; if found use that as old_value; if not, use default 8 as old_value; then propose old→15
-- User: "set conveyor scrap probability to 2" → query parameter_change_events; if found use that; else use default 0; propose old→2
+- User: "set jam time to 15" → query conveyor_states for jammed_time; if found use that as old_value; if not, use default 8 as old_value; then propose old→15
+- User: "set conveyor scrap probability to 2" → query conveyor_states for scrap_probability; if found use that; else use default 0; propose old→2
+- User: "what are the current conveyor settings?" → query conveyor_states ORDER BY sim_tick DESC LIMIT 1 and report all 5 param columns
 - User: "can you change conveyor parameters?" → Ask WHICH parameter and WHAT value they want. Do NOT ask for the current value.
+
 
 ## CHANGING PARAMETERS (Human-in-the-Loop Protocol)
 
