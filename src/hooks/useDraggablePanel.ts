@@ -368,6 +368,15 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
   const dragOffset = useRef({ x: 0, y: 0 });
   /** Mouse position and panel dimensions at resize start */
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  /**
+   * userHasDragged — set to true the first time the user manually moves this
+   * panel. Once set, side-panel open/close/resize (Effect 2) will NOT reset
+   * the panel's position — only the content-area boundaries are refreshed so
+   * that drag clamping stays accurate. Window resize (Effect 1) still re-clamps
+   * the position to prevent it from going off-screen, but does not snap it back
+   * to the cascade default.
+   */
+  const userHasDragged = useRef(false);
 
   /**
    * contentAreaRef — keeps event handlers always synchronised with the latest
@@ -376,7 +385,7 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
    */
   const contentAreaRef = useRef<ContentArea>(initArea);
 
-  // ── Recompute helper ──────────────────────────────────────────────────────
+  // ── Recompute helpers ────────────────────────────────────────────────────
   /**
    * recomputeDefaults — Recompute and apply the default panel position/size.
    *
@@ -386,7 +395,8 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
    *
    * Called by:
    *  a) The window 'resize' event listener.
-   *  b) The side-panel-change useEffect.
+   *  b) The side-panel-change useEffect (only allowed to update boundaries, not
+   *     position, when the user has already manually placed the panel).
    */
   const recomputeDefaults = useCallback(() => {
     /** Skip recompute while user is actively interacting with the panel */
@@ -399,6 +409,19 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
     setWidth(fresh.width);
     setHeight(fresh.height);
   }, [panelIndex]);
+
+  /**
+   * refreshBoundariesOnly — Update the content-area ref without moving the panel.
+   *
+   * Used by Effect 2 (side-panel resize trigger) when the user has already
+   * manually positioned this panel. The panel stays exactly where the user left
+   * it — only the clamping boundaries are updated so subsequent drags work
+   * correctly against the new CWF/DTXFR panel widths.
+   */
+  const refreshBoundariesOnly = useCallback(() => {
+    if (isDragging.current || isResizing.current) return;
+    contentAreaRef.current = computeContentArea();
+  }, []);
 
   // ── Effect 1: Recompute on window resize ───────────────────────────────────
   /**
@@ -427,29 +450,31 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
 
   // ── Effect 2: Recompute on side-panel open / close / resize ──────────────
   /**
-   * Trigger a full position recompute whenever any docked side panel changes.
-   * This is the core of Fix 3 — without this effect, panels positioned at
-   * their default cascade positions remain at those coordinates even as the
-   * visible content area shrinks or shifts, hiding them behind side panels.
+   * Trigger a position recompute (or boundary-only refresh) when any docked
+   * side panel changes width.
+   *
+   * If the user has NEVER manually moved this panel → full recompute so the
+   * default cascade position always sits inside the visible content area.
+   *
+   * If the user HAS manually positioned the panel → only refresh the
+   * content-area boundaries (used for drag clamping). The panel stays exactly
+   * where the user left it and is never auto-snapped back to the cascade slot.
    *
    * Dependencies:
-   *   cwfOpen, cwfWidth   — CWF right-docked panel
+   *   cwfOpen, cwfWidth     — CWF right-docked panel
    *   dtxfrOpen, dtxfrWidth — DTXFR left-docked panel
    *   basicOpen, basicWidth — Basic left-docked panel
-   *
-   * PANEL_SIDE_REFLOW_DELAY_MS controls whether reposition is immediate (0)
-   * or waits for the side-panel slide animation to complete.
    */
   useEffect(() => {
+    /** Choose the right handler based on whether the user has moved the panel */
+    const handler = userHasDragged.current ? refreshBoundariesOnly : recomputeDefaults;
     if (PANEL_SIDE_REFLOW_DELAY_MS === 0) {
-      /** Immediate reposition — panels move simultaneously with side panels */
-      recomputeDefaults();
+      handler();
     } else {
-      /** Delayed reposition — waits for slide animation to settle */
-      const timer = setTimeout(recomputeDefaults, PANEL_SIDE_REFLOW_DELAY_MS);
+      const timer = setTimeout(handler, PANEL_SIDE_REFLOW_DELAY_MS);
       return () => clearTimeout(timer);
     }
-  }, [cwfOpen, cwfWidth, dtxfrOpen, dtxfrWidth, basicOpen, basicWidth, recomputeDefaults]);
+  }, [cwfOpen, cwfWidth, dtxfrOpen, dtxfrWidth, basicOpen, basicWidth, recomputeDefaults, refreshBoundariesOnly]);
 
   // ── Global mouse + touch listeners for drag and resize ───────────────────
   useEffect(() => {
@@ -514,6 +539,8 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
    */
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging.current = true;
+    /** Mark this panel as manually positioned — stops Effect 2 from resetting it */
+    userHasDragged.current = true;
     dragOffset.current = {
       x: e.clientX - position.left,
       y: e.clientY - position.top,
@@ -526,6 +553,8 @@ export function useDraggablePanel(panelIndex: number, resizable = false): Dragga
    */
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     isDragging.current = true;
+    /** Mark as manually positioned on touch-drag as well */
+    userHasDragged.current = true;
     const touch = e.touches[0];
     dragOffset.current = {
       x: touch.clientX - position.left,

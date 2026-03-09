@@ -731,6 +731,17 @@ export function CWFChatPanel() {
     setTimeout(() => inputRef.current?.focus(), 300); // Deferred focus for layout stabilization
   }, []); // Run only on mount
 
+  // Re-focus input after each new message is appended to the chat history.
+  // Using useEffect (not requestAnimationFrame) so focus is set AFTER React
+  // has fully committed all state updates — including the new message bubble
+  // and isLoading flag — to the DOM. rAF fires too early, before React's
+  // commit phase completes, so subsequent renders steal the focus back.
+  useEffect(() => {
+    if (messages.length > 0) {
+      inputRef.current?.focus(); // Return cursor to text box after send
+    }
+  }, [messages.length]); // Fires once per message added
+
   // ─── Resize Handle Logic ────────────────────────────────────────────
 
   // Calculates new width based on MouseEvent X position relative to viewport
@@ -791,7 +802,9 @@ export function CWFChatPanel() {
 
   // ─── Message Handling ────────────────────────────────────────────────
 
-  // Trims input and dispatches message to store if valid
+  // Trims input and dispatches message to store if valid.
+  // Focus is returned to the textarea automatically by the messages.length
+  // useEffect above — no manual focus call needed here.
   const handleSend = () => {
     const trimmed = input.trim(); // strip extraneous whitespace
     if (!trimmed || isLoading) return; // ignore invalid states
@@ -976,9 +989,17 @@ export function CWFChatPanel() {
               onChange={(e) => setInput(e.target.value)} // update text capture
               onKeyDown={handleKeyDown} // map Enter key
               placeholder={t("placeholder")} // localized CTA
-              disabled={isLoading} // lock-down during processing
+              // NOTE: do NOT set disabled={isLoading} here.
+              // A disabled element cannot receive focus() — the browser silently
+              // ignores any .focus() call on it. Instead we keep the textarea
+              // always focusable and communicate loading state visually via
+              // opacity and aria-busy. The send guard in handleSend() already
+              // prevents submission while isLoading is true.
+              aria-busy={isLoading} // accessibility hint during loading
               rows={1} // initial compact height
-              className={`flex-1 bg-white/5 border rounded-xl px-3 py-2 text-white/90 ${CWF_UI_CONFIG.messageFontSize} placeholder-white/30 focus:outline-none resize-none max-h-24 transition-all h-[46px] disabled:opacity-50 ${
+              className={`flex-1 bg-white/5 border rounded-xl px-3 py-2 text-white/90 ${CWF_UI_CONFIG.messageFontSize} placeholder-white/30 focus:outline-none resize-none max-h-24 transition-all h-[46px] ${
+                isLoading ? "opacity-50" : "opacity-100"
+              } ${
                 isCopilotEnabled
                   ? "border-pink-500/30 focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/30"
                   : "border-white/10 focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
