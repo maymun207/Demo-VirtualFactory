@@ -227,8 +227,19 @@ export const useUIStore = create<UIState>((set) => ({
     set({ basicPanelWidth: Math.max(BASIC_SIDE_PANEL_MIN_WIDTH, Math.min(BASIC_SIDE_PANEL_MAX_WIDTH, width)) }),
   /** Toggle the OEE Hierarchy 3D table on/off */
   toggleOEEHierarchy: () => set((s) => ({ showOEEHierarchy: !s.showOEEHierarchy })),
-  /** Toggle the DemoScreen panel below the header on/off */
-  toggleDemoScreen: () => set((s) => ({ showDemoScreen: !s.showDemoScreen })),
+  /** Toggle the DemoScreen panel below the header on/off.
+   *  When opening the demo (showDemoScreen becomes true), also close the
+   *  Production Table and OEE Hierarchy panels so the scene is clean. */
+  toggleDemoScreen: () =>
+    set((s) => {
+      const opening = !s.showDemoScreen;
+      return {
+        showDemoScreen: opening,
+        /** Close the 3-D table overlays when entering demo mode */
+        showProductionTable: opening ? false : s.showProductionTable,
+        showOEEHierarchy: opening ? false : s.showOEEHierarchy,
+      };
+    }),
   /** Mark simulation as configured (true) or clear the flag (false) */
   setSimConfigured: (configured) => set({ isSimConfigured: configured }),
   /**
