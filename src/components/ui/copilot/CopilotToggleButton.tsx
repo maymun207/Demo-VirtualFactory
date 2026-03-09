@@ -3,10 +3,19 @@
  *
  * Self-contained button component that appears in the CWF panel header toolbar.
  * Provides two visual states:
- *   - INACTIVE: A visible ShieldCheck icon with pink accent that glows on hover.
- *              Clicking sends the copilot activation message to CWF chat.
- *   - ACTIVE:  A glowing pink badge with pulse dot, "COPILOT" label,
- *              and action counter. Clicking sends the disable message.
+ *   - INACTIVE: A subtle ShieldCheck icon that glows pink on hover.
+ *               Clicking sends the copilot activation message to CWF chat (LLM-driven).
+ *   - ACTIVE:   A glowing pink badge with:
+ *                 • A GREEN indicator dot (signals "engine alive / healthy")
+ *                 • "COPILOT" label + action counter in pink
+ *               Clicking DIRECTLY calls the disable endpoint — no LLM roundtrip.
+ *
+ * Why direct API call on disable?
+ *   Routing through the LLM on disable is slow and fragile. The user expects an
+ *   immediate, reliable response when they press the toggle to stop copilot.
+ *   The API call resets cwf_state='normal' in Supabase, which triggers Realtime
+ *   → useCopilotLifecycle → syncStateFromCloud → isEnabled transitions to false
+ *   → all pink theme reverts automatically.
  *
  * All text labels, colours, and messages are sourced from params/copilot.ts
  * (COPILOT_THEME and COPILOT_UI_LABELS) — no hard-coded values here.
@@ -15,7 +24,8 @@
  *   - src/components/ui/CWFChatPanel.tsx (rendered in the header toolbar)
  */
 
-import { ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { ShieldCheck, Loader2 } from "lucide-react";
 import { COPILOT_THEME, COPILOT_UI_LABELS } from "../../../lib/params/copilot";
 
 // =============================================================================
@@ -34,10 +44,14 @@ interface CopilotToggleButtonProps {
   totalActions: number;
   /** Current UI language ('en' or 'tr') for bilingual labels */
   language: "en" | "tr";
-  /** Whether the CWF agent is currently processing (disables button) */
+  /** Whether the CWF agent is currently processing (disables button during message send) */
   isLoading: boolean;
-  /** Callback to send a chat message when the button is clicked */
+  /** The active simulation session ID (needed for direct disable API call) */
+  simulationId: string | null;
+  /** Callback to send a chat message — used only for the ENABLE flow */
   onSendMessage: (message: string, language: "en" | "tr") => void;
+  /** Optional callback fired after direct disable succeeds (e.g., add a chat message) */
+  onDisabled?: () => void;
 }
 
 // =============================================================================
@@ -48,34 +62,69 @@ interface CopilotToggleButtonProps {
  * CopilotToggleButton — Renders a header toolbar button for copilot mode.
  *
  * @param props - See CopilotToggleButtonProps interface above.
- * @returns React element — either an active pink badge or an inactive icon button.
+ * @returns React element — either an active green+pink badge or an inactive icon button.
  */
 export function CopilotToggleButton({
   isEnabled,
   totalActions,
   language,
   isLoading,
+  simulationId,
   onSendMessage,
+  onDisabled,
 }: CopilotToggleButtonProps) {
   /** Resolve bilingual labels from the centralised params module */
   const labels = COPILOT_UI_LABELS;
 
+  /**
+   * Local loading state for the direct disable API call.
+   * Shown only during the brief network round-trip to prevent double-clicks.
+   */
+  const [isDisabling, setIsDisabling] = useState(false);
+
+  // ===========================================================================
+  // ACTIVE STATE — Glowing pink badge with green health indicator
+  // ===========================================================================
+
   if (isEnabled) {
     /**
-     * ACTIVE STATE — Glowing pink badge.
-     * Shows pulse dot + "COPILOT" label + action count.
-     * Click sends the disable message to CWF chat.
+     * Handle direct disable: bypasses the LLM entirely.
+     *
+     * Calls /api/cwf/copilot/disable directly:
+     *  1. POST to the engine endpoint to stop the polling loop.
+     *  2. Supabase is updated server-side (cwf_state='normal').
+     *  3. Realtime fires → useCopilotLifecycle → syncStateFromCloud → UI reverts.
+     *
+     * We do NOT update Zustand directly here — the Realtime event is the source of truth.
      */
+    const handleDirectDisable = async () => {
+      if (isDisabling || !simulationId) return;
+
+      setIsDisabling(true);
+      try {
+        /** Call the disable endpoint — CWF dev server or Vercel function */
+        await fetch("/api/cwf/copilot/disable", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ simulationId }),
+        });
+        /** Notify parent so it can add a system message to chat */
+        onDisabled?.();
+      } catch {
+        /** Engine may already be stopped — the Supabase state reset is what matters */
+      } finally {
+        setIsDisabling(false);
+      }
+    };
+
     return (
       <button
-        /** Send the localised disable message on click */
-        onClick={() =>
-          onSendMessage(labels.disableChatMessage[language], language)
-        }
-        /** Prevent double-clicks while CWF is processing */
-        disabled={isLoading}
+        /** Direct disable — no LLM roundtrip */
+        onClick={handleDirectDisable}
+        /** Prevent double-clicks while the API call is in flight */
+        disabled={isDisabling}
         /** Pink badge layout: horizontal flex, rounded, with glow */
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg mr-1 transition-all duration-300 hover:opacity-80 cursor-pointer"
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg mr-1 transition-all duration-300 hover:opacity-80 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         /** Dynamic pink glow styling from centralised theme */
         style={{
           background: `${COPILOT_THEME.primary}20`,
@@ -85,12 +134,26 @@ export function CopilotToggleButton({
         /** Tooltip: localised disable instruction */
         title={labels.disableTooltip[language]}
       >
-        {/* Animated pink pulse dot — signals active monitoring */}
-        <div
-          className="w-2 h-2 rounded-full animate-pulse"
-          style={{ backgroundColor: COPILOT_THEME.primary }}
-        />
-        {/* Badge label + action counter */}
+        {isDisabling ? (
+          /** Spinner while awaiting the disable API response */
+          <Loader2
+            size={10}
+            className="animate-spin"
+            style={{ color: COPILOT_THEME.primary }}
+          />
+        ) : (
+          /**
+           * GREEN indicator dot — signals "engine is alive and monitoring".
+           * Distinct from the pink branding: green = healthy/active status,
+           * the same UX convention used in the simulation session dot in the header.
+           */
+          <div
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ backgroundColor: "#4ade80" }} /** green-400 */
+            title="Copilot engine active"
+          />
+        )}
+        {/* Badge label + action counter in pink */}
         <span
           className="text-[10px] font-bold"
           style={{ color: COPILOT_THEME.primaryLight }}
@@ -104,10 +167,14 @@ export function CopilotToggleButton({
     );
   }
 
+  // ===========================================================================
+  // INACTIVE STATE — Subtle icon button
+  // ===========================================================================
+
   /**
-   * INACTIVE STATE — Subtle icon button.
-   * Shows a muted ShieldCheck icon that glows pink on hover.
-   * Click sends the localised enable message to CWF chat.
+   * INACTIVE STATE — shows a muted ShieldCheck icon that glows pink on hover.
+   * Click sends the localised enable message to CWF chat (LLM-driven flow).
+   * The LLM sets cwf_state='copilot_pending_auth' → asks for auth code.
    */
   return (
     <button

@@ -5,6 +5,12 @@
  * Contains all timing constants, threshold defaults, theme colours, intent
  * detection keywords, Supabase table names, and type definitions.
  *
+ * CWF STATE MACHINE: The copilot feature uses a 3-state machine:
+ *   NORMAL → COPILOT_PENDING_AUTH → COPILOT_ACTIVE
+ * The state is stored in Supabase (copilot_config.cwf_state) as the
+ * authoritative source of truth. The Zustand client store mirrors it via
+ * Supabase Realtime. The Vercel serverless function reads it directly.
+ *
  * ALL copilot-related magic numbers and strings live here — no hard-coded
  * values in other modules. Every constant has a JSDoc comment explaining its
  * purpose and how it interacts with the rest of the system.
@@ -14,7 +20,7 @@
  *   - src/hooks/useCopilotHeartbeat.ts (heartbeat timing)
  *   - src/hooks/useCopilotLifecycle.ts (table names, sentinel)
  *   - api/cwf/copilotEngine.ts         (timing, thresholds, model)
- *   - api/cwf/chat.ts                  (auth bypass sentinel)
+ *   - api/cwf/chat.ts                  (auth bypass sentinel, state machine)
  *   - src/hooks/useCWFCommandListener  (sentinel detection)
  */
 
@@ -28,6 +34,29 @@
  * endpoints return 503. Set to false to disable copilot without removing code.
  */
 export const COPILOT_FEATURE_ENABLED = true;
+
+// =============================================================================
+// CWF STATE MACHINE
+// =============================================================================
+
+/**
+ * Valid CWF state machine states.
+ *
+ * The state is stored in Supabase copilot_config.cwf_state (authoritative).
+ * The Zustand copilotStore mirrors it for UI reactivity.
+ *
+ *   NORMAL              — Standard conversational CWF; HITL protocol applies.
+ *   COPILOT_PENDING_AUTH — User requested copilot; awaiting correct auth code.
+ *   COPILOT_ACTIVE       — Copilot authorised; applies corrections autonomously.
+ */
+export type CwfState = 'normal' | 'copilot_pending_auth' | 'copilot_active';
+
+/**
+ * Maximum number of failed authorization attempts before the state machine
+ * rejects the copilot enable request and returns to NORMAL.
+ * After 3 wrong codes, the user must reinitiate the copilot enable flow.
+ */
+export const COPILOT_MAX_AUTH_ATTEMPTS = 3;
 
 // =============================================================================
 // AUTHENTICATION
@@ -53,16 +82,16 @@ export const COPILOT_AUTH_SENTINEL = 'system:copilot_auto';
  * Default polling interval in seconds — how often the copilot engine reads
  * Supabase for the latest factory metrics and evaluates whether action is needed.
  *
- * 15 seconds balances responsiveness (catches drift within ~2 ticks) against
- * Gemini API cost (only called when pre-filter detects an anomaly).
+ * 6 seconds provides fast anomaly detection (catches drift within one tick)
+ * while staying well within Gemini API limits and Supabase query budgets.
  */
-export const COPILOT_DEFAULT_POLL_INTERVAL_SEC = 15;
+export const COPILOT_DEFAULT_POLL_INTERVAL_SEC = 6;
 
 /**
  * Minimum allowed poll interval (seconds). Prevents the user from setting
  * an interval so low it overwhelms the Gemini API or Supabase.
  */
-export const COPILOT_MIN_POLL_INTERVAL_SEC = 10;
+export const COPILOT_MIN_POLL_INTERVAL_SEC = 6;
 
 /**
  * Maximum allowed poll interval (seconds). Beyond this, the copilot is so
@@ -97,12 +126,11 @@ export const COPILOT_HEARTBEAT_TIMEOUT_MS = 15_000;
 
 /**
  * Maximum number of autonomous corrective actions the copilot may take per
- * minute. Prevents runaway corrections if the Gemini model hallucinates or
- * a feedback loop forms (correction → drift → re-correction).
- *
- * 2 actions/minute means the factory has 30 seconds to stabilise after each fix.
+ * minute. Set to 20 to allow the copilot to correct all out-of-range parameters
+ * in a single evaluation cycle (up to 7 kiln params + other stations).
+ * Per-parameter cooldown still prevents oscillation on any individual param.
  */
-export const COPILOT_DEFAULT_MAX_ACTIONS_PER_MINUTE = 2;
+export const COPILOT_DEFAULT_MAX_ACTIONS_PER_MINUTE = 20;
 
 /**
  * Default cooldown in seconds between corrections to the SAME parameter.
@@ -312,6 +340,9 @@ export type CopilotDecision = 'corrected' | 'observed' | 'escalated' | 'skipped'
 
 /**
  * Shape of the copilot_config table row, used by both server and client.
+ * Two columns were added in migration 20260309_copilot_state_machine.sql:
+ *   cwf_state     — CWF State Machine current state
+ *   auth_attempts — Failed auth count in COPILOT_PENDING_AUTH phase
  */
 export interface CopilotConfig {
     /** UUID primary key */
@@ -320,6 +351,10 @@ export interface CopilotConfig {
     simulation_id: string;
     /** Master on/off switch */
     enabled: boolean;
+    /** CWF State Machine state: 'normal' | 'copilot_pending_auth' | 'copilot_active' */
+    cwf_state: CwfState;
+    /** Number of failed auth attempts in the current COPILOT_PENDING_AUTH phase */
+    auth_attempts: number;
     /** Evaluation frequency in seconds */
     poll_interval_sec: number;
     /** Max corrections per minute */

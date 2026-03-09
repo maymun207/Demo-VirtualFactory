@@ -705,6 +705,15 @@ export function useCWFCommandListener(): void {
                     command.parameter as 'speed_change' | 'jammed_events',
                     command.new_value !== 0,
                 );
+            } else if (command.parameter === 'conveyor_speed_x') {
+                /**
+                 * Conveyor speed multiplier — corrected by the copilot engine when
+                 * low belt speed causes OEE to drop. Routed to setConveyorSpeed()
+                 * in simulationStore (same action used by the UI slider and by
+                 * execute_ui_action 'set_conveyor_speed'). Cannot use updateConveyorParam
+                 * because speed_x is stored in simulationStore, NOT in conveyor_states.
+                 */
+                useSimulationStore.getState().setConveyorSpeed(command.new_value);
             } else {
                 /**
                  * Apply numeric conveyor param (jammed_time, impacted_tiles, scrap_probability).

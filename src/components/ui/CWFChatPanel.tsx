@@ -700,6 +700,8 @@ export function CWFChatPanel() {
   const isLoading = useCWFStore((s) => s.isLoading); // Track agent processing status
   const sendMessage = useCWFStore((s) => s.sendMessage); // Access send logic
   const clearMessages = useCWFStore((s) => s.clearMessages); // Access purge logic
+  /** Simulation session ID — needed for direct disable API call from toggle button */
+  const simulationId = useCWFStore((s) => s.simulationId);
 
   /** ── Copilot State ───────────────────────────────────────────────────── */
   const isCopilotEnabled = useCopilotStore((s) => s.isEnabled); // Whether copilot is active
@@ -893,6 +895,7 @@ export function CWFChatPanel() {
               totalActions={copilotTotalActions}
               language={language}
               isLoading={isLoading}
+              simulationId={simulationId}
               onSendMessage={sendMessage}
             />
             {/* Quick Actions dropdown — always accessible for predefined queries */}

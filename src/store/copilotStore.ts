@@ -2,25 +2,36 @@
  * copilotStore.ts — Zustand Store for CWF Copilot UI State
  *
  * Manages the client-side state for the CWF Copilot feature:
- *   - isEnabled: whether copilot mode is currently active
- *   - isAuthPending: whether the 3-step auth flow is in progress
- *   - lastAction: most recent copilot action (for status indicator)
- *   - actionHistory: ring buffer of recent actions (for action feed in chat)
- *   - config: current copilot configuration (mirrors Supabase copilot_config)
+ *   - cwfState:     CWF State Machine state (SLAVE of Supabase copilot_config.cwf_state)
+ *   - authAttempts: Failed auth attempts in the current COPILOT_PENDING_AUTH phase
+ *   - isEnabled:    Derived helper — true only when cwfState = 'copilot_active'
+ *   - isAuthPending: Derived helper — true when cwfState = 'copilot_pending_auth'
+ *   - lastAction:   Most recent copilot action (for status indicator in CWF header)
+ *   - actionHistory: Ring buffer of recent actions (displayed in CWF chat feed)
+ *   - config:       Cached copilot config (mirrors Supabase copilot_config)
+ *
+ * IMPORTANT: This store is a READ-ONLY MIRROR of Supabase.
+ * The canonical cwf_state and auth_attempts live in copilot_config (Supabase).
+ * This store is updated by useCopilotLifecycle via Supabase Realtime so the
+ * UI stays in sync. The Vercel function reads Supabase directly for decisions.
+ *
+ * State machine transitions:
+ *   NORMAL → COPILOT_PENDING_AUTH → COPILOT_ACTIVE
+ *   Any state → NORMAL (sim ends, user disables, 3 bad auth codes)
  *
  * The store is updated by:
- *   - User interactions (toggle button, typed commands)
- *   - useCopilotLifecycle hook (Supabase Realtime subscriptions)
+ *   - useCopilotLifecycle hook (Supabase Realtime subscriptions — PRIMARY source)
  *   - useCWFCommandListener (when copilot messages arrive)
  *
  * Used by:
  *   - CWF panel component (pink theme, status indicator, action feed)
- *   - WatchdogStatusIndicator component
+ *   - cwfStore.ts (injects cwfState into uiContext hint for the LLM)
  *   - useCopilotHeartbeat hook (reads isEnabled to control heartbeat interval)
  *   - useCopilotLifecycle hook (writes state from Realtime events)
  */
 
 import { create } from 'zustand';
+import type { CwfState } from '../lib/params/copilot';
 
 // =============================================================================
 // TYPES
@@ -60,16 +71,41 @@ export interface CopilotUIConfig {
 
 /**
  * Copilot store state shape (Zustand).
+ * SLAVE of Supabase copilot_config — updated via Supabase Realtime.
  */
 interface CopilotState {
-    // ─── State ───────────────────────────────────────────────────────────────
+    // ─── CWF State Machine Mirror (master is Supabase copilot_config) ─────────
 
-    /** Whether copilot mode is currently active (monitoring + correcting) */
+    /**
+     * Current CWF state machine state.
+     * This is a CLIENT-SIDE MIRROR synced from Supabase via Realtime.
+     * The Vercel serverless function reads copilot_config.cwf_state directly
+     * and does NOT rely on this value for its decisions.
+     */
+    cwfState: CwfState;
+
+    /**
+     * Number of failed authorization attempts in the current COPILOT_PENDING_AUTH phase.
+     * Mirrored from Supabase copilot_config.auth_attempts via Realtime.
+     * Resets to 0 on every state transition.
+     */
+    authAttempts: number;
+
+    // ─── Derived State Helpers ────────────────────────────────────────────────
+
+    /**
+     * Convenience flag — true only when cwfState === 'copilot_active'.
+     * Used by useCopilotHeartbeat and UI theme toggle.
+     */
     isEnabled: boolean;
 
-    /** Whether the 3-step auth flow is in progress (user has initiated but not
-        yet provided the auth code) */
+    /**
+     * Convenience flag — true only when cwfState === 'copilot_pending_auth'.
+     * Used by the toggle button to show a spinner while waiting for auth.
+     */
     isAuthPending: boolean;
+
+    // ─── Action Feed ──────────────────────────────────────────────────────────
 
     /** Most recent copilot action (for the status indicator in CWF header) */
     lastAction: CopilotChatAction | null;
@@ -87,17 +123,30 @@ interface CopilotState {
     /** Total evaluation cycles in this copilot session */
     totalCycles: number;
 
-    // ─── Actions ─────────────────────────────────────────────────────────────
+    // ─── State Machine Actions (mirror updates from Supabase Realtime) ────────
 
-    /** Enable copilot mode — called after successful auth flow */
+    /**
+     * Called by useCopilotLifecycle when Realtime fires a copilot_config change.
+     * Syncs cwfState + authAttempts from the Supabase row into the Zustand mirror.
+     * Also keeps the derived isEnabled / isAuthPending flags consistent.
+     */
+    syncStateFromCloud: (cwfState: CwfState, authAttempts: number) => void;
+
+    /**
+     * Enable copilot mode — legacy helper, now equivalent to
+     * syncStateFromCloud('copilot_active', 0).
+     * Kept for backward-compat with useCopilotLifecycle.ts enableCopilot() calls.
+     */
     enableCopilot: () => void;
 
-    /** Disable copilot mode — called by button, typed command, sim stop,
-        or browser disconnect detection */
+    /**
+     * Disable copilot mode — legacy helper, now equivalent to
+     * syncStateFromCloud('normal', 0).
+     * Kept for backward-compat with useCopilotLifecycle.ts disableCopilot() calls.
+     */
     disableCopilot: () => void;
 
-    /** Set auth pending state — called when user clicks copilot button
-        before auth is complete */
+    /** Set auth pending state — legacy helper used by the toggle button */
     setAuthPending: (pending: boolean) => void;
 
     /** Push a new action into the history ring buffer.
@@ -144,10 +193,16 @@ const DEFAULT_CONFIG: CopilotUIConfig = {
 export const useCopilotStore = create<CopilotState>((set) => ({
     // ─── Initial State ───────────────────────────────────────────────────────
 
-    /** Copilot starts disabled — user must explicitly activate via auth flow */
+    /** CWF starts in normal mode — mirrored from Supabase, initialised locally */
+    cwfState: 'normal',
+
+    /** Zero failed auth attempts on init */
+    authAttempts: 0,
+
+    /** Derived: copilot not active at start */
     isEnabled: false,
 
-    /** No auth flow in progress initially */
+    /** Derived: no auth pending at start */
     isAuthPending: false,
 
     /** No actions yet */
@@ -163,21 +218,37 @@ export const useCopilotStore = create<CopilotState>((set) => ({
     totalActions: 0,
     totalCycles: 0,
 
-    // ─── Actions ─────────────────────────────────────────────────────────────
+    // ─── State Machine Sync (primary update path from Supabase Realtime) ─────
+
+    syncStateFromCloud: (cwfState, authAttempts) => set({
+        /** Mirror the authoritative Supabase state into Zustand */
+        cwfState,
+        authAttempts,
+        /** Derive convenience flags from the received state */
+        isEnabled: cwfState === 'copilot_active',
+        isAuthPending: cwfState === 'copilot_pending_auth',
+    }),
+
+    // ─── Legacy Action Helpers (kept for backward-compat) ────────────────────
 
     enableCopilot: () => set({
+        cwfState: 'copilot_active',
+        authAttempts: 0,
         isEnabled: true,
         isAuthPending: false,
     }),
 
     disableCopilot: () => set({
+        cwfState: 'normal',
+        authAttempts: 0,
         isEnabled: false,
         isAuthPending: false,
     }),
 
-    setAuthPending: (pending) => set({
+    setAuthPending: (pending) => set((state) => ({
+        cwfState: pending ? 'copilot_pending_auth' : state.cwfState,
         isAuthPending: pending,
-    }),
+    })),
 
     pushAction: (action) => set((state) => {
         /** Prepend new action (most recent first) and cap at MAX_ACTION_HISTORY */
@@ -202,6 +273,8 @@ export const useCopilotStore = create<CopilotState>((set) => ({
     })),
 
     resetCopilot: () => set({
+        cwfState: 'normal',
+        authAttempts: 0,
         isEnabled: false,
         isAuthPending: false,
         lastAction: null,

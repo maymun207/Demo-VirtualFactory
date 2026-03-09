@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS copilot_config (
     severity_threshold TEXT NOT NULL DEFAULT 'medium',
 
     /** Factory OEE (FOEE) below this value triggers copilot evaluation */
-    oee_alarm_threshold REAL NOT NULL DEFAULT 60.0,
+    oee_alarm_threshold REAL NOT NULL DEFAULT 75.0,
 
     /** Quality percentage below this value triggers copilot evaluation */
     quality_alarm_threshold REAL NOT NULL DEFAULT 85.0,

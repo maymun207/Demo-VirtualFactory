@@ -189,11 +189,38 @@ export const useCWFStore = create<CWFState>((set, get) => ({
     // ── Action Implementations ─────────────────────────────────────
 
     /** Update the active simulation ID and session code */
-    setSimulationId: (id, sessionCode) => set({
-        simulationId: id,
-        sessionCode: sessionCode ?? null,
-        simulationHistory: getSimulationHistory(),
-    }),
+    setSimulationId: (id, sessionCode) => {
+        /**
+         * Guard: validate that the provided ID is a UUID-shaped string before storing.
+         *
+         * cwfStore.simulationId MUST be the Supabase UUID (simulation_sessions.id),
+         * NOT the 6-digit human-readable session code (e.g., "585749").
+         *
+         * The UUID is set by App.tsx from simulationDataStore.session?.id.
+         * This guard prevents any short-code or null from being used as the simulation ID,
+         * which would break Supabase queries in copilot_config and heartbeat targeting.
+         *
+         * UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars, 5 hyphen-separated groups)
+         */
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (id !== null && !UUID_RE.test(id)) {
+            console.warn(
+                `[CWF Store] ⚠️ setSimulationId rejected non-UUID value: "${id}". ` +
+                `simulationId must be a Supabase UUID (e.g. "29bf4242-..."). ` +
+                `Use cwfStore.sessionCode for display purposes.`
+            );
+            /** Set to null instead of the invalid value — prevents downstream Supabase mismatches */
+            set({ simulationId: null, sessionCode: sessionCode ?? null, simulationHistory: getSimulationHistory() });
+            return;
+        }
+
+        set({
+            simulationId: id,
+            sessionCode: sessionCode ?? null,
+            simulationHistory: getSimulationHistory(),
+        });
+    },
+
 
     /** Clear all messages */
     clearMessages: () => set({ messages: [] }),

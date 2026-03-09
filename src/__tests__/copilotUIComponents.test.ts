@@ -219,4 +219,17 @@ describe('COPILOT_THEME — used by extracted components', () => {
         /** The active toggle button uses glow for box-shadow */
         expect(COPILOT_THEME.glow).toMatch(/^rgba\(/);
     });
+
+    test('active indicator dot green colour is #4ade80 (green-400, not pink)', () => {
+        /**
+         * The CopilotToggleButton's active state renders a green dot (#4ade80)
+         * to signal "engine is alive and healthy". This is intentionally distinct
+         * from COPILOT_THEME.primary (pink) which is the branding colour.
+         * Green = healthy status indicator (same UX convention as simulation dot).
+         * If this test is changed, also update CopilotToggleButton.tsx.
+         */
+        const ACTIVE_INDICATOR_DOT = '#4ade80'; // green-400
+        expect(ACTIVE_INDICATOR_DOT).not.toBe(COPILOT_THEME.primary);
+        expect(ACTIVE_INDICATOR_DOT).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    });
 });

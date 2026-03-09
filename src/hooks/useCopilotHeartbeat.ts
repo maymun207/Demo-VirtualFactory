@@ -6,6 +6,14 @@
  * in copilot_config.last_heartbeat_at and auto-disengages copilot if the
  * browser stops sending heartbeats (tab closed, network lost, etc.).
  *
+ * IMPORTANT — Simulation ID used for heartbeats:
+ *   Heartbeats MUST use the Supabase UUID (cwfStore.simulationId), NOT the
+ *   human-readable session code from simulationStore.sessionId.
+ *   The copilot_config table is keyed on simulation_id = UUID.
+ *   Using the session code causes the engine to never find the copilot_config
+ *   row, leaving last_heartbeat_at perpetually stale and triggering a false
+ *   auto-disengage on first poll after the 30-second grace window.
+ *
  * Timing:
  *   - Sends every COPILOT_HEARTBEAT_INTERVAL_MS (5 seconds)
  *   - Server timeout: COPILOT_HEARTBEAT_TIMEOUT_MS (15 seconds = 3 missed beats)
@@ -14,17 +22,17 @@
  * This hook ONLY runs when copilot is enabled. When copilot is disabled,
  * the interval is cleared and no heartbeats are sent.
  *
- * Used by: App.tsx or SimulationRunner.tsx (mounted at top level)
+ * Used by: CWFChatPanel.tsx (mounted when CWF panel is open)
  *
  * Dependencies:
- *   - src/store/copilotStore.ts (reads isEnabled)
- *   - src/store/simulationStore.ts (reads sessionId for the heartbeat payload)
- *   - src/lib/params/copilot.ts (COPILOT_HEARTBEAT_INTERVAL_MS)
+ *   - src/store/copilotStore.ts  (reads isEnabled)
+ *   - src/store/cwfStore.ts      (reads simulationId — the Supabase UUID)
+ *   - src/lib/params/copilot.ts  (COPILOT_HEARTBEAT_INTERVAL_MS)
  */
 
 import { useEffect, useRef } from 'react';
 import { useCopilotStore } from '../store/copilotStore';
-import { useSimulationStore } from '../store/simulationStore';
+import { useCWFStore } from '../store/cwfStore';
 import {
     COPILOT_HEARTBEAT_INTERVAL_MS,
     COPILOT_FEATURE_ENABLED,
@@ -38,27 +46,37 @@ import {
  * Send periodic heartbeats to the CWF dev server while copilot is active.
  *
  * Lifecycle:
- *   - When isEnabled transitions to true → start interval
- *   - When isEnabled transitions to false → clear interval
- *   - When component unmounts → clear interval (server detects timeout)
+ *   - When isEnabled transitions to true  → start interval, send immediately
+ *   - When isEnabled transitions to false → clear interval, stop heartbeats
+ *   - When component unmounts             → clear interval (server detects timeout)
  *
  * Heartbeat endpoint: POST /api/cwf/copilot/heartbeat
- * Body: { simulationId: string }
+ * Body: { simulationId: string }  ← MUST be the Supabase UUID from cwfStore
  */
 export function useCopilotHeartbeat(): void {
-    /** Timer reference for cleanup */
+    /** Timer reference for cleanup on unmount or dependency change */
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     /** Read copilot enabled state from the Zustand store */
     const isEnabled = useCopilotStore((s) => s.isEnabled);
 
-    /** Read the active simulation session ID */
-    const sessionId = useSimulationStore((s) => s.sessionId);
+    /**
+     * Read the active simulation UUID from cwfStore.
+     *
+     * CRITICAL: This is the Supabase UUID used as the primary key in
+     * copilot_config (e.g., "29bf4242-140b-417d-9442-9904797171d7").
+     *
+     * DO NOT use simulationStore.sessionId — that is a short human-readable
+     * numeric code (e.g., "585749") and does NOT match the
+     * copilot_config.simulation_id column, causing every heartbeat to target
+     * the wrong row and triggering a false auto-disengage.
+     */
+    const simulationId = useCWFStore((s) => s.simulationId);
 
     useEffect(() => {
-        /** Guard: feature flag must be on, copilot must be enabled, session must exist */
-        if (!COPILOT_FEATURE_ENABLED || !isEnabled || !sessionId) {
-            /** Clear any existing interval when copilot is disabled */
+        /** Guard: feature flag must be on, copilot must be enabled, UUID must exist */
+        if (!COPILOT_FEATURE_ENABLED || !isEnabled || !simulationId) {
+            /** Clear any existing interval when copilot is disabled or no session */
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
@@ -76,13 +94,14 @@ export function useCopilotHeartbeat(): void {
             fetch('/api/cwf/copilot/heartbeat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ simulationId: sessionId }),
+                /** Use the Supabase UUID — matches copilot_config.simulation_id */
+                body: JSON.stringify({ simulationId }),
             }).catch(() => {
                 /** Silently ignore fetch errors — server handles timeout detection */
             });
         };
 
-        /** Send first heartbeat immediately (don't wait for first interval) */
+        /** Send first heartbeat immediately (don't wait for first interval tick) */
         sendHeartbeat();
 
         /** Start the periodic heartbeat interval */
@@ -95,5 +114,5 @@ export function useCopilotHeartbeat(): void {
                 intervalRef.current = null;
             }
         };
-    }, [isEnabled, sessionId]);
+    }, [isEnabled, simulationId]);
 }

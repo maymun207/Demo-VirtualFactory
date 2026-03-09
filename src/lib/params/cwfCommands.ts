@@ -187,8 +187,18 @@ export const CWF_PARAM_RANGES: Record<string, Record<string, { min: number; max:
      *
      * Numeric params use the same wider-than-optimal bounds pattern as all
      * other stations, allowing CWF to demonstrate both normal and fault ranges.
+     *
+     * conveyor_speed_x is the main OEE-affecting parameter (0.3x demo minimum
+     * to 2.0x maximum). When the copilot detects low conveyor OEE it corrects
+     * speed to the optimal midpoint (1.35x) via this parameter.
      */
     conveyor: {
+        /**
+         * Visual belt speed multiplier — healthy range: 0.7–2.0x.
+         * Below 0.7x triggers copilot detection (demo starts at 0.3x).
+         * Correction target is the midpoint: 1.35x.
+         */
+        conveyor_speed_x: { min: 0.3, max: 2.0 },
         /** Speed-change events toggle: 0 = disabled, 1 = enabled */
         speed_change: { min: 0, max: 1 },
         /** Jam events toggle: 0 = disabled, 1 = enabled */

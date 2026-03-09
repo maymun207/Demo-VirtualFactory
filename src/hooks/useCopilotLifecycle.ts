@@ -20,21 +20,31 @@
  * Used by: SimulationRunner.tsx (mounted at top level with simulation lifecycle)
  *
  * Dependencies:
- *   - src/store/copilotStore.ts (writes state changes)
- *   - src/store/simulationStore.ts (reads isDataFlowing, sessionId)
- *   - src/lib/supabaseClient.ts (Supabase client for Realtime)
- *   - src/lib/params/copilot.ts (table names, feature flag)
+ *   - src/store/copilotStore.ts    (writes state changes)
+ *   - src/store/cwfStore.ts        (reads simulationId — the Supabase UUID)
+ *   - src/store/simulationStore.ts (reads isDataFlowing)
+ *   - src/lib/supabaseClient.ts    (Supabase client for Realtime)
+ *   - src/lib/params/copilot.ts    (table names, feature flag)
+ *
+ * IMPORTANT — Simulation ID:
+ *   All Supabase operations (Realtime filter, disable call) use
+ *   cwfStore.simulationId which is the UUID from simulation_sessions.id.
+ *   Do NOT use simulationStore.sessionId — that is the 6-digit human-readable
+ *   display code (e.g., "585749") and does NOT match the UUID primary key
+ *   used in copilot_config.simulation_id.
  */
 
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useCopilotStore } from '../store/copilotStore';
 import { useSimulationStore } from '../store/simulationStore';
+import { useCWFStore } from '../store/cwfStore';
 import {
     COPILOT_FEATURE_ENABLED,
     COPILOT_CONFIG_TABLE,
     COPILOT_ACTIONS_TABLE,
 } from '../lib/params/copilot';
+import type { CwfState } from '../lib/params/copilot';
 
 // =============================================================================
 // HOOK
@@ -47,6 +57,9 @@ import {
  *   - Watches isDataFlowing → disables copilot when simulation stops
  *   - Subscribes to copilot_config Realtime changes → syncs enable/disable
  *   - Subscribes to copilot_actions Realtime inserts → feeds action history
+ *
+ * All Supabase operations key on the simulation UUID (cwfStore.simulationId),
+ * NOT the 6-digit session code (simulationStore.sessionId).
  */
 export function useCopilotLifecycle(): void {
     /** Track whether we've already disabled copilot for the current sim-stop event
@@ -56,9 +69,22 @@ export function useCopilotLifecycle(): void {
     /** Read state from stores */
     const isEnabled = useCopilotStore((s) => s.isEnabled);
     const isDataFlowing = useSimulationStore((s) => s.isDataFlowing);
-    const sessionId = useSimulationStore((s) => s.sessionId);
+
+    /**
+     * Read the SUPABASE UUID for this simulation from cwfStore.
+     *
+     * CRITICAL: This is simulation_sessions.id (UUID like "29bf4242-..."),
+     * set by App.tsx via simulationDataStore.session?.id.
+     *
+     * Do NOT use simulationStore.sessionId — that is a 6-digit display code
+     * (e.g., "585749") and does NOT match copilot_config.simulation_id.
+     * Using the wrong ID means Realtime subscriptions and disable calls
+     * target the wrong row, breaking all copilot sync.
+     */
+    const simulationId = useCWFStore((s) => s.simulationId);
 
     /** Get store actions (stable references from Zustand) */
+    const syncStateFromCloud = useCopilotStore((s) => s.syncStateFromCloud);
     const disableCopilot = useCopilotStore((s) => s.disableCopilot);
     const enableCopilot = useCopilotStore((s) => s.enableCopilot);
     const pushAction = useCopilotStore((s) => s.pushAction);
@@ -82,14 +108,20 @@ export function useCopilotLifecycle(): void {
             /** Disable locally */
             disableCopilot();
 
-            /** Disable on server (fire-and-forget) */
-            fetch('/api/cwf/copilot/disable', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ simulationId: sessionId }),
-            }).catch(() => {
-                /** Server may already know — ignore errors */
-            });
+            /**
+             * Disable on server (fire-and-forget).
+             * Uses simulationId (UUID) — matches copilot_config.simulation_id.
+             * Falls back gracefully if simulationId is null (session already cleared).
+             */
+            if (simulationId) {
+                fetch('/api/cwf/copilot/disable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ simulationId }),
+                }).catch(() => {
+                    /** Server may already know — ignore errors */
+                });
+            }
 
             console.log('[Copilot UI] 🔴 Auto-disengaged: simulation stopped');
         }
@@ -98,42 +130,75 @@ export function useCopilotLifecycle(): void {
             /** Simulation restarted — reset the guard */
             hasDisabledForStopRef.current = false;
         }
-    }, [isDataFlowing, isEnabled, sessionId, disableCopilot]);
+    }, [isDataFlowing, isEnabled, simulationId, disableCopilot]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // EFFECT 2: Supabase Realtime subscription for copilot_config changes
     // ─────────────────────────────────────────────────────────────────────────
 
     useEffect(() => {
-        /** Guard: feature flag + active session */
-        if (!COPILOT_FEATURE_ENABLED || !sessionId || !supabase) return;
+        /**
+         * Guard: feature flag + active simulation UUID.
+         *
+         * We guard on simulationId (UUID) — if it's null the simulation hasn't
+         * fully connected yet and we cannot subscribe to the correct row.
+         * We do NOT guard on isEnabled here — we subscribe unconditionally so
+         * that the UI catches transitions TO enabled (not just while enabled).
+         *
+         * NOTE: isEnabled is intentionally NOT in the dependency array.
+         * Including it would rebuild the subscription on every toggle,
+         * creating a race window where the Realtime event that changes isEnabled
+         * would arrive during the subscription teardown and be missed.
+         */
+        if (!COPILOT_FEATURE_ENABLED || !simulationId || !supabase) return;
 
-        /** Subscribe to ALL events on copilot_config for this session.
+        /** Subscribe to ALL events on copilot_config for this simulation UUID.
          *  We use '*' instead of 'UPDATE' because the first enable uses upsert(),
          *  which fires an INSERT event (not UPDATE) when the row doesn't exist. */
         const configChannel = supabase!
-            .channel(`copilot-config-${sessionId}`)
+            .channel(`copilot-config-${simulationId}`)
             .on(
                 'postgres_changes' as 'system',
                 {
                     event: '*',
                     schema: 'public',
                     table: COPILOT_CONFIG_TABLE,
-                    filter: `simulation_id=eq.${sessionId}`,
+                    /** Filter on simulation UUID — matches copilot_config.simulation_id */
+                    filter: `simulation_id=eq.${simulationId}`,
                 } as never,
                 (payload: { new: Record<string, unknown> }) => {
                     const newRow = payload.new;
 
-                    /** Sync enabled state from server */
-                    if (newRow.enabled === true && !isEnabled) {
-                        enableCopilot();
-                        console.log('[Copilot UI] 🟢 Copilot enabled via Realtime');
-                    } else if (newRow.enabled === false && isEnabled) {
-                        disableCopilot();
-                        console.log('[Copilot UI] 🔴 Copilot disabled via Realtime');
+                    /**
+                     * PRIMARY sync: push cwf_state + auth_attempts from the DB row
+                     * into the Zustand mirror. This is the ONLY authoritative update path.
+                     * syncStateFromCloud also derives isEnabled and isAuthPending.
+                     */
+                    if (newRow.cwf_state) {
+                        syncStateFromCloud(
+                            newRow.cwf_state as CwfState,
+                            (newRow.auth_attempts as number) ?? 0,
+                        );
+                        console.log(
+                            `[Copilot UI] 🔄 State synced from cloud: ${newRow.cwf_state} ` +
+                            `(sim=${simulationId.slice(0, 8)}..., auth_attempts=${newRow.auth_attempts ?? 0})`
+                        );
+                    } else {
+                        /**
+                         * Fallback for rows that don't yet have cwf_state
+                         * (rows created before the state machine migration).
+                         * Use the legacy enabled boolean to derive the state.
+                         */
+                        if (newRow.enabled === true && !isEnabled) {
+                            enableCopilot();
+                            console.log('[Copilot UI] 🟢 Copilot enabled via Realtime (legacy fallback)');
+                        } else if (newRow.enabled === false && isEnabled) {
+                            disableCopilot();
+                            console.log('[Copilot UI] 🔴 Copilot disabled via Realtime (legacy fallback)');
+                        }
                     }
 
-                    /** Sync config values */
+                    /** Sync config thresholds (unchanged) */
                     updateConfig({
                         pollIntervalSec: newRow.poll_interval_sec as number,
                         oeeAlarmThreshold: newRow.oee_alarm_threshold as number,
@@ -144,30 +209,37 @@ export function useCopilotLifecycle(): void {
             )
             .subscribe();
 
-        /** Cleanup: unsubscribe on unmount or session change */
+        /** Cleanup: unsubscribe on unmount or simulation change */
         return () => {
             supabase!.removeChannel(configChannel);
         };
-    }, [sessionId, isEnabled, enableCopilot, disableCopilot, updateConfig]);
+        /**
+         * Dependencies: simulationId drives subscriptions.
+         * isEnabled deliberately EXCLUDED to prevent subscription rebuild on toggle.
+         * enableCopilot / disableCopilot used in callback but are stable Zustand refs.
+         */
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [simulationId]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // EFFECT 3: Supabase Realtime subscription for copilot_actions inserts
     // ─────────────────────────────────────────────────────────────────────────
 
     useEffect(() => {
-        /** Guard: feature flag + active session + copilot enabled */
-        if (!COPILOT_FEATURE_ENABLED || !sessionId || !isEnabled || !supabase) return;
+        /** Guard: feature flag + active simulation UUID + copilot enabled */
+        if (!COPILOT_FEATURE_ENABLED || !simulationId || !isEnabled || !supabase) return;
 
-        /** Subscribe to INSERT events on copilot_actions for this session */
+        /** Subscribe to INSERT events on copilot_actions for this simulation UUID */
         const actionsChannel = supabase!
-            .channel(`copilot-actions-${sessionId}`)
+            .channel(`copilot-actions-${simulationId}`)
             .on(
                 'postgres_changes' as 'system',
                 {
                     event: 'INSERT',
                     schema: 'public',
                     table: COPILOT_ACTIONS_TABLE,
-                    filter: `simulation_id=eq.${sessionId}`,
+                    /** Filter on simulation UUID — matches copilot_actions.simulation_id */
+                    filter: `simulation_id=eq.${simulationId}`,
                 } as never,
                 (payload: { new: Record<string, unknown> }) => {
                     const row = payload.new;
@@ -190,5 +262,5 @@ export function useCopilotLifecycle(): void {
         return () => {
             supabase!.removeChannel(actionsChannel);
         };
-    }, [sessionId, isEnabled, pushAction]);
+    }, [simulationId, isEnabled, pushAction]);
 }

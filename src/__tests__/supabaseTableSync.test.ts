@@ -109,6 +109,10 @@ const ALL_SUPABASE_TABLES: string[] = [
 
     // ── Simulation state transitions (CWF context enrichment) ──
     'simulation_events',
+
+    // ── CWF Copilot state machine ──
+    'copilot_config',       // Copilot enable/disable state + auth_attempts + heartbeat
+    'copilot_actions',      // Autonomous copilot action log per sim tick
 ];
 
 /**
@@ -622,13 +626,16 @@ describe('Zustand ↔ Supabase Table Sync Consistency', () => {
             '20260308_conveyor_param_columns.sql',
             // 2026-03-08: CWF Phase 2 — UI telemetry events table for behavioral analytics
             '20260308120000_ui_telemetry_events.sql',
+            // 2026-03-09: CWF Copilot state machine (copilot_config) + action log (copilot_actions)
+            '20260309_copilot_state_machine.sql',
+            '20260309_copilot_tables.sql',
         ];
 
         it('should have exactly the expected number of migration files', () => {
             /**
              * Ensures no migration files are accidentally added or deleted
              * without updating this test.
-             * COUNT: 13 (was 12 before 20260308120000_ui_telemetry_events.sql was added)
+             * COUNT: 15 (was 13 before copilot state machine migrations were added 2026-03-09)
              */
             const files = getMigrationFileNames();
             expect(

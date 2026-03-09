@@ -1,154 +1,67 @@
-scenario_code,scenario_name,severity,station,parameter,value,drift_limit_pct,normal_min,normal_max,out_of_range
-SCN-000,Reference Production,low,press,pressure_bar,365,0,280,450,false
-SCN-000,Reference Production,low,press,cycle_time_sec,6,0,4,8,false
-SCN-000,Reference Production,low,press,mold_temperature_c,50,0,40,60,false
-SCN-000,Reference Production,low,press,powder_moisture_pct,6,0,5,7,false
-SCN-000,Reference Production,low,press,fill_amount_g,1650,0,800,2500,false
-SCN-000,Reference Production,low,press,mold_wear_pct,0,0,0,30,false
-SCN-000,Reference Production,low,dryer,inlet_temperature_c,200,0,150,250,false
-SCN-000,Reference Production,low,dryer,outlet_temperature_c,100,0,80,120,false
-SCN-000,Reference Production,low,dryer,belt_speed_m_min,3,0,1,5,false
-SCN-000,Reference Production,low,dryer,drying_time_min,45,0,30,60,false
-SCN-000,Reference Production,low,dryer,exit_moisture_pct,1.0,0,0.5,1.5,false
-SCN-000,Reference Production,low,dryer,fan_frequency_hz,40,0,30,50,false
-SCN-000,Reference Production,low,glaze,glaze_density_g_cm3,1.45,0,1.35,1.55,false
-SCN-000,Reference Production,low,glaze,glaze_viscosity_sec,26,0,18,35,false
-SCN-000,Reference Production,low,glaze,application_weight_g_m2,450,0,300,600,false
-SCN-000,Reference Production,low,glaze,cabin_pressure_bar,0.75,0,0.3,1.2,false
-SCN-000,Reference Production,low,glaze,nozzle_angle_deg,30,0,15,45,false
-SCN-000,Reference Production,low,glaze,belt_speed_m_min,25,0,15,35,false
-SCN-000,Reference Production,low,glaze,glaze_temperature_c,25,0,20,30,false
-SCN-000,Reference Production,low,printer,head_temperature_c,40,0,35,45,false
-SCN-000,Reference Production,low,printer,ink_viscosity_mpa_s,11.5,0,8,15,false
-SCN-000,Reference Production,low,printer,drop_size_pl,43,0,6,80,false
-SCN-000,Reference Production,low,printer,resolution_dpi,540,0,360,720,false
-SCN-000,Reference Production,low,printer,belt_speed_m_min,32,0,20,45,false
-SCN-000,Reference Production,low,printer,head_gap_mm,2.75,0,1.5,4,false
-SCN-000,Reference Production,low,printer,active_nozzle_pct,98,0,95,100,false
-SCN-000,Reference Production,low,kiln,max_temperature_c,1160,0,1100,1220,false
-SCN-000,Reference Production,low,kiln,firing_time_min,47,0,35,60,false
-SCN-000,Reference Production,low,kiln,preheat_gradient_c_min,27,0,15,40,false
-SCN-000,Reference Production,low,kiln,cooling_gradient_c_min,35,0,20,50,false
-SCN-000,Reference Production,low,kiln,belt_speed_m_min,2,0,1,3,false
-SCN-000,Reference Production,low,kiln,atmosphere_pressure_mbar,0,0,-0.5,0.5,false
-SCN-000,Reference Production,low,kiln,o2_level_pct,5,0,2,8,false
-SCN-000,Reference Production,low,sorting,camera_resolution_mp,12,0,5,20,false
-SCN-000,Reference Production,low,sorting,scan_rate_tiles_min,40,0,20,60,false
-SCN-000,Reference Production,low,sorting,size_tolerance_mm,0.5,0,0.3,1.0,false
-SCN-000,Reference Production,low,sorting,color_tolerance_de,1.0,0,0.5,2.0,false
-SCN-000,Reference Production,low,sorting,flatness_tolerance_mm,0.3,0,0.1,0.5,false
-SCN-000,Reference Production,low,sorting,defect_threshold_mm2,1.5,0,0.5,3.0,false
-SCN-000,Reference Production,low,packaging,stack_count,8,0,4,12,false
-SCN-000,Reference Production,low,packaging,box_sealing_pressure_bar,3.5,0,2,5,false
-SCN-000,Reference Production,low,packaging,pallet_capacity_m2,60,0,40,80,false
-SCN-000,Reference Production,low,packaging,stretch_tension_pct,225,0,150,300,false
-SCN-000,Reference Production,low,packaging,robot_speed_cycles_min,10,0,6,15,false
-SCN-000,Reference Production,low,packaging,label_accuracy_pct,99.5,0,99,100,false
-SCN-000,Reference Production,low,conveyor,speed_change,0,0,0,1,false
-SCN-000,Reference Production,low,conveyor,jammed_events,0,0,0,1,false
-SCN-000,Reference Production,low,conveyor,jammed_time,7,0,6,10,false
-SCN-000,Reference Production,low,conveyor,impacted_tiles,0,0,1,5,false
-SCN-000,Reference Production,low,conveyor,scrap_probability_pct,0,0,0,3,false
-SCN-001,Optimal Production,low,press,pressure_bar,365,3,280,450,false
-SCN-001,Optimal Production,low,press,cycle_time_sec,6,2,4,8,false
-SCN-001,Optimal Production,low,press,mold_temperature_c,50,3,40,60,false
-SCN-001,Optimal Production,low,press,powder_moisture_pct,6,2,5,7,false
-SCN-001,Optimal Production,low,press,fill_amount_g,1650,3,800,2500,false
-SCN-001,Optimal Production,low,press,mold_wear_pct,10,2,0,30,false
-SCN-001,Optimal Production,low,dryer,inlet_temperature_c,200,3,150,250,false
-SCN-001,Optimal Production,low,dryer,outlet_temperature_c,100,3,80,120,false
-SCN-001,Optimal Production,low,dryer,belt_speed_m_min,3,2,1,5,false
-SCN-001,Optimal Production,low,dryer,drying_time_min,45,2,30,60,false
-SCN-001,Optimal Production,low,dryer,exit_moisture_pct,1.0,2,0.5,1.5,false
-SCN-001,Optimal Production,low,dryer,fan_frequency_hz,40,2,30,50,false
-SCN-001,Optimal Production,low,glaze,glaze_density_g_cm3,1.45,2,1.35,1.55,false
-SCN-001,Optimal Production,low,glaze,glaze_viscosity_sec,26,3,18,35,false
-SCN-001,Optimal Production,low,glaze,application_weight_g_m2,450,3,300,600,false
-SCN-001,Optimal Production,low,glaze,cabin_pressure_bar,0.75,2,0.3,1.2,false
-SCN-001,Optimal Production,low,glaze,nozzle_angle_deg,30,2,15,45,false
-SCN-001,Optimal Production,low,glaze,belt_speed_m_min,25,2,15,35,false
-SCN-001,Optimal Production,low,glaze,glaze_temperature_c,25,2,20,30,false
-SCN-001,Optimal Production,low,printer,head_temperature_c,40,2,35,45,false
-SCN-001,Optimal Production,low,printer,ink_viscosity_mpa_s,11.5,3,8,15,false
-SCN-001,Optimal Production,low,printer,drop_size_pl,43,3,6,80,false
-SCN-001,Optimal Production,low,printer,resolution_dpi,540,2,360,720,false
-SCN-001,Optimal Production,low,printer,belt_speed_m_min,32,2,20,45,false
-SCN-001,Optimal Production,low,printer,head_gap_mm,2.75,2,1.5,4,false
-SCN-001,Optimal Production,low,printer,active_nozzle_pct,98,2,95,100,false
-SCN-001,Optimal Production,low,kiln,max_temperature_c,1160,2,1100,1220,false
-SCN-001,Optimal Production,low,kiln,firing_time_min,47,2,35,60,false
-SCN-001,Optimal Production,low,kiln,preheat_gradient_c_min,27,3,15,40,false
-SCN-001,Optimal Production,low,kiln,cooling_gradient_c_min,35,3,20,50,false
-SCN-001,Optimal Production,low,kiln,belt_speed_m_min,2,2,1,3,false
-SCN-001,Optimal Production,low,kiln,atmosphere_pressure_mbar,0,2,-0.5,0.5,false
-SCN-001,Optimal Production,low,kiln,o2_level_pct,5,2,2,8,false
-SCN-001,Optimal Production,low,sorting,camera_resolution_mp,12,2,5,20,false
-SCN-001,Optimal Production,low,sorting,scan_rate_tiles_min,40,2,20,60,false
-SCN-001,Optimal Production,low,sorting,size_tolerance_mm,0.65,2,0.3,1.0,false
-SCN-001,Optimal Production,low,sorting,color_tolerance_de,1.25,2,0.5,2.0,false
-SCN-001,Optimal Production,low,sorting,flatness_tolerance_mm,0.3,2,0.1,0.5,false
-SCN-001,Optimal Production,low,sorting,defect_threshold_mm2,1.75,2,0.5,3.0,false
-SCN-001,Optimal Production,low,packaging,stack_count,8,2,4,12,false
-SCN-001,Optimal Production,low,packaging,box_sealing_pressure_bar,3.5,2,2,5,false
-SCN-001,Optimal Production,low,packaging,pallet_capacity_m2,60,2,40,80,false
-SCN-001,Optimal Production,low,packaging,stretch_tension_pct,225,2,150,300,false
-SCN-001,Optimal Production,low,packaging,robot_speed_cycles_min,10,2,6,15,false
-SCN-001,Optimal Production,low,packaging,label_accuracy_pct,99.5,2,99,100,false
-SCN-001,Optimal Production,low,conveyor,speed_change,1,5,0,1,false
-SCN-001,Optimal Production,low,conveyor,jammed_events,0,1,0,1,false
-SCN-001,Optimal Production,low,conveyor,jammed_time,7,1,6,10,false
-SCN-001,Optimal Production,low,conveyor,impacted_tiles,4,1,1,5,false
-SCN-001,Optimal Production,low,conveyor,scrap_probability_pct,2,1,0,3,false
-SCN-002,Kiln Temperature Crisis,critical,kiln,max_temperature_c,1238,10,1100,1220,true
-SCN-002,Kiln Temperature Crisis,critical,kiln,cooling_gradient_c_min,55,12,20,50,true
-SCN-002,Kiln Temperature Crisis,critical,kiln,o2_level_pct,1.5,8,2,8,true
-SCN-002,Kiln Temperature Crisis,critical,kiln,atmosphere_pressure_mbar,0.8,10,-0.5,0.5,true
-SCN-002,Kiln Temperature Crisis,critical,kiln,firing_time_min,62,8,35,60,true
-SCN-002,Kiln Temperature Crisis,critical,kiln,preheat_gradient_c_min,45,10,15,40,true
-SCN-002,Kiln Temperature Crisis,critical,kiln,belt_speed_m_min,0.8,8,1,3,true
-SCN-002,Kiln Temperature Crisis,critical,sorting,defect_threshold_mm2,2.8,5,0.5,3.0,false
-SCN-002,Kiln Temperature Crisis,critical,sorting,color_tolerance_de,1.8,5,0.5,2.0,false
-SCN-002,Kiln Temperature Crisis,critical,conveyor,speed_change,0,5,0,1,false
-SCN-002,Kiln Temperature Crisis,critical,conveyor,jammed_events,0,5,0,1,false
-SCN-002,Kiln Temperature Crisis,critical,conveyor,jammed_time,14,5,6,10,true
-SCN-002,Kiln Temperature Crisis,critical,conveyor,impacted_tiles,8,5,1,5,true
-SCN-002,Kiln Temperature Crisis,critical,conveyor,scrap_probability_pct,2.5,1,0,3,false
-SCN-003,Glaze Viscosity Drift,high,glaze,glaze_viscosity_sec,15,12,18,35,true
-SCN-003,Glaze Viscosity Drift,high,glaze,glaze_density_g_cm3,1.30,10,1.35,1.55,true
-SCN-003,Glaze Viscosity Drift,high,glaze,application_weight_g_m2,250,15,300,600,true
-SCN-003,Glaze Viscosity Drift,high,glaze,glaze_temperature_c,34,10,20,30,true
-SCN-003,Glaze Viscosity Drift,high,glaze,nozzle_angle_deg,50,12,15,45,true
-SCN-003,Glaze Viscosity Drift,high,glaze,cabin_pressure_bar,0.2,10,0.3,1.2,true
-SCN-003,Glaze Viscosity Drift,high,printer,head_temperature_c,48,8,35,45,true
-SCN-003,Glaze Viscosity Drift,high,printer,ink_viscosity_mpa_s,6,8,8,15,true
-SCN-003,Glaze Viscosity Drift,high,printer,active_nozzle_pct,88,8,95,100,true
-SCN-003,Glaze Viscosity Drift,high,dryer,exit_moisture_pct,2.0,5,0.5,1.5,true
-SCN-003,Glaze Viscosity Drift,high,conveyor,speed_change,1,8,0,1,false
-SCN-003,Glaze Viscosity Drift,high,conveyor,jammed_events,1,8,0,1,false
-SCN-003,Glaze Viscosity Drift,high,conveyor,jammed_time,20,12,6,10,true
-SCN-003,Glaze Viscosity Drift,high,conveyor,impacted_tiles,12,15,1,5,true
-SCN-003,Glaze Viscosity Drift,high,conveyor,scrap_probability_pct,2,1,0,3,false
-SCN-004,Multi-Station Cascade Failure,critical,press,pressure_bar,260,15,280,450,true
-SCN-004,Multi-Station Cascade Failure,critical,press,mold_wear_pct,42,15,0,30,true
-SCN-004,Multi-Station Cascade Failure,critical,press,powder_moisture_pct,8.5,15,5,7,true
-SCN-004,Multi-Station Cascade Failure,critical,press,fill_amount_g,750,15,800,2500,true
-SCN-004,Multi-Station Cascade Failure,critical,dryer,inlet_temperature_c,280,12,150,250,true
-SCN-004,Multi-Station Cascade Failure,critical,dryer,fan_frequency_hz,25,12,30,50,true
-SCN-004,Multi-Station Cascade Failure,critical,dryer,exit_moisture_pct,2.5,12,0.5,1.5,true
-SCN-004,Multi-Station Cascade Failure,critical,glaze,glaze_viscosity_sec,40,15,18,35,true
-SCN-004,Multi-Station Cascade Failure,critical,glaze,nozzle_angle_deg,12,15,15,45,true
-SCN-004,Multi-Station Cascade Failure,critical,glaze,cabin_pressure_bar,1.5,15,0.3,1.2,true
-SCN-004,Multi-Station Cascade Failure,critical,printer,active_nozzle_pct,82,12,95,100,true
-SCN-004,Multi-Station Cascade Failure,critical,printer,head_gap_mm,5,12,1.5,4,true
-SCN-004,Multi-Station Cascade Failure,critical,printer,head_temperature_c,50,12,35,45,true
-SCN-004,Multi-Station Cascade Failure,critical,kiln,max_temperature_c,1080,15,1100,1220,true
-SCN-004,Multi-Station Cascade Failure,critical,kiln,firing_time_min,30,15,35,60,true
-SCN-004,Multi-Station Cascade Failure,critical,sorting,camera_resolution_mp,4,20,5,20,true
-SCN-004,Multi-Station Cascade Failure,critical,sorting,defect_threshold_mm2,3.5,20,0.5,3.0,true
-SCN-004,Multi-Station Cascade Failure,critical,packaging,box_sealing_pressure_bar,1.5,15,2,5,true
-SCN-004,Multi-Station Cascade Failure,critical,packaging,stretch_tension_pct,120,15,150,300,true
-SCN-004,Multi-Station Cascade Failure,critical,conveyor,speed_change,1,10,0,1,false
-SCN-004,Multi-Station Cascade Failure,critical,conveyor,jammed_events,1,15,0,1,false
-SCN-004,Multi-Station Cascade Failure,critical,conveyor,jammed_time,20,12,6,10,true
-SCN-004,Multi-Station Cascade Failure,critical,conveyor,impacted_tiles,12,15,1,5,true
-SCN-004,Multi-Station Cascade Failure,critical,conveyor,scrap_probability_pct,3,1,0,3,false
+scenario_code,scenario_name,severity,station,parameter,value,drift_limit_pct,normal_min,normal_max,out_of_range,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,press,pressure_bar,365,3,280,450,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,press,cycle_time_sec,6,2,4,8,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,press,mold_temperature_c,50,3,40,60,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,press,powder_moisture_pct,6,2,5,7,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,press,fill_amount_g,1650,3,800,2500,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,press,mold_wear_pct,10,2,0,30,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,dryer,inlet_temperature_c,200,3,150,250,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,dryer,outlet_temperature_c,100,3,80,120,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,dryer,belt_speed_m_min,3,2,1,5,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,dryer,drying_time_min,45,2,30,60,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,dryer,exit_moisture_pct,1,2,0.5,1.5,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,dryer,fan_frequency_hz,40,2,30,50,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,glaze,glaze_density_g_cm3,1.45,2,1.35,1.55,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,glaze,glaze_viscosity_sec,26,3,18,35,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,glaze,application_weight_g_m2,450,3,300,600,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,glaze,cabin_pressure_bar,0.75,2,0.3,1.2,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,glaze,nozzle_angle_deg,30,2,15,45,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,glaze,belt_speed_m_min,25,2,15,35,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,glaze,glaze_temperature_c,25,2,20,30,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,printer,head_temperature_c,40,2,35,45,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,printer,ink_viscosity_mpa_s,11.5,3,8,15,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,printer,drop_size_pl,43,3,6,80,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,printer,resolution_dpi,540,2,360,720,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,printer,belt_speed_m_min,32,2,20,45,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,printer,head_gap_mm,2.75,2,1.5,4,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,printer,active_nozzle_pct,98,2,95,100,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,kiln,max_temperature_c,1160,2,1100,1220,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,kiln,firing_time_min,47,2,35,60,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,kiln,preheat_gradient_c_min,27,3,15,40,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,kiln,cooling_gradient_c_min,35,3,20,50,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,kiln,belt_speed_m_min,2,2,1,3,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,kiln,atmosphere_pressure_mbar,0,2,-0.5,0.5,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,kiln,o2_level_pct,5,2,2,8,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,sorting,camera_resolution_mp,12,2,5,20,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,sorting,scan_rate_tiles_min,40,2,20,60,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,sorting,size_tolerance_mm,0.65,2,0.3,1,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,sorting,color_tolerance_de,1.25,2,0.5,2,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,sorting,flatness_tolerance_mm,0.3,2,0.1,0.5,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,sorting,defect_threshold_mm2,1.75,2,0.5,3,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,packaging,stack_count,8,2,4,12,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,packaging,box_sealing_pressure_bar,3.5,2,2,5,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,packaging,pallet_capacity_m2,60,2,40,80,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,packaging,stretch_tension_pct,225,2,150,300,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,packaging,robot_speed_cycles_min,10,2,6,15,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,packaging,label_accuracy_pct,99.5,2,99,100,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+SCN-001,Optimal Production,low,conveyor,speed_change,1,5,0,1,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,conveyor,jammed_events,0,1,0,1,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,conveyor,jammed_time,7,1,6,10,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,conveyor,impacted_tiles,4,1,1,5,FALSE,,,,,,,,,,,
+SCN-001,Optimal Production,low,conveyor,scrap_probability_pct,2,1,0,3,FALSE,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+work_order_id,label,lot_id,order_id,order_tile_count,actual_tile_count,recipe_id,recipe_name,normal_tile_color,defected_tile_color,description_en,description_tr,,,,,,,,,
+WorkID#1,WorkID #1,LOT-2026-001,ORD-7845,500,530,CeramID WEY,CeramID WEY,#F5F0E8,#E8820C,Produced tiles will be ivory cream colour — defected tiles will be orange,Üretilen karoların rengi fildişi krem rengi olacak — defected olarak işaretlenen karoların rengi turuncu olacak,,,,,,,,,
+WorkID#2,WorkID #2,LOT-2026-002,ORD-8210,800,850,CeramID REY,CeramID REY,#9CA3AF,#E8820C,Produced tiles will be grey — defected tiles will be orange,Üretilen karoların rengi gri olacak — defected olarak işaretlenen karoların rengi turuncu olacak,,,,,,,,,
+WorkID#3,WorkID #3,LOT-2026-003,ORD-9033,1000,1100,CeramID OEY,CeramID OEY,#2ECC71,#E8820C,Produced tiles will be green — defected tiles will be orange,Üretilen karoların rengi yeşil olacak — defected olarak işaretlenen karoların rengi turuncu olacak,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,

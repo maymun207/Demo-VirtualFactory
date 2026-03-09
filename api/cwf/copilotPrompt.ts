@@ -1,23 +1,28 @@
 /**
- * copilotPrompt.ts — Gemini System Prompt for CWF Copilot Autonomous Decisions
+ * copilotPrompt.ts — JSON-First Gemini Prompt for CWF Copilot
  *
- * Builds the specialised system prompt that the CWF Copilot engine sends to
- * Gemini on each evaluation cycle. Unlike the interactive CWF prompt (which
- * expects conversational responses), this prompt instructs Gemini to return
- * **structured JSON** with a decision, reasoning, and optional corrective action.
+ * Implements the JSON-in / actions-out architecture for autonomous factory supervision:
  *
- * The prompt includes:
- *   - Role definition (autonomous factory supervisor, not a chatbot)
- *   - Decision taxonomy (skip / correct / escalate)
- *   - Safety rules (one action per cycle, midpoint correction strategy)
- *   - Full parameter range reference (copied from cwfParameterRanges.ts)
- *   - JSON response format specification
- *   - Human-readable chat message requirement
+ *   REFERENCE JSON (built once at engine start):
+ *     Full safe-range spec for every machine parameter. Passed as part of the
+ *     Gemini system prompt so Gemini always knows what "normal" looks like without
+ *     needing it re-embedded in every user message.
+ *
+ *   CURRENT STATE JSON (built every cycle from Supabase reads):
+ *     All current parameter readings for every machine + conveyor, plus OEE
+ *     metrics and cooldown status. Sent as the per-cycle user message.
+ *
+ *   ACTIONS JSON (returned by Gemini):
+ *     An array of ALL corrections that should be applied in this cycle.
+ *     The engine applies every action in the array — no autonomous fallback loop.
+ *
+ * This design gives Gemini full situational awareness in a single API call and
+ * lets it return a complete correction plan rather than just one parameter at a time.
  *
  * Used by: api/cwf/copilotEngine.ts
  *
  * Dependencies:
- *   - api/cwf/cwfParameterRanges.ts (CWF_PARAM_RANGES — mirrors src/lib/params)
+ *   - src/lib/params/parameterRanges.ts (PARAMETER_RANGES)
  */
 
 import { PARAMETER_RANGES } from '../../src/lib/params/parameterRanges.js';
@@ -27,225 +32,292 @@ import { PARAMETER_RANGES } from '../../src/lib/params/parameterRanges.js';
 // =============================================================================
 
 /**
- * Shape of the structured JSON response expected from Gemini.
- * The copilot engine parses this and acts on the decision.
+ * Reference JSON — built ONCE from PARAMETER_RANGES at engine startup.
+ * Passed to Gemini as part of the system prompt so it always knows the
+ * safe range and correction midpoint for every parameter.
+ *
+ * Shape example:
+ * {
+ *   "kiln": {
+ *     "max_temperature_c": { "min": 1000, "max": 1300, "midpoint": 1150 },
+ *     ...
+ *   },
+ *   "conveyor": {
+ *     "conveyor_speed_x": { "min": 0.7, "max": 2.0, "midpoint": 1.35 }
+ *   }
+ * }
+ */
+export interface CopilotReferenceJSON {
+    /** Station name key (e.g. "kiln", "press", "conveyor") */
+    [station: string]: {
+        /** Parameter column name key (e.g. "max_temperature_c") */
+        [parameter: string]: {
+            /** Safe range lower bound */
+            min: number;
+            /** Safe range upper bound */
+            max: number;
+            /** Correction target — always (min + max) / 2 */
+            midpoint: number;
+        };
+    };
+}
+
+/**
+ * Current State JSON — built EVERY cycle from latest Supabase readings.
+ * Contains ALL parameter values (not just out-of-range ones) so Gemini can
+ * perform its own comparisons against the reference JSON.
+ *
+ * Also contains the list of parameters currently in cooldown (recently
+ * corrected), which Gemini must exclude from its actions array.
+ */
+export interface CopilotStateJSON {
+    /** Current simulation tick */
+    sim_tick: number;
+    /** Factory Overall Equipment Effectiveness percentage */
+    foee: number;
+    /** Per-machine OEE percentages */
+    machine_oees: {
+        press: number;
+        dryer: number;
+        glaze: number;
+        printer: number;
+        kiln: number;
+        sorting: number;
+        packaging: number;
+        conveyor: number;
+    };
+    /**
+     * All current parameter readings for every station.
+     * Keys match the station names in the reference JSON.
+     * Values are the latest readings; null = not yet reported by simulator.
+     */
+    parameters: {
+        [station: string]: {
+            [parameter: string]: number | null;
+        };
+    };
+    /** Count of active fault alarms in the simulation */
+    active_alarms: number;
+    /**
+     * Parameters currently in cooldown — DO NOT include these in actions[].
+     * Format: ["station.parameter", ...] e.g. ["kiln.max_temperature_c"]
+     */
+    cooldown_params: string[];
+}
+
+/**
+ * Structured JSON response from Gemini — the complete correction plan for
+ * this evaluation cycle.
+ *
+ * Key change from the old architecture: `actions` is an ARRAY, not a single
+ * `action` object. Gemini is expected to include ALL parameters that need
+ * correction in one shot.
  */
 export interface CopilotGeminiResponse {
-    /** Decision outcome: skip (healthy), correct (fix one param), escalate (human review) */
+    /**
+     * 'correct' — one or more parameters need correction, see actions[].
+     * 'skip'    — factory is operating within normal parameters.
+     * 'escalate'— OEE is low but root cause is unknown (no out-of-range params found).
+     */
     decision: 'skip' | 'correct' | 'escalate';
-    /** Severity assessment of the current factory state */
+    /** Overall severity of the detected condition */
     severity: 'low' | 'medium' | 'high' | 'critical';
-    /** Brief technical reasoning for the decision (for audit trail) */
+    /** Brief technical reasoning for the decision (for audit log) */
     reasoning: string;
-    /** Human-readable message to display in the CWF chat panel with emoji */
+    /** Human-readable message for the CWF chat panel (1–2 sentences, with emojis) */
     chat_message: string;
-    /** Corrective action details — null when decision is 'skip' or 'escalate' */
-    action: {
-        /** Station name (e.g., 'kiln', 'press', 'dryer') */
+    /**
+     * Ordered list of corrective actions to apply this cycle.
+     * Empty array when decision is 'skip' or 'escalate'.
+     * Ordered by priority: kiln > press > dryer > glaze > printer > sorting > packaging > conveyor.
+     * target_value MUST always equal the parameter's midpoint from the reference JSON.
+     */
+    actions: Array<{
+        /** Station name — must match a key in the reference JSON */
         station: string;
-        /** Parameter column name (e.g., 'max_temperature_c') */
+        /** Parameter column name — must match a key in station's reference JSON */
         parameter: string;
-        /** Current value of the parameter (from latest machine state) */
+        /** Current reading (from state JSON — include for audit trail) */
         current_value: number;
-        /** Target value to correct to (should be midpoint of safe range) */
-        new_value: number;
-        /** Brief reason for this specific correction */
+        /** Correction target — MUST equal midpoint from reference JSON */
+        target_value: number;
+        /** One-line reason for this specific correction */
         reason: string;
-    } | null;
+    }>;
 }
 
 // =============================================================================
-// PARAMETER RANGES — formatted for the prompt
+// REFERENCE JSON BUILDER — called ONCE at engine startup
 // =============================================================================
 
 /**
- * Build a human-readable parameter range reference for the Gemini prompt.
- * Lists every station and every parameter with its min/max safe range,
- * so Gemini can identify out-of-range values and calculate midpoints.
+ * Build the static Reference JSON from PARAMETER_RANGES.
  *
- * @returns Formatted string with all parameter ranges for prompt injection
+ * This is called ONCE when the CopilotEngine is constructed and cached as
+ * a class field. It is never rebuilt during a monitoring session.
+ *
+ * Also adds the conveyor speed parameter, which lives outside PARAMETER_RANGES
+ * but is monitored and corrected the same way.
+ *
+ * @returns CopilotReferenceJSON — safe ranges + midpoints for every parameter
  */
-function buildParameterRangeReference(): string {
-    /** Collect formatted lines for each station's parameters */
-    const lines: string[] = [];
+export function buildReferenceJSON(): CopilotReferenceJSON {
+    const ref: CopilotReferenceJSON = {};
 
+    /** Build from PARAMETER_RANGES (all machine stations except conveyor) */
     for (const [station, params] of Object.entries(PARAMETER_RANGES)) {
-        /** Station header */
-        lines.push(`### ${station.toUpperCase()}`);
-
+        ref[station] = {};
         for (const [param, range] of Object.entries(params)) {
-            /** Calculate the midpoint — this is the correction target */
+            /** Cast to typed range (PARAMETER_RANGES uses Record<string, {min, max}>) */
             const typedRange = range as { min: number; max: number };
-            const midpoint = ((typedRange.min + typedRange.max) / 2).toFixed(1);
-
-            /** Format: "  - parameter_name: [min – max], midpoint = X" */
-            lines.push(`  - ${param}: [${typedRange.min} – ${typedRange.max}], midpoint = ${midpoint}`);
+            const midpoint = (typedRange.min + typedRange.max) / 2;
+            ref[station][param] = {
+                min: typedRange.min,
+                max: typedRange.max,
+                /** Round to 2 decimal places to avoid floating-point noise in prompts */
+                midpoint: Math.round(midpoint * 100) / 100,
+            };
         }
-
-        /** Blank line between stations for readability */
-        lines.push('');
     }
 
-    return lines.join('\n');
+    /**
+     * Add conveyor speed — monitored separately because conveyor is not a
+     * process machine station but a cross-cutting infrastructure component.
+     * Safe range: 0.7–2.0x. Midpoint: 1.35x. Below 0.7 causes OEE Performance drop.
+     */
+    ref['conveyor'] = {
+        conveyor_speed_x: { min: 0.7, max: 2.0, midpoint: 1.35 },
+    };
+
+    return ref;
 }
 
 // =============================================================================
-// SYSTEM PROMPT BUILDER
+// SYSTEM PROMPT BUILDER — called ONCE per monitoring session
 // =============================================================================
 
 /**
- * Build the complete Gemini system prompt for a copilot evaluation cycle.
+ * Build the Gemini system prompt for the copilot monitoring session.
  *
- * @param cooldownSec - Current cooldown setting in seconds
- * @param recentlyCorrectedParams - List of "station.parameter" strings that are
- *                                   currently in cooldown (recently corrected)
- * @returns Complete system prompt string for Gemini
+ * The system prompt is constructed ONCE at session start (in CopilotEngine.start())
+ * and passed to the persistent ChatSession. It includes:
+ *   - Role definition
+ *   - Decision taxonomy
+ *   - Response format (with actions[] array schema)
+ *   - The full Reference JSON (safe ranges + midpoints)
+ *
+ * Per-cycle variable data (current readings, cooldown list, OEE values) is
+ * passed in the per-cycle user message via buildCopilotUserMessage().
+ *
+ * @param referenceJSON - Pre-built reference JSON (from buildReferenceJSON())
+ * @returns Complete system prompt string
  */
-export function buildCopilotSystemPrompt(
-    cooldownSec: number,
-    recentlyCorrectedParams: string[],
-): string {
-    /** Pre-build the parameter range reference (all stations + params) */
-    const paramRanges = buildParameterRangeReference();
-
-    /** Format the cooldown list for the prompt */
-    const cooldownList = recentlyCorrectedParams.length > 0
-        ? recentlyCorrectedParams.map(p => `  - ${p}`).join('\n')
-        : '  (none — all parameters are eligible for correction)';
+export function buildCopilotSystemPrompt(referenceJSON: CopilotReferenceJSON): string {
+    /** Serialise the reference JSON compactly — it will be embedded in the prompt */
+    const referenceJSONStr = JSON.stringify(referenceJSON, null, 2);
 
     return `You are the AUTONOMOUS FACTORY SUPERVISOR for a ceramic tile production line digital twin.
-You are NOT chatting with a human — you are making real-time autonomous decisions.
+You are NOT chatting with a human — you are making real-time autonomous control decisions.
 
-YOUR SINGLE JOB: Analyze the metrics snapshot below and decide what to do.
+Every evaluation cycle you will receive a CURRENT STATE JSON object with:
+  - sim_tick: current simulation tick
+  - foee: Factory OEE %
+  - machine_oees: per-machine OEE %
+  - parameters: current readings for ALL machine parameters
+  - active_alarms: count of active fault alarms
+  - cooldown_params: parameters recently corrected (DO NOT touch these)
+
+You will compare the current readings against the REFERENCE JSON (safe ranges) provided below.
+
+## YOUR JOB
+
+Identify ALL parameters that are outside their safe range and return a correction plan for all of them in ONE response. Do NOT pick just one — fix everything that is wrong in a single cycle.
 
 ## DECISION OPTIONS
 
-1. **SKIP** — Factory is healthy. All parameters are within safe ranges and OEE is acceptable.
-   Only use this when there is genuinely nothing wrong.
+**"correct"** — One or more parameters are outside their safe range. Return ALL of them in the actions array. Always correct to the MIDPOINT from the reference JSON. Never include cooldown_params in actions[].
 
-2. **CORRECT** — One parameter is out of safe range or causing quality/performance degradation.
-   You may correct EXACTLY ONE parameter per evaluation cycle.
-   Always correct to the MIDPOINT of the safe range (most stable operating point).
+**"skip"** — All parameters are within safe range AND all machine OEEs are ≥ 80% AND factory OEE ≥ alarm threshold. Return empty actions array.
 
-3. **ESCALATE** — Multiple critical issues detected simultaneously, or a parameter is so far
-   out of range that autonomous correction might cause abrupt production changes.
-   Flag this for the human operator's attention.
+**"escalate"** — OEE is low but ALL parameters appear within safe range AND root cause is genuinely unknown. Return empty actions array. Use sparingly — prefer "correct" whenever any parameter is out of range.
 
-## SAFETY RULES (MANDATORY — VIOLATING THESE IS A CRITICAL FAILURE)
+## MANDATORY RULES
 
-1. You may correct EXACTLY ONE parameter per evaluation cycle. Never two. Never zero-and-then-recommend.
-2. Always correct to the MIDPOINT of the safe range for that parameter.
-3. NEVER correct a parameter that is currently in cooldown (listed below).
-4. NEVER set a value outside the safe range — the new_value MUST be the range midpoint.
-5. If FOEE is above the alarm threshold AND all parameters are in range → decision MUST be "skip".
+1. NEVER include a parameter in actions[] if it is listed in cooldown_params.
+2. target_value MUST always equal the parameter's midpoint from the reference JSON. Never deviate.
+3. If decision = "correct", actions[] MUST contain at least one entry.
+4. If decision = "skip" or "escalate", actions[] MUST be an empty array [].
+5. Only use parameters and stations that exist in the reference JSON.
+6. If conveyor OEE < 70%, check conveyor.conveyor_speed_x — if it is below 0.7, add it to actions[].
 
-## PRIORITY ORDER (when multiple parameters are out of range)
+## PRIORITY ORDER (within actions array — list in this order)
 
-Correct the MOST IMPACTFUL parameter first, using this priority:
-1. KILN parameters — highest safety risk (thermal shock, energy waste)
-2. PRESS parameters — structural quality (cracks, lamination)
-3. DRYER parameters — moisture-related defects (explosions, warping)
-4. GLAZE parameters — coating quality (pinholes, drips)
-5. PRINTER parameters — decoration quality (lines, blur)
-6. SORTING parameters — detection calibration
-7. PACKAGING parameters — handling damage
+1. kiln parameters (highest thermal risk)
+2. press parameters
+3. dryer parameters
+4. glaze parameters
+5. printer parameters
+6. sorting parameters
+7. packaging parameters
+8. conveyor parameters
 
-Within the same station, prioritise parameters that are furthest from their midpoint.
-
-## PARAMETERS IN COOLDOWN (recently corrected — DO NOT touch these)
-${cooldownList}
-
-Cooldown period: ${cooldownSec} seconds per parameter after correction.
-
-## SAFE PARAMETER RANGES (with midpoints)
-${paramRanges}
+Within the same station, list parameters that are FURTHEST from midpoint first.
 
 ## CHAT MESSAGE GUIDELINES
 
-The chat_message field will be displayed to the factory operator in the CWF chat panel.
-- Use 1–2 sentences maximum
-- Include relevant emojis (🔧 for correction, ✅ for healthy, ⚠️ for escalation)
-- Mention the SPECIFIC parameter using its DISPLAY NAME (not the column name)
-  Examples: "Max Kiln Temperature" not "max_temperature_c", "Press Pressure" not "pressure_bar"
-- Include actual numbers: current value → new value
-- For SKIP: "✅ Factory is operating within normal parameters."
-- For CORRECT: "🔧 Correcting [Display Name] from [old] to [new] — was outside safe range [min–max]."
-- For ESCALATE: "⚠️ Multiple parameters are out of range. Please review [list]. Copilot is standing by."
+- 1–2 sentences maximum
+- Use emojis: 🔧 correction, ✅ healthy, ⚠️ escalation
+- Use display names: "Max Kiln Temperature" not "max_temperature_c"
+- Include numbers: current → target
+- For single correction: "🔧 Correcting [name] from [val] to [target] — [reason]."
+- For multiple corrections: "🔧 Applying [N] corrections: [brief summary of stations affected]."
+- For skip: "✅ Factory is operating within normal parameters."
+- For escalate: "⚠️ [Machine] OEE is low but root cause is unclear. Please review manually."
+
+## REFERENCE JSON (safe ranges and correction midpoints for all parameters)
+
+\`\`\`json
+${referenceJSONStr}
+\`\`\`
 
 ## RESPONSE FORMAT (STRICT — respond with ONLY this JSON, no markdown, no backticks, no preamble)
 
 {
   "decision": "skip" | "correct" | "escalate",
   "severity": "low" | "medium" | "high" | "critical",
-  "reasoning": "Brief technical reasoning for the decision (1-2 sentences)",
-  "chat_message": "Human-readable message for the CWF chat panel",
-  "action": null | {
-    "station": "station_name",
-    "parameter": "parameter_column_name",
-    "current_value": 123.4,
-    "new_value": 456.7,
-    "reason": "Brief reason for this correction"
-  }
+  "reasoning": "Brief technical reasoning (1-2 sentences)",
+  "chat_message": "Human-readable CWF chat message",
+  "actions": [
+    {
+      "station": "station_name",
+      "parameter": "parameter_column_name",
+      "current_value": 123.4,
+      "target_value": 456.7,
+      "reason": "One-line correction reason"
+    }
+  ]
 }
 
 RESPOND WITH ONLY THE JSON OBJECT. NO MARKDOWN. NO BACKTICKS. NO PREAMBLE.`;
 }
 
 // =============================================================================
-// METRICS SNAPSHOT BUILDER
+// PER-CYCLE USER MESSAGE BUILDER
 // =============================================================================
 
 /**
- * Build the user-message content for a copilot evaluation cycle.
- * This is the "question" sent alongside the system prompt, containing
- * the live factory metrics that Gemini must evaluate.
+ * Build the per-cycle user message from the current state JSON.
  *
- * @param foee - Current Factory OEE percentage
- * @param machineOees - Map of machine name → OEE percentage
- * @param outOfRangeParams - List of parameters currently outside safe range
- * @param alarmCount - Number of active alarms
- * @param simTick - Current simulation tick
- * @returns Formatted metrics string for the Gemini user message
+ * This is called every evaluation cycle and sent via chatSession.sendMessage().
+ * Gemini compares these readings against the reference JSON (already in its
+ * system prompt) and returns the complete correction plan.
+ *
+ * @param stateJSON - Current factory state snapshot
+ * @returns JSON string to send as the Gemini user message
  */
-export function buildMetricsSnapshot(
-    foee: number,
-    machineOees: Record<string, number>,
-    outOfRangeParams: Array<{
-        station: string;
-        parameter: string;
-        current_value: number;
-        min: number;
-        max: number;
-    }>,
-    alarmCount: number,
-    simTick: number,
-): string {
-    /** Format machine OEEs as a bulleted list */
-    const oeeLines = Object.entries(machineOees)
-        .map(([machine, oee]) => `  - ${machine}: ${oee.toFixed(1)}%`)
-        .join('\n');
-
-    /** Format out-of-range params with their current vs safe range */
-    const paramLines = outOfRangeParams.length > 0
-        ? outOfRangeParams.map(p => {
-            const midpoint = ((p.min + p.max) / 2).toFixed(1);
-            return `  - ${p.station}.${p.parameter}: current=${p.current_value}, safe=[${p.min}–${p.max}], midpoint=${midpoint}`;
-        }).join('\n')
-        : '  (all parameters within safe ranges)';
-
-    return `## FACTORY METRICS SNAPSHOT (Tick ${simTick})
-
-### Factory OEE: ${foee.toFixed(1)}%
-
-### Machine OEEs:
-${oeeLines}
-
-### Out-of-Range Parameters:
-${paramLines}
-
-### Active Alarms: ${alarmCount}
-
-Evaluate these metrics and respond with your decision.`;
+export function buildCopilotUserMessage(stateJSON: CopilotStateJSON): string {
+    /** Serialise compactly — Gemini parses JSON reliably */
+    return JSON.stringify(stateJSON, null, 2);
 }
 
 // =============================================================================
@@ -254,52 +326,93 @@ Evaluate these metrics and respond with your decision.`;
 
 /**
  * Parse and validate the JSON response from Gemini.
- * Handles common Gemini quirks: markdown wrapping, extra whitespace, etc.
+ *
+ * Handles common Gemini quirks: markdown code fences, extra whitespace,
+ * occasional preamble text before the JSON object.
+ *
+ * Validates:
+ *   - Required top-level fields exist
+ *   - decision / severity are valid enum values
+ *   - actions[] is an array
+ *   - Each action has required fields with finite numeric values
+ *   - decision='correct' implies actions.length >= 1
  *
  * @param rawText - Raw text response from Gemini
  * @returns Parsed and validated CopilotGeminiResponse, or null if invalid
  */
 export function parseCopilotResponse(rawText: string): CopilotGeminiResponse | null {
     try {
-        /** Strip markdown code fences if Gemini wrapped the JSON */
         let cleaned = rawText.trim();
 
-        /** Remove ```json ... ``` wrapping */
+        /** Strip markdown code fences if Gemini wrapped the JSON (common quirk) */
         if (cleaned.startsWith('```')) {
             cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+        }
+
+        /**
+         * Strip any preamble text before the opening brace.
+         * Some Gemini models occasionally prefix with "Here is my response:" etc.
+         */
+        const jsonStart = cleaned.indexOf('{');
+        if (jsonStart > 0) {
+            cleaned = cleaned.substring(jsonStart);
         }
 
         /** Parse the JSON */
         const parsed = JSON.parse(cleaned);
 
-        /** Validate required fields exist */
+        /** Validate required top-level fields */
         if (!parsed.decision || !parsed.severity || !parsed.reasoning || !parsed.chat_message) {
             console.error('[Copilot] ❌ Missing required fields in Gemini response:', parsed);
             return null;
         }
 
-        /** Validate decision is one of the allowed values */
+        /** Validate decision enum */
         if (!['skip', 'correct', 'escalate'].includes(parsed.decision)) {
             console.error('[Copilot] ❌ Invalid decision value:', parsed.decision);
             return null;
         }
 
-        /** Validate severity is one of the allowed values */
+        /** Validate severity enum */
         if (!['low', 'medium', 'high', 'critical'].includes(parsed.severity)) {
             console.error('[Copilot] ❌ Invalid severity value:', parsed.severity);
             return null;
         }
 
-        /** If decision is 'correct', the action object must be present and valid */
-        if (parsed.decision === 'correct') {
-            if (!parsed.action || !parsed.action.station || !parsed.action.parameter ||
-                !Number.isFinite(parsed.action.current_value) || !Number.isFinite(parsed.action.new_value)) {
-                console.error('[Copilot] ❌ Decision is "correct" but action is invalid:', parsed.action);
-                return null;
+        /** Normalise actions: ensure it is always an array */
+        if (!Array.isArray(parsed.actions)) {
+            /** Handle old-style single action object (graceful degradation) */
+            if (parsed.action && typeof parsed.action === 'object') {
+                console.warn('[Copilot] ⚠️ Gemini returned old single-action format — converting to actions[]');
+                parsed.actions = [parsed.action];
+                delete parsed.action;
+            } else {
+                /** Default to empty array for skip/escalate */
+                parsed.actions = [];
             }
         }
 
+        /** Validate each action entry */
+        for (let i = 0; i < parsed.actions.length; i++) {
+            const a = parsed.actions[i];
+            if (!a.station || !a.parameter ||
+                !Number.isFinite(a.current_value) ||
+                !Number.isFinite(a.target_value)) {
+                console.error(`[Copilot] ❌ Action[${i}] has invalid fields:`, a);
+                /** Remove invalid action rather than rejecting the whole response */
+                parsed.actions.splice(i, 1);
+                i--;
+            }
+        }
+
+        /** If decision is 'correct' but actions[] is empty, something went wrong */
+        if (parsed.decision === 'correct' && parsed.actions.length === 0) {
+            console.warn('[Copilot] ⚠️ Decision is "correct" but actions[] is empty — treating as escalate');
+            parsed.decision = 'escalate';
+        }
+
         return parsed as CopilotGeminiResponse;
+
     } catch (err) {
         console.error('[Copilot] ❌ Failed to parse Gemini JSON response:', err);
         console.error('[Copilot] Raw response was:', rawText.substring(0, 500));

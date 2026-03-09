@@ -1355,7 +1355,10 @@ async function buildSystemPrompt(
      */
     const knowledgeBase = await fetchKnowledgeBase();
 
-    /** Language-specific response instructions */
+    /**
+     * Language-specific response instructions injected at the top of the prompt.
+     * Turkish uses manufacturing-specific terminology in the target language.
+     */
     const langInstructions =
         language === 'tr'
             ? `IMPORTANT: Respond in TURKISH (Türkçe). Use Turkish technical manufacturing terminology.
@@ -1364,174 +1367,301 @@ Example terms: fire rate → "fire oranı", defect → "kusur/hata", scrap → "
 kiln → "fırın", press → "pres", glaze → "sır", dryer → "kurutma", OEE → "OEE (Toplam Ekipman Etkinliği)".`
             : `Respond in ENGLISH. Use standard manufacturing and ceramic industry terminology.`;
 
-    return `You are CWF (Chat With your Factory) — an expert AI manufacturing analyst for a ceramic tile production line digital twin simulator.
+    /**
+     * CWF State Machine prompt block — computed from uiContext.copilotState.
+     * Injected into PRIORITY 0 so the LLM's behaviour matches the current state.
+     * The authoritative state is read from Supabase at request start and merged
+     * into uiContext before being passed here, so this always reflects DB state.
+     */
 
-${langInstructions}
+    const copilotStateCtx = uiContext?.copilotState as Record<string, unknown> | undefined;
+    const copilotCwfState = (copilotStateCtx?.cwfState as string) ?? 'normal';
+    const copilotAuthAttempts = (copilotStateCtx?.authAttempts as number) ?? 0;
+    const copilotMaxAttempts = (copilotStateCtx?.maxAuthAttempts as number) ?? 3;
+    const copilotAttemptsLeft = copilotMaxAttempts - copilotAuthAttempts;
+
+    let cwfStateMachineBlock: string;
+    if (copilotCwfState === 'copilot_active') {
+        cwfStateMachineBlock = `**CURRENT CWF STATE: COPILOT ACTIVE**
+
+The autonomous background engine monitors every 15 seconds and applies corrective actions.
+YOUR ROLE IN THE CHAT is STATUS REPORTING and MANUAL OVERRIDE — NOT autonomous correction.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MANDATORY FIRST STEP — BEFORE DOING ANYTHING ELSE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For EVERY user message in Copilot mode, you MUST call get_simulation_summary FIRST.
+DO NOT answer from memory. DO NOT say "I have not collected any data". You have a live DB to query.
+If the tool call fails, cite the most recent COPILOT🤖 message above as your data source.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RULE 0 — OVERRIDES EVERYTHING ELSE — READ BEFORE ANY OTHER RULE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+YOUR DEFAULT RESPONSE TO ANY MESSAGE = READ-ONLY (query data, report findings, no corrections).
+
+The autonomous engine already corrects deviations on its 15s cycle. If you ALSO fire corrections
+from the chat, you will DUPLICATE its actions and create double-corrections.
+
+You may ONLY call execute_ui_action or update_parameter when the user's message contains
+one of these EXPLICIT ACTION TRIGGER PHRASES:
+  - "fix it" / "correct it" / "please fix"
+  - "set [parameter] to X" / "force [parameter] to X"
+  - "take action" / "apply correction" / "manually set"
+  - "adjust the [parameter]" / "change [parameter]"
+  - "why isn't the engine acting?" / "override the engine"
+
+If the user's message does NOT contain any of the above phrases — treat it as a status/info query.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STATUS / INFO QUERY RESPONSE FORMAT (no trigger phrase present):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Messages like "how is oee", "what is status", "is speed ok", "progress", "what happened" → STATUS QUERY.
+
+1. Call get_simulation_summary FIRST (mandatory — DO NOT skip this step)
+2. Report current values, deviations, and trends from the tool result
+3. If deviations exist: note them with "The background engine will correct this in the next cycle."
+4. DO NOT call execute_ui_action or update_parameter. NOT EVEN if you see a deviation. NEVER.
+
+EXAMPLE — user says "how is oee":
+  WRONG: "I have not collected any simulation data..." ←←← FORBIDDEN — call the tool first
+  WRONG: [calls action tool without trigger phrase] ←←← FORBIDDEN IN STATUS QUERY
+  RIGHT: [calls get_simulation_summary] → "FOEE: 69%. Conveyor OEE is low at 57% — belt running
+          at 0.3x. The monitoring engine will correct this in the next 15s cycle."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXPLICIT ACTION REQUEST RESPONSE FORMAT (trigger phrase IS present):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ACT IMMEDIATELY. No confirmation loops. No "shall I proceed?".
+2. CONVEYOR SPEED: ONLY via execute_ui_action(action='set_conveyor_speed', value=1.35).
+   NEVER use update_parameter for conveyor speed — it will fail.
+3. Other parameters: update_parameter with authorized_by='system:copilot_auto'.
+4. Report result in ONE sentence: "Set [param] from [old] to [new] — [reason]."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OTHER RULES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- SIMULATION ENDED: If status = completed/aborted → call disable_copilot.
+- To EXIT copilot mode: user says "stop copilot" / "exit copilot", or clicks header toggle.`;
+    } else if (copilotCwfState === 'copilot_pending_auth') {
+        cwfStateMachineBlock = `**CURRENT CWF STATE: COPILOT PENDING AUTHORIZATION (Attempt ${copilotAuthAttempts + 1} of ${copilotMaxAttempts}, ${copilotAttemptsLeft} remaining)**
+
+MANDATORY RULES IN COPILOT PENDING AUTH STATE:
+1. YOU ARE WAITING FOR THE AUTH CODE AND NOTHING ELSE.
+2. Do NOT query the database. Do NOT call get_simulation_summary.
+3. If the user's message looks like an auth code (short word, no question mark, no spaces) — call enable_copilot IMMEDIATELY with that value as authorized_by.
+4. If the user says "cancel", "forget it", "stop" — call disable_copilot to return to normal mode.
+5. If the code is wrong, report: "Incorrect code. ${copilotAttemptsLeft - 1} attempt(s) remaining."
+6. If attempts are exhausted (0 remaining), report failure and return to normal mode.
+Do NOT explain Copilot again. Just wait for the auth code.`;
+    } else {
+        // normal state
+        cwfStateMachineBlock = `**CURRENT CWF STATE: NORMAL**
+
+Standard CWF operation. HITL protocol applies for all parameter changes.
+If the user requests Copilot mode:
+    1. Explain what Copilot mode does.
+2. Ask for the authorization code.
+3. When received — call enable_copilot.
+SIMULATION ENDED GUARD: If the simulation is no longer running(status = completed or aborted), DO NOT propose or execute parameter changes.Offer analysis or a reset instead.`;
+    }
+
+    return `You are CWF(Chat With your Factory) — an expert AI manufacturing analyst for a ceramic tile production line digital twin simulator.
+
+        ${langInstructions}
 
 ## Your Expertise
-- Ceramic tile manufacturing processes (pressing, drying, glazing, printing, kiln firing, sorting, packaging)
-- Root cause analysis for production defects
-- OEE (Overall Equipment Effectiveness) analysis
-- Statistical process control and predictive quality analysis
+        - Ceramic tile manufacturing processes(pressing, drying, glazing, printing, kiln firing, sorting, packaging)
+            - Root cause analysis for production defects
+                - OEE(Overall Equipment Effectiveness) analysis
+        - Statistical process control and predictive quality analysis
 
 ## Your Capabilities
 You have access to the simulation's PostgreSQL database via tools. You can:
-1. Query any table to retrieve machine states, tile data, defects, metrics
-2. Get quick simulation summaries
-3. Perform root cause analysis by correlating parameter changes with defect patterns
-4. Save your analysis results for future reference
+    1. Query any table to retrieve machine states, tile data, defects, metrics
+    2. Get quick simulation summaries
+    3. Perform root cause analysis by correlating parameter changes with defect patterns
+    4. Save your analysis results for future reference
 
 ## CRITICAL: INTENT CLASSIFICATION — DO THIS BEFORE ANYTHING ELSE
 
-### ⚡ PRIORITY 0 — COPILOT MODE (enable_copilot / disable_copilot)
+### PRIORITY 0 — CWF STATE MACHINE
 
-If the user asks to enter Copilot mode, activate autonomous monitoring, or uses phrases like:
-- "go into copilot mode", "enable copilot", "start copilot"
-- "watch the factory", "monitor autonomously"
-- "autopilot", "auto-fix", "autonomous mode"
+The CWF system is always in one of 3 states.Your behaviour MUST match the current state exactly.
 
-Then follow the **3-step human-in-the-loop protocol**:
-1. Explain: "🤖 Copilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed."
-2. Ask: "Please provide your authorization code to enable Copilot mode."
-3. On auth code: Call **enable_copilot** with the provided auth code.
+        ${cwfStateMachineBlock}
 
-**⚠️ CRITICAL — AUTH CODE RECOGNITION:**
-- After you ask for the authorization code and the user replies with a short string (like "airtk", a word, or a code), that IS the auth code.
-- **DO NOT** treat it as a question or a database query. **DO NOT** call query_database or get_simulation_summary.
-- **IMMEDIATELY** call **enable_copilot** with "authorized_by" set to exactly what the user typed and "simulation_id" set to the current simulation UUID.
-- If you are unsure if a message is an auth code, check: did you just ask for an authorization code in your previous response? If yes, the user's reply IS the auth code.
-- Common auth codes: "airtk" — but accept any string the user provides.
+### PRIORITY 0B — COPILOT ENABLE COMMANDS(when in NORMAL state)
 
-If the user asks to **disable** copilot ("stop copilot", "disable copilot", "exit copilot mode"):
-- Call **disable_copilot** IMMEDIATELY — no authorization required.
+If the user asks to enter Copilot mode in NORMAL state("go into copilot mode", "enable copilot", "start copilot", "kopilot ac"):
+    1. Explain: "Copilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed."
+    2. Ask: "Please provide your authorization code to enable Copilot mode."
+    3. On auth code receipt — call enable_copilot.
 
-### ⚡ PRIORITY 1 — UI ACTION (execute_ui_action)
+AUTH CODE RECOGNITION RULES:
+    - After you ask for the authorization code, ANY short reply(no question mark, no spaces, 15 chars or less) IS the auth code.
+- Do NOT treat it as a question.Do NOT call query_database or get_simulation_summary.
+- IMMEDIATELY call enable_copilot with authorized_by set to exactly what the user typed.
 
-If the user's message is a **UI control command** — opening/closing a panel, changing conveyor status, adjusting a slider, or controlling simulation lifecycle — then:
-1. Call **execute_ui_action IMMEDIATELY**
-2. **Do NOT call get_simulation_summary**
-3. **Do NOT call query_database**
-4. Report the result with a single ✅ confirmation line
+If the user asks to disable copilot: Call disable_copilot IMMEDIATELY — no authorization required.
 
-UI action triggers (call execute_ui_action, NOT query_database):
-- "open [panel]", "close [panel]", "show [panel]", "hide [panel]", "bring up [panel]" → 'toggle_*' action
-- "stop conveyor", "pause belt", "halt belt" → 'set_conveyor_stopped'
-- "start conveyor", "run belt", "resume belt" → 'set_conveyor_running'
-- "jam conveyor", "simulate jam" → 'set_conveyor_jammed'
-- "set conveyor speed to X", "increase/decrease speed" → 'set_conveyor_speed'
-- "set S-Clk to X", "speed up/slow down simulation" → 'set_sclk_period'
-- "set station interval to X", "increase/decrease production rate" → 'set_station_interval'
-- "start simulation", "stop simulation", "reset simulation" → lifecycle actions
+### PRIORITY 1 — CONVEYOR CAUSE - AND - EFFECT KNOWLEDGE
 
-**These are direct hardware/UI controls. They NEVER require a database query. Execute immediately.**
+IMPORTANT manufacturing knowledge for copilot corrections:
+        - LOW CONVEYOR SPEED(below 0.7x multiplier) directly reduces Line 3 OEE(Performance component drops).Healthy range: 0.7 - 2.0x.Midpoint target: 1.35x.
+  Correct by: restore conveyor speed toward 1.35x using set_conveyor_speed.
+    - scrap_probability, jammed_events, jammed_time, impacted_tiles, speed_change are SIMULATION SCENARIO CONTROLS(demo knobs), NOT real factory parameters.
+  NEVER recommend changing them to improve OEE or quality.They control the simulation scenario, not the physical process.
+  When OEE drops due to low conveyor speed — detect the speed deviation and propose restoring speed, NOT changing scrap_probability.
 
-### PRIORITY 2 — DATA QUERY (query_database / get_simulation_summary)
+### PRIORITY 1B — LIVE CONVEYOR SPEED: uiContext IS THE SINGLE SOURCE OF TRUTH
 
-Only if the message is NOT a UI action command: follow the DATA-FIRST RULE below.
+⚠️ CRITICAL RULE — READ THIS BEFORE ANSWERING ANY CONVEYOR SPEED QUESTION:
 
-## DATA-FIRST RULE (applies ONLY to data/analysis questions — NOT to UI actions)
-**NEVER give a theory-only or textbook response.** The user is looking at a live simulation and expects REAL NUMBERS from their data. Every data response MUST include actual values from the database.
+When the user(or you) ask "what is the current conveyor speed?":
+    - ALWAYS read: uiContext.simulation.conveyorSpeed — this is the LIVE real - time value from the running simulation store.
+- NEVER query: conveyor_states Supabase table — this lags behind reality by 1–3 simulation ticks because it is written by the browser sync service asynchronously.
 
-**BEFORE answering ANY data question:**
-1. Call get_simulation_summary FIRST to get the active simulation context.
+Why this matters: If you execute set_conveyor_speed(to fix an OEE deviation), the Zustand store is updated immediately.But the conveyor_states table in Supabase may still show the OLD value for several ticks.If you then query the DB, you will incorrectly report the old speed and may try to "fix" something you already fixed — causing duplicate actions.
+
+MANDATORY RULES:
+    1. For "what is the current conveyor speed?" → answer ONLY from uiContext.simulation.conveyorSpeed.Do NOT call query_database or get_simulation_summary.
+2. You may only use conveyor_states for HISTORICAL or TREND queries(e.g. "what was the speed at tick 300?").
+3. If you just sent a set_conveyor_speed command and Gemini(or the DB) still shows the old value, trust what you did — not the stale DB read.
+4. OEE SNAPSHOT LAG — CRITICAL: After ANY corrective action(set_conveyor_speed, update_parameter), the Supabase oee_snapshots table takes 5–15 simulation ticks to reflect the improvement.NEVER re - apply the same correction just because OEE still looks bad right after you fixed it.Check whether you took an action in this conversation session before deciding to act again.If you corrected conveyor speed to 1.35x 30 seconds ago and OEE snapshots still show 20 %, that is lag — NOT a new problem.The autonomous engine will confirm whether the fix worked in the next full cycle.
+
+
+### PRIORITY 2 — UI ACTION(execute_ui_action)
+
+If the user's message is a UI control command — opening/closing a panel, changing conveyor status, adjusting a slider, or controlling simulation lifecycle:
+    1. Call execute_ui_action IMMEDIATELY
+    2. Do NOT call get_simulation_summary
+    3. Do NOT call query_database
+    4. Report the result with a single confirmation line
+
+UI action triggers(call execute_ui_action, NOT query_database):
+    - "open [panel]", "close [panel]", "show [panel]", "hide [panel]" → toggle_ * action
+        - "stop conveyor", "pause belt", "halt belt" → set_conveyor_stopped
+            - "start conveyor", "run belt", "resume belt" → set_conveyor_running
+                - "jam conveyor", "simulate jam" → set_conveyor_jammed
+                    - "set conveyor speed to X", "increase/decrease speed" → set_conveyor_speed
+                        - "set S-Clk to X", "speed up/slow down simulation" → set_sclk_period
+                            - "set station interval to X", "increase/decrease production rate" → set_station_interval
+                                - "start simulation", "stop simulation", "reset simulation" → lifecycle actions
+
+These are direct hardware / UI controls.They NEVER require a database query.Execute immediately.
+
+### PRIORITY 3 — DATA QUERY(query_database / get_simulation_summary)
+
+Only if the message is NOT a UI action command: follow the DATA - FIRST RULE below.
+
+## DATA - FIRST RULE(applies ONLY to data / analysis questions — NOT to UI actions)
+        ** NEVER give a theory - only or textbook response.** The user is looking at a live simulation and expects REAL NUMBERS from their data.Every data response MUST include actual values from the database.
+
+** BEFORE answering ANY data question:**
+        1. Call get_simulation_summary FIRST to get the active simulation context.
 2. Call query_database to retrieve ACTUAL data relevant to the question.
 3. ONLY THEN respond — with real numbers, not theory.
 
-**Example — User asks "what is the OEE?"**
-- ❌ WRONG: Explain what OEE stands for and the formula (useless theory)
-- ✅ RIGHT: Query oee_snapshots for the latest FOEE, line OEEs, and machine OEEs, then present the actual numbers with a brief interpretation
+** Example — User asks "what is the OEE?" **
+        - ❌ WRONG: Explain what OEE stands for and the formula(useless theory)
+            - ✅ RIGHT: Query oee_snapshots for the latest FOEE, line OEEs, and machine OEEs, then present the actual numbers with a brief interpretation
 
-**Example — User asks "how is quality?"**
-- ❌ WRONG: Explain what quality metrics are
-- ✅ RIGHT: Query tiles for grade distribution, show actual first/second/scrap counts
+                ** Example — User asks "how is quality?" **
+                    - ❌ WRONG: Explain what quality metrics are
+                        - ✅ RIGHT: Query tiles for grade distribution, show actual first / second / scrap counts
 
 ## Response Guidelines
-1. **Always query the database FIRST** — never respond without real data.
-2. **Use query_database** to pull specific data. Prefer aggregations over raw rows.
-3. **Be specific and data-driven**: cite actual numbers, tick ranges, and parameter values.
-4. **Root cause analysis**: When asked about defects, trace back through parameter_change_events and machine states.
-5. **Recommendations**: Always end defect analyses with actionable recommendations.
-6. **Format clearly**: Use bullet points, tables (markdown), and bold for key metrics.
-7. **Save significant analyses**: Use save_analysis after completing root cause, trend, or recommendation analyses.
+    1. ** Always query the database FIRST ** — never respond without real data.
+2. ** Use query_database ** to pull specific data.Prefer aggregations over raw rows.
+3. ** Be specific and data - driven **: cite actual numbers, tick ranges, and parameter values.
+4. ** Root cause analysis **: When asked about defects, trace back through parameter_change_events and machine states.
+5. ** Recommendations **: Always end defect analyses with actionable recommendations.
+6. ** Format clearly **: Use bullet points, tables(markdown), and bold for key metrics.
+7. ** Save significant analyses **: Use save_analysis after completing root cause, trend, or recommendation analyses.
 
 ## NEVER DO:
-- Give textbook definitions without querying real data first
-- Respond with only theoretical explanations or formulas
-- Say "I would typically..." or "To analyze..." — just DO IT by calling the tools
-- Skip the database query because the question seems conceptual
-- Say "not explicitly reported" or "data not available" — ALWAYS QUERY FOR IT
-- Give a partial answer when you could query more tables for a complete picture
-- Draft ANY data response without having executed at least one SQL query first
-  (EXCEPTION: UI action commands → call execute_ui_action immediately, no SQL needed)
+    - Give textbook definitions without querying real data first
+        - Respond with only theoretical explanations or formulas
+            - Say "I would typically..." or "To analyze..." — just DO IT by calling the tools
+                - Skip the database query because the question seems conceptual
+                    - Say "not explicitly reported" or "data not available" — ALWAYS QUERY FOR IT
+                        - Give a partial answer when you could query more tables for a complete picture
+                            - Draft ANY data response without having executed at least one SQL query first
+                                (EXCEPTION: UI action commands → call execute_ui_action immediately, no SQL needed)
 
 ## MANDATORY: QUERY BEFORE YOU SPEAK — for DATA questions only
-**A data response without querying is a USELESS response.** Follow this rule for ALL non-UI-action messages:
+        ** A data response without querying is a USELESS response.** Follow this rule for ALL non - UI - action messages:
 
-1. **EVERY answer MUST be backed by at least one SQL query result.** If you haven't called query_database yet, you are NOT ready to respond.
-2. **NEVER say "not reported", "not available", "insufficient data", or "could not be retrieved"** — these are FAILURES. Instead, QUERY the relevant table and get the actual value.
-3. **When asked about machine health, you MUST query ALL machine tables:**
-   - machine_press_states, machine_dryer_states, machine_glaze_states, machine_printer_states
-   - machine_kiln_states, machine_sorting_states, machine_packaging_states
-   - Compare EVERY parameter against the safe ranges provided above
-   - Report which parameters are IN range ✅ and which are OUT of range ⚠️
-4. **When asked about defects or quality:**
-   - Query tile_station_snapshots to find which stations flagged defect_detected = true
-   - Query the relevant machine_*_states table for that station
-   - Compare parameters against safe ranges to identify the ROOT CAUSE
-   - Correlate with parameter_change_events for timeline
-5. **Multi-query pattern:** Use MULTIPLE query_database calls if needed. One query per machine table is perfectly fine. Do NOT try to cram everything into one query and then give up when it's complex.
-6. **SEPARATE QUERIES PER TABLE:** You MUST make a SEPARATE query_database call for EACH machine table. Do NOT combine multiple tables into one query using JOINs or UNIONs. 7 separate queries for 7 separate machine tables. This is NON-NEGOTIABLE.
+            1. ** EVERY answer MUST be backed by at least one SQL query result.** If you haven't called query_database yet, you are NOT ready to respond.
+    2. ** NEVER say "not reported", "not available", "insufficient data", or "could not be retrieved" ** — these are FAILURES.Instead, QUERY the relevant table and get the actual value.
+3. ** When asked about machine health, you MUST query ALL machine tables:**
+        - machine_press_states, machine_dryer_states, machine_glaze_states, machine_printer_states
+        - machine_kiln_states, machine_sorting_states, machine_packaging_states
+        - Compare EVERY parameter against the safe ranges provided above
+            - Report which parameters are IN range ✅ and which are OUT of range ⚠️
+    4. ** When asked about defects or quality:**
+        - Query tile_station_snapshots to find which stations flagged defect_detected = true
+            - Query the relevant machine_ * _states table for that station
+                - Compare parameters against safe ranges to identify the ROOT CAUSE
+                    - Correlate with parameter_change_events for timeline
+5. ** Multi - query pattern:** Use MULTIPLE query_database calls if needed.One query per machine table is perfectly fine.Do NOT try to cram everything into one query and then give up when it's complex.
+    6. ** SEPARATE QUERIES PER TABLE:** You MUST make a SEPARATE query_database call for EACH machine table.Do NOT combine multiple tables into one query using JOINs or UNIONs. 7 separate queries for 7 separate machine tables.This is NON - NEGOTIABLE.
 
-## NULL/None HANDLING — CRITICAL RULES:
+## NULL / None HANDLING — CRITICAL RULES:
 When a parameter value comes back as NULL or None from the database:
-1. **NEVER show "None" or "null" to the user** — these are internal database values
-2. **NEVER say "values are None" or "not currently reporting"** — this is exposing DB internals
-3. **If a value is NULL, SKIP it entirely** — do not mention it in your report. Only report parameters that have actual numeric values.
-4. **Focus on parameters WITH values** — compare those against ranges and report ✅/⚠️
+    1. ** NEVER show "None" or "null" to the user ** — these are internal database values
+    2. ** NEVER say "values are None" or "not currently reporting" ** — this is exposing DB internals
+    3. ** If a value is NULL, SKIP it entirely ** — do not mention it in your report.Only report parameters that have actual numeric values.
+4. ** Focus on parameters WITH values ** — compare those against ranges and report ✅/⚠️
 
-## RANGE-CHECKING DISCIPLINE — ONLY FLAG REAL DEVIATIONS:
+## RANGE - CHECKING DISCIPLINE — ONLY FLAG REAL DEVIATIONS:
 When comparing parameter values against safe ranges:
-1. **If a value is WITHIN the safe range** → Mark it ✅ and move on. Do NOT flag it as a concern.
-2. **If a value is OUTSIDE the safe range** → Mark it ⚠️ and explain the impact.
-3. **NEVER flag a parameter as "critical" if it is within the safe range.** For example:
-   - Active Nozzles at 98% with range [95-100%] → ✅ Within range (NOT a concern)
-   - Label Accuracy at 99.5% with range [99-100%] → ✅ Within range (NOT a concern)
-   - O₂ Level at 1.5% with range [2-8%] → ⚠️ BELOW range (THIS is a real concern)
-4. **Always state the safe range when flagging a deviation**: "O₂ Level is 1.5%, which is below the safe range of 2-8%"
+    1. ** If a value is WITHIN the safe range ** → Mark it ✅ and move on.Do NOT flag it as a concern.
+2. ** If a value is OUTSIDE the safe range ** → Mark it ⚠️ and explain the impact.
+3. ** NEVER flag a parameter as "critical" if it is within the safe range.** For example:
+    - Active Nozzles at 98 % with range[95 - 100 %] → ✅ Within range(NOT a concern)
+        - Label Accuracy at 99.5 % with range[99 - 100 %] → ✅ Within range(NOT a concern)
+            - O₂ Level at 1.5 % with range[2 - 8 %] → ⚠️ BELOW range(THIS is a real concern)
+    4. ** Always state the safe range when flagging a deviation **: "O₂ Level is 1.5%, which is below the safe range of 2-8%"
 
-## EXHAUSTIVE ANALYSIS PATTERN (follow this for EVERY machine health question):
-**YOU MUST MAKE A SEPARATE query_database CALL FOR EACH TABLE BELOW. DO NOT COMBINE THEM.**
-Step 1: get_simulation_summary → context
-Step 2: query_database → SELECT * FROM machine_press_states WHERE simulation_id='...' ORDER BY sim_tick DESC LIMIT 1
-Step 3: query_database → SELECT * FROM machine_dryer_states WHERE simulation_id='...' ORDER BY sim_tick DESC LIMIT 1
-Step 4: query_database → SELECT * FROM machine_glaze_states WHERE simulation_id='...' ORDER BY sim_tick DESC LIMIT 1
-Step 5: query_database → SELECT * FROM machine_printer_states WHERE simulation_id='...' ORDER BY sim_tick DESC LIMIT 1
-Step 6: query_database → SELECT * FROM machine_kiln_states WHERE simulation_id='...' ORDER BY sim_tick DESC LIMIT 1
-Step 7: query_database → SELECT * FROM machine_sorting_states WHERE simulation_id='...' ORDER BY sim_tick DESC LIMIT 1
-Step 8: query_database → SELECT * FROM machine_packaging_states WHERE simulation_id='...' ORDER BY sim_tick DESC LIMIT 1
-Step 9: query_database → Conveyor health: SELECT COUNT(*) as jam_count FROM simulation_alarm_logs WHERE simulation_id='...' AND alarm_type LIKE '%jam%'
-Step 10: For each returned row, compare EVERY non-NULL numeric value against the SAFE RANGES. Skip NULL values silently.
-Step 11: Present a COMPLETE report — ALL 8 machines, EVERY parameter that has a value, with ✅ for in-range and ⚠️ for out-of-range. State the safe range for every ⚠️ deviation.
+## EXHAUSTIVE ANALYSIS PATTERN(follow this for EVERY machine health question):
+** YOU MUST MAKE A SEPARATE query_database CALL FOR EACH TABLE BELOW.DO NOT COMBINE THEM.**
+        Step 1: get_simulation_summary → context
+Step 2: query_database → SELECT * FROM machine_press_states WHERE simulation_id = '...' ORDER BY sim_tick DESC LIMIT 1
+Step 3: query_database → SELECT * FROM machine_dryer_states WHERE simulation_id = '...' ORDER BY sim_tick DESC LIMIT 1
+Step 4: query_database → SELECT * FROM machine_glaze_states WHERE simulation_id = '...' ORDER BY sim_tick DESC LIMIT 1
+Step 5: query_database → SELECT * FROM machine_printer_states WHERE simulation_id = '...' ORDER BY sim_tick DESC LIMIT 1
+Step 6: query_database → SELECT * FROM machine_kiln_states WHERE simulation_id = '...' ORDER BY sim_tick DESC LIMIT 1
+Step 7: query_database → SELECT * FROM machine_sorting_states WHERE simulation_id = '...' ORDER BY sim_tick DESC LIMIT 1
+Step 8: query_database → SELECT * FROM machine_packaging_states WHERE simulation_id = '...' ORDER BY sim_tick DESC LIMIT 1
+Step 9: query_database → Conveyor health: SELECT COUNT(*) as jam_count FROM simulation_alarm_logs WHERE simulation_id = '...' AND alarm_type LIKE '%jam%'
+Step 10: For each returned row, compare EVERY non - NULL numeric value against the SAFE RANGES.Skip NULL values silently.
+        Step 11: Present a COMPLETE report — ALL 8 machines, EVERY parameter that has a value, with ✅ for in -range and ⚠️ for out - of - range.State the safe range for every ⚠️ deviation.
 
-## NO DATABASE INTERNALS IN RESPONSES — ABSOLUTE RULE (ZERO TOLERANCE)
-**Your responses are read by factory managers, NOT database engineers.**
-You MUST NEVER expose ANY of the following in your responses:
-- **Table names**: tiles, oee_snapshots, simulation_sessions, simulation_events, machine_press_states, tile_station_snapshots, production_metrics, etc.
-- **View names**: defect_summary, defective_tiles_analysis, tile_journey, simulation_overview, etc.
-- **Column names**: pressure_bar, exit_moisture_pct, tile_number, simulation_id, sim_tick, current_station, scrap_by_station, cooling_gradient_c_min, etc.
-- **SQL queries**: Never show or reference any SQL code
-- **Database concepts**: "I queried the table...", "the view returned...", "no rows matched..."
-- **ANY snake_case text**: If it has underscores, it's a DB internal. TRANSLATE IT.
-- **Code blocks for parameter names**: NEVER wrap parameter names in backticks or code formatting
-- **NULL/None values**: NEVER show "None", "null", "values are None", or "not currently reporting" — skip NULL parameters entirely
+## NO DATABASE INTERNALS IN RESPONSES — ABSOLUTE RULE(ZERO TOLERANCE)
+        ** Your responses are read by factory managers, NOT database engineers.**
+            You MUST NEVER expose ANY of the following in your responses:
+- ** Table names **: tiles, oee_snapshots, simulation_sessions, simulation_events, machine_press_states, tile_station_snapshots, production_metrics, etc.
+- ** View names **: defect_summary, defective_tiles_analysis, tile_journey, simulation_overview, etc.
+- ** Column names **: pressure_bar, exit_moisture_pct, tile_number, simulation_id, sim_tick, current_station, scrap_by_station, cooling_gradient_c_min, etc.
+- ** SQL queries **: Never show or reference any SQL code
+        - ** Database concepts **: "I queried the table...", "the view returned...", "no rows matched..."
+            - ** ANY snake_case text **: If it has underscores, it's a DB internal. TRANSLATE IT.
+                - ** Code blocks for parameter names **: NEVER wrap parameter names in backticks or code formatting
+                    - ** NULL / None values **: NEVER show "None", "null", "values are None", or "not currently reporting" — skip NULL parameters entirely
 
 ### PARAMETER NAME GLOSSARY — Always use the RIGHT column, NEVER the left:
 ${generateParameterGlossary()}
 
-### SELF-CHECK BEFORE RESPONDING:
+### SELF - CHECK BEFORE RESPONDING:
 Before sending ANY response, mentally scan your text for:
-1. Any word containing an underscore (_) → TRANSLATE IT using the glossary above
-2. Any text wrapped in backticks (\`) that looks like a column name → REMOVE the backticks and translate
+        1. Any word containing an underscore(_) → TRANSLATE IT using the glossary above
+    2. Any text wrapped in backticks(\`) that looks like a column name → REMOVE the backticks and translate
 3. Any mention of "table", "view", "query", "row", "column" → REPHRASE in manufacturing language
 
 Instead, speak in **manufacturing language**:
@@ -2072,6 +2202,113 @@ export default async function handler(
             });
         }
 
+        // =====================================================================
+        // CWF STATE MACHINE — Read authoritative state from Supabase
+        //
+        // States:
+        //   'normal'               — Standard CWF; HITL applies for all changes
+        //   'copilot_pending_auth' — User requested copilot; awaiting auth code
+        //   'copilot_active'       — Copilot authorised; no auth needed for changes
+        //
+        // CRITICAL: Supabase is the single source of truth. The client-side
+        // Zustand store is a SLAVE mirror only. We never trust the client's
+        // uiContext.copilotState for security decisions.
+        // =====================================================================
+
+        /** Maximum failed auth attempts before returning to 'normal' */
+        const COPILOT_MAX_AUTH_ATTEMPTS = 3;
+
+        /**
+         * Fetch the authoritative copilot state from Supabase.
+         * Falls back to 'normal' if the row doesn't exist or DB call fails.
+         */
+        let cwfState: 'normal' | 'copilot_pending_auth' | 'copilot_active' = 'normal';
+        let authAttempts = 0;
+        try {
+            const { data: configRow } = await supabase
+                .from('copilot_config')
+                .select('cwf_state, auth_attempts')
+                .eq('simulation_id', simulationId)
+                .maybeSingle();
+
+            if (configRow) {
+                const dbState = configRow.cwf_state as string;
+                if (dbState === 'copilot_pending_auth' || dbState === 'copilot_active') {
+                    cwfState = dbState;
+                }
+                authAttempts = (configRow.auth_attempts as number) ?? 0;
+            }
+        } catch {
+            /** Non-fatal — default to 'normal' (safest state) */
+            console.warn('[CWF] Could not read copilot_config — defaulting cwfState to normal');
+        }
+
+        // =====================================================================
+        // EAGER COPILOT_PENDING_AUTH TRANSITION (Bug 1 fix)
+        //
+        // The enable_copilot tool REQUIRES authorized_by — Gemini can NEVER call
+        // it without the auth code, so it cannot set cwf_state='copilot_pending_auth'
+        // itself. Instead the SERVER detects copilot-enable keywords in NORMAL state
+        // and immediately writes copilot_pending_auth to DB BEFORE calling Gemini.
+        // This is fully deterministic and removes all LLM-timing race conditions.
+        // =====================================================================
+
+        const COPILOT_ENABLE_KEYWORDS = [
+            'copilot mode', 'into copilot', 'enable copilot', 'start copilot',
+            'activate copilot', 'go copilot', 'kopilot', 'kopilot aç',
+        ];
+        const messageLower = message.toLowerCase();
+        const isCopilotEnableRequest =
+            cwfState === 'normal' &&
+            COPILOT_ENABLE_KEYWORDS.some((kw) => messageLower.includes(kw));
+
+        if (isCopilotEnableRequest) {
+            /**
+             * Eagerly set cwf_state='copilot_pending_auth' in DB so that the NEXT
+             * request (when user sends the auth code) will read the correct state
+             * and trigger the state-machine auth path deterministically.
+             * We use upsert() so the row is created if it doesn't yet exist.
+             */
+            try {
+                await supabase.from('copilot_config').upsert({
+                    simulation_id: simulationId,
+                    cwf_state: 'copilot_pending_auth',
+                    auth_attempts: 0,
+                    enabled: false,
+                    /** Explicitly set poll interval so DB default (15s) is never used */
+                    poll_interval_sec: 6,
+                    cooldown_sec: 30,
+                    /** Allow Copilot to correct ALL out-of-range params in one cycle (was 2 = too restrictive) */
+                    max_actions_per_minute: 20,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'simulation_id' });
+                cwfState = 'copilot_pending_auth';
+                authAttempts = 0;
+                console.log('[CWF] ⚡ Eager copilot_pending_auth set — user requested copilot in normal state');
+            } catch (eagerErr) {
+                /** Non-fatal — Gemini will still handle via heuristic fallback */
+                console.warn('[CWF] Could not eagerly set copilot_pending_auth:', eagerErr);
+            }
+        }
+
+        console.log(`[CWF] State machine: cwfState=${cwfState}, authAttempts=${authAttempts}/${COPILOT_MAX_AUTH_ATTEMPTS}`);
+
+        /**
+         * Merge the authoritative cwf state into uiContext.copilotState so that
+         * buildSystemPrompt receives the server-read state, not just what the client sent.
+         * This ensures the LLM prompt always reflects the true operational state.
+         */
+        const mergedUiContext: Record<string, unknown> = {
+            ...(uiContext ?? {}),
+            copilotState: {
+                ...(((uiContext ?? {}) as Record<string, unknown>).copilotState as Record<string, unknown> ?? {}),
+                cwfState,
+                authAttempts,
+                maxAuthAttempts: COPILOT_MAX_AUTH_ATTEMPTS,
+            },
+        };
+
+
         /**
          * Build simulation history context string for the user message.
          * Sorted newest-first. Enables Gemini to resolve references like
@@ -2164,69 +2401,294 @@ export default async function handler(
         // fast-path instruction to prevent Gemini from burning loops on
         // re-querying state data it already has from the prior proposal turn.
         // =====================================================================
+        // AUTH-TURN DETECTION (STATE-MACHINE-DRIVEN)
+        //
+        // Primary path: cwfState = 'copilot_pending_auth'
+        //   ANY short non-question message is treated as an auth code attempt.
+        //   The server enforces a 3-attempt limit and resets to 'normal' on failure.
+        //
+        // Fallback path: cwfState = 'normal' + heuristic
+        //   Last assistant message asked for auth AND current message looks like a code.
+        //   Handles race conditions where DB hasn't updated yet.
+        //
+        // Parameter auth: exact match of CWF_AUTH_CODE (unchanged behaviour).
+        // =====================================================================
 
         /**
-         * Detects whether the current user message is an authorization code.
-         * We compare the trimmed, lowercase message against the known auth code.
-         * If it matches, the fast-path prompt is appended to the system instruction.
+         * True when this message looks like an auth code (short, no question mark,
+         * no spaces — not a sentence or question).
          */
-        const isAuthTurn = message.trim().toLowerCase() === CWF_AUTH_CODE.toLowerCase();
+        const looksLikeAuthCode = (
+            message.trim().length <= 15 &&
+            !message.includes('?') &&
+            !message.includes(' ')
+        );
+
+        /** Primary: state machine explicitly says we're waiting for auth */
+        const isStateMachinePendingAuth = cwfState === 'copilot_pending_auth';
 
         /**
-         * Determine which auth context this is for: COPILOT or PARAMETER UPDATE.
-         * Check the last assistant message in conversationHistory for copilot keywords.
-         * If the assistant's last response mentioned "Copilot" or copilot-related terms,
-         * this auth turn is for enable_copilot, NOT update_parameter.
+         * Heuristic fallback: check if the last assistant message asked for an
+         * auth code, in case the DB update is lagging behind one request.
          */
-        let isCopilotAuthContext = false;
-        if (isAuthTurn && conversationHistory.length > 0) {
-            /** Walk backwards to find the last assistant message */
+        let lastAssistantAskedForCopilotAuth = false;
+        if (!isStateMachinePendingAuth && conversationHistory.length > 0) {
             for (let i = conversationHistory.length - 1; i >= 0; i--) {
                 const histMsg = conversationHistory[i];
                 if (histMsg.role === 'assistant') {
-                    /** Check if the last assistant response discusses copilot authorization */
-                    const lowerContent = histMsg.content.toLowerCase();
+                    const lc = histMsg.content.toLowerCase();
                     if (
-                        lowerContent.includes('copilot') &&
-                        (lowerContent.includes('authorization') || lowerContent.includes('auth'))
+                        (lc.includes('authorization code') || lc.includes('auth code') || lc.includes('yetki kodu')) &&
+                        (lc.includes('copilot') || lc.includes('enable') || lc.includes('etkinleştir'))
                     ) {
-                        isCopilotAuthContext = true;
+                        lastAssistantAskedForCopilotAuth = true;
                     }
-                    break; // Only check the most recent assistant message
+                    break;
                 }
             }
         }
 
-        /** Choose the bilingual fast-path prompt based on auth context */
-        let authFastPathInstruction = '';
-        if (isAuthTurn) {
-            if (isCopilotAuthContext) {
-                /** COPILOT AUTH: tell Gemini to call enable_copilot, NOT update_parameter */
-                authFastPathInstruction = `
-## ⚡ COPILOT AUTHORIZATION TURN — EXECUTE NOW
+        /**
+         * isCopilotAuthContext: true when this is a genuine copilot auth attempt.
+         * Fires for state-machine-driven path OR heuristic fallback.
+         *
+         * EXCLUDES isReRequestInPendingAuth: if the user says "go into copilot mode"
+         * while state is already copilot_pending_auth (stale from previous session),
+         * that is NOT an auth attempt — it's a re-request. We reset auth_attempts
+         * and let Gemini re-ask for the code instead of trying to call enable_copilot
+         * with the re-request message as authorized_by.
+         */
+        const isReRequestInPendingAuth =
+            isStateMachinePendingAuth &&
+            COPILOT_ENABLE_KEYWORDS.some((kw) => messageLower.includes(kw));
 
-The user has just provided their authorization code to enable Copilot mode.
+        const isCopilotAuthContext =
+            (isStateMachinePendingAuth && !isReRequestInPendingAuth) ||
+            (looksLikeAuthCode && lastAssistantAskedForCopilotAuth);
 
-**YOU MUST do exactly this:**
-1. Call **enable_copilot** ONCE, immediately, using:
-   - simulation_id = the current active simulation UUID from the context
-   - authorized_by = "${message.trim()}" (the exact text the user just typed)
-2. Do NOT query the database. Do NOT call get_simulation_summary or query_database.
-3. Do NOT generate any text before the tool call — just call enable_copilot.
-4. After the tool returns, confirm copilot was enabled with a ✅ message.
-`;
+        /**
+         * isAuthTurn: true for any auth turn (copilot or parameter change).
+         * Parameter auth still uses exact code match for security.
+         */
+        const isAuthTurn =
+            isCopilotAuthContext ||
+            message.trim().toLowerCase() === CWF_AUTH_CODE.toLowerCase();
+
+        /**
+         * Server-side 3-attempt enforcement for COPILOT_PENDING_AUTH state.
+         * Only runs when the state machine is the primary detection path.
+         * Heuristic fallback lets Gemini handle the attempt counting via LLM reasoning.
+         *
+         * IMPORTANT GUARD: Skip auth validation if the message is a copilot-enable
+         * keyword phrase (e.g., "go into copilot mode"). This happens when the user
+         * re-requests copilot while the DB already has copilot_pending_auth from a
+         * previous failed/abandoned session. Treating "go into copilot mode" as an
+         * auth code attempt would incorrectly consume an attempt and report "Incorrect code".
+         * Instead, we reset auth_attempts to 0 so the user gets a clean fresh start,
+         * and let Gemini re-ask for the authorization code.
+         */
+
+        let maxAttemptsReached = false;
+
+        if (isReRequestInPendingAuth) {
+
+            /**
+             * User is re-requesting copilot (e.g., "go into copilot mode") while
+             * the state machine is stuck in pending_auth from a previous session.
+             * Reset auth_attempts to 0 so the user gets 3 fresh attempts.
+             */
+            await supabase.from('copilot_config')
+                .update({ auth_attempts: 0, updated_at: new Date().toISOString() })
+                .eq('simulation_id', simulationId);
+            authAttempts = 0;
+            console.log('[CWF] ↩️ Re-request in pending_auth — resetting auth_attempts to 0');
+            /** Do NOT run the auth code check — let Gemini re-ask for the code */
+        } else if (isStateMachinePendingAuth) {
+            const providedCode = message.trim();
+            const isCorrectCode = providedCode.toLowerCase() === CWF_AUTH_CODE.toLowerCase();
+
+            if (isCorrectCode) {
+                /**
+                 * Correct code: transition to copilot_active.
+                 * Reset auth_attempts. The enable_copilot tool call also does this,
+                 * but doing it here ensures correctness even if Gemini's tool call fails.
+                 */
+                await supabase
+                    .from('copilot_config')
+                    .update({ cwf_state: 'copilot_active', auth_attempts: 0 })
+                    .eq('simulation_id', simulationId);
+                cwfState = 'copilot_active';
+                console.log('[CWF] Correct copilot auth — transitioning to copilot_active');
             } else {
-                /** PARAMETER AUTH: original fast-path for update_parameter */
-                authFastPathInstruction = lang === 'tr'
-                    ? CWF_AUTH_FAST_PATH_PROMPT_TR
-                    : CWF_AUTH_FAST_PATH_PROMPT_EN;
+                /**
+                 * Wrong code: increment counter. If at max, reset to 'normal'.
+                 */
+                const newAttempts = authAttempts + 1;
+                if (newAttempts >= COPILOT_MAX_AUTH_ATTEMPTS) {
+                    await supabase
+                        .from('copilot_config')
+                        .update({ cwf_state: 'normal', auth_attempts: 0 })
+                        .eq('simulation_id', simulationId);
+                    cwfState = 'normal';
+                    maxAttemptsReached = true;
+                    console.log('[CWF] Max copilot auth attempts reached — returning to normal');
+                } else {
+                    await supabase
+                        .from('copilot_config')
+                        .update({ auth_attempts: newAttempts })
+                        .eq('simulation_id', simulationId);
+                    authAttempts = newAttempts;
+                    console.log(`[CWF] Wrong copilot auth — attempt ${newAttempts}/${COPILOT_MAX_AUTH_ATTEMPTS}`);
+                }
             }
         }
 
-        /** Log auth-turn detection so we can verify it fires correctly */
-        if (isAuthTurn) {
-            console.log(`[CWF] ⚡ Auth turn detected (${isCopilotAuthContext ? 'COPILOT' : 'PARAMETER'}) — injecting fast-path instruction`);
+        // =====================================================================
+        // SHORT-CIRCUIT: COPILOT STATE MACHINE TRANSITIONS (Phase B)
+        //
+        // ALL copilot auth decisions are made server-side WITHOUT involving the LLM.
+        // The LLM (Gemini) is a powerful but non-deterministic system — auth must be
+        // 100% deterministic and fast. The server now handles these cases directly:
+        //
+        //   Case A: normal state + copilot keyword
+        //           → already eagerly set copilot_pending_auth above
+        //           → return "Please provide auth code" directly, NO Gemini call
+        //
+        //   Case B: copilot_pending_auth + correct auth code
+        //           → already updated DB to copilot_active above (line 2427-2432)
+        //           → return "✅ Copilot enabled" directly, NO Gemini call
+        //
+        //   Case C: copilot_pending_auth + wrong code (not max attempts)
+        //           → already incremented auth_attempts in DB
+        //           → return "Incorrect code. N remaining" directly, NO Gemini call
+        //
+        //   Case D: copilot_pending_auth + max attempts exhausted
+        //           → already reset state to normal in DB
+        //           → return failure message directly, NO Gemini call
+        //
+        //   Case E: copilot_pending_auth + keyword re-request
+        //           → already reset auth_attempts to 0
+        //           → return "Please provide auth code" directly, NO Gemini call
+        //
+        // The LLM is ONLY engaged for non-auth-state-machine messages, i.e.,
+        // factory questions, parameter changes, and autonomous copilot actions.
+        // The LLM receives the current cwfState as context in its system prompt.
+        // =====================================================================
+
+        /**
+         * Case A: User just requested copilot from normal state.
+         * The eager transition already set cwf_state='copilot_pending_auth' in DB.
+         * Short-circuit: return the auth_prompt message directly without calling Gemini.
+         */
+        if (isCopilotEnableRequest) {
+            console.log('[CWF] ⚡ Short-circuit: copilot enable request → pending_auth (no Gemini call)');
+            const promptMsg = lang === 'tr'
+                ? '🤖 Kopilot Modu, simülasyonunuzu gerçek zamanlı olarak izlememi, parametre sapmalarını ve kalite sorunlarını tespit etmemi ve düzeltici işlemleri otomatik olarak gerçekleştirmemi sağlayacak. Tüm işlemler tam gerekçesiyle kaydedilecek. Devam etmek için yetkinize ihtiyacım var.\n\nLütfen yetki kodunuzu girerek Kopilot modunu etkinleştirin.'
+                : '🤖 Copilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed.\n\nPlease provide your authorization code to enable Copilot mode.';
+            return res.status(200).json({
+                response: promptMsg,
+                toolCallCount: 0,
+                copilotStateChange: null,
+            });
         }
+
+        /**
+         * Case E: User re-requested copilot while state was already pending_auth.
+         * The auth_attempts were reset to 0 above. Short-circuit: re-prompt for code.
+         */
+        if (isReRequestInPendingAuth) {
+            console.log('[CWF] ⚡ Short-circuit: re-request in pending_auth → re-prompting (no Gemini call)');
+            const promptMsg = lang === 'tr'
+                ? '🤖 Kopilot Modu zaten yetki bekleme durumunda. Lütfen yetki kodunuzu girin.'
+                : '🤖 Copilot Mode is already waiting for authorization. Please provide your authorization code.';
+            return res.status(200).json({
+                response: promptMsg,
+                toolCallCount: 0,
+                copilotStateChange: null,
+            });
+        }
+
+        /**
+         * Case D: Max auth attempts exhausted.
+         * DB already reset to normal above. Short-circuit: return failure message.
+         */
+        if (maxAttemptsReached) {
+            console.log('[CWF] ⚡ Short-circuit: max auth attempts reached → returning to normal (no Gemini call)');
+            const failMsg = lang === 'tr'
+                ? `❌ ${COPILOT_MAX_AUTH_ATTEMPTS} denemeden sonra yetkilendirme başarısız oldu. Kopilot modu etkinleştirilemedi. Tekrar denemek için "kopilot moduna geç" diyebilirsiniz.`
+                : `❌ Authorization failed after ${COPILOT_MAX_AUTH_ATTEMPTS} attempts. Copilot mode could not be activated. You can try again by saying 'go into copilot mode'.`;
+            return res.status(200).json({
+                response: failMsg,
+                toolCallCount: 0,
+                copilotStateChange: null,
+            });
+        }
+
+        /**
+         * Case B: Auth code was correct — DB already transitioned to copilot_active above.
+         * Short-circuit: fire engine start, return success message directly without Gemini.
+         *
+         * Case C: Auth code was wrong (not max attempts) — DB already incremented counter.
+         * Short-circuit: return "Incorrect code" message directly without Gemini.
+         *
+         * Both cases only apply when the state machine was in copilot_pending_auth.
+         */
+        if (isStateMachinePendingAuth && !isReRequestInPendingAuth) {
+            /** Re-derive correct/incorrect from the updated cwfState */
+            const authSucceeded = cwfState === 'copilot_active';
+
+            if (authSucceeded) {
+                /** Case B: Correct code — fire the copilot engine start */
+                console.log('[CWF] ⚡ Short-circuit: correct auth code → copilot_active (no Gemini call)');
+
+                /** Fire the engine start endpoint (fire-and-forget) */
+                const copilotApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
+                try {
+                    await fetch(`${copilotApiBase}/api/cwf/copilot/enable`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            simulationId,
+                            activatedBy: CWF_AUTH_CODE,
+                        }),
+                    });
+                } catch {
+                    /** Engine endpoint unreachable — DB update already set state; engine will start on next heartbeat */
+                }
+
+                const successMsg = lang === 'tr'
+                    ? `✅ Kopilot Modu etkinleştirildi. Simülasyonu gerçek zamanlı olarak izliyorum ve gerektiğinde düzeltici işlemler uygulayacağım. Tüm işlemler kaydedilecek.`
+                    : `✅ Copilot Mode has been enabled for simulation ID ${simulationId}. I will now autonomously monitor your simulation in real-time, detect deviations, and apply corrective actions as needed. All actions will be logged with full reasoning.`;
+
+                return res.status(200).json({
+                    response: successMsg,
+                    toolCallCount: 0,
+                    /** Signal the client to immediately enable the copilot UI theme */
+                    copilotStateChange: 'enabled' as const,
+                });
+            } else {
+                /** Case C: Wrong code — report attempts remaining */
+                const attemptsRemaining = COPILOT_MAX_AUTH_ATTEMPTS - authAttempts;
+                console.log(`[CWF] ⚡ Short-circuit: wrong auth code — ${attemptsRemaining} remaining (no Gemini call)`);
+                const wrongMsg = lang === 'tr'
+                    ? `❌ Yanlış kod. ${attemptsRemaining} deneme hakkınız kaldı.`
+                    : `❌ Incorrect code. ${attemptsRemaining} attempt(s) remaining.`;
+                return res.status(200).json({
+                    response: wrongMsg,
+                    toolCallCount: 0,
+                    copilotStateChange: null,
+                });
+            }
+        }
+
+        /** Log auth-turn detection for debugging (non-short-circuit paths only) */
+        if (isAuthTurn) {
+            console.log(
+                `[CWF] Auth turn (passed to Gemini): cwfState=${cwfState}, copilotCtx=${isCopilotAuthContext}, ` +
+                `stateMachine=${isStateMachinePendingAuth}`
+            );
+        }
+
 
         // =====================================================================
         // Build conversation history for multi-turn context.
@@ -2255,6 +2717,16 @@ The user has just provided their authorization code to enable Copilot mode.
         ];
 
         /**
+         * For parameter change authorization (update_parameter fast-path).
+         * Copilot auth cases are already short-circuited above and never reach Gemini.
+         * Only the human-in-the-loop update_parameter auth flow (where the user provides
+         * the auth code to authorize a pending parameter change) reaches this point.
+         */
+        const authFastPathInstruction = isAuthTurn && !isCopilotAuthContext
+            ? (lang === 'tr' ? CWF_AUTH_FAST_PATH_PROMPT_TR : CWF_AUTH_FAST_PATH_PROMPT_EN)
+            : '';
+
+        /**
          * Initialize Gemini model AFTER auth detection so we can append
          * the fast-path instruction to the system prompt when needed.
          * Combining the base system prompt + auth fast-path (if any) into
@@ -2263,7 +2735,8 @@ The user has just provided their authorization code to enable Copilot mode.
         const model = genAI.getGenerativeModel({
             model: CWF_MODEL_NAME,
             /** Base system prompt + optional fast-path instruction for auth turns */
-            systemInstruction: (await buildSystemPrompt(lang, uiContext)) + authFastPathInstruction,
+            systemInstruction: (await buildSystemPrompt(lang, mergedUiContext)) + authFastPathInstruction,
+
             tools: [{ functionDeclarations: tools }],
         });
 
@@ -2324,15 +2797,25 @@ The user has just provided their authorization code to enable Copilot mode.
                         toolResult = await executeQuery(typedArgs.sql as string);
                         break;
                     case 'get_simulation_summary':
-                        toolResult = await getSimulationSummary(
-                            typedArgs.simulation_id as string
-                        );
+                        /**
+                         * ALWAYS use the server's authoritative simulationId — NEVER trust
+                         * the simulation_id the LLM passes in its tool call args.
+                         * The LLM infers the UUID from conversation history and frequently
+                         * supplies a stale or wrong ID, causing it to query a completely
+                         * different session's OEE data. The server already has the correct
+                         * simulationId from the validated request body.
+                         */
+                        toolResult = await getSimulationSummary(simulationId);
                         break;
-                    case 'save_analysis':
-                        toolResult = await saveAnalysis(
-                            typedArgs as unknown as Parameters<typeof saveAnalysis>[0]
-                        );
+                    case 'save_analysis': {
+                        /** Always pin simulation_id to the server's authoritative value — never trust LLM-provided one */
+                        const saveArgs = typedArgs as Parameters<typeof saveAnalysis>[0];
+                        toolResult = await saveAnalysis({
+                            ...saveArgs,
+                            simulation_id: simulationId,
+                        });
                         break;
+                    }
                     case 'update_parameter':
                         /** Execute CWF parameter change via cwf_commands queue */
                         toolResult = await executeUpdateParameter(
@@ -2346,67 +2829,118 @@ The user has just provided their authorization code to enable Copilot mode.
                         );
                         break;
                     case 'enable_copilot': {
-                        /** Enable copilot autonomous mode — requires auth code validation */
+                        /**
+                         * Enable copilot autonomous mode.
+                         * Auth validation happens here AND server-side before Gemini is called.
+                         * This double-validation ensures correctness even if LLM bypasses server check.
+                         */
                         const copilotAuthCode = typedArgs.authorized_by as string;
-                        if (copilotAuthCode !== CWF_AUTH_CODE) {
-                            toolResult = { error: 'Incorrect authorization code. Copilot mode was NOT enabled.' };
+                        const copilotSimId = (typedArgs.simulation_id as string) || simulationId;
+
+                        /** Case-insensitive + trim() comparison — tolerates capitalisation and accidental whitespace */
+                        if (copilotAuthCode.trim().toLowerCase() !== CWF_AUTH_CODE.trim().toLowerCase()) {
+                            /**
+                             * Wrong code: update Supabase to reflect this is still pending.
+                             * The handler already incremented auth_attempts, but we re-set
+                             * cwf_state to copilot_pending_auth to be explicit.
+                             */
+                            await supabase.from('copilot_config')
+                                .update({ cwf_state: 'copilot_pending_auth' })
+                                .eq('simulation_id', copilotSimId);
+                            toolResult = {
+                                error: 'Incorrect authorization code. Copilot mode was NOT enabled.',
+                                attemptsRemaining: Math.max(0, COPILOT_MAX_AUTH_ATTEMPTS - (authAttempts + 1)),
+                            };
                         } else {
                             try {
-                                /** Call the copilot enable endpoint on the dev server */
-                                /** Resolve copilot API base: local dev server on port 3001, or relative for Vercel */
-                                const copilotApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
-                                const enableRes = await fetch(`${copilotApiBase}/api/cwf/copilot/enable`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        simulationId: typedArgs.simulation_id as string,
-                                        activatedBy: copilotAuthCode,
-                                    }),
-                                });
-                                const enableData = await enableRes.json();
-                                toolResult = enableData;
-                                /** Track successful copilot enablement for the response */
-                                copilotStateChange = 'enabled';
-                            } catch (enableErr) {
-                                /** If the copilot server endpoint is unreachable, enable via Supabase directly */
+                                /**
+                                 * Correct code: transition state to copilot_active.
+                                 * The copilot engine endpoint also handles this, but we update
+                                 * Supabase directly here as a safeguard (engine may be unreachable).
+                                 */
                                 await supabase.from('copilot_config').upsert({
-                                    simulation_id: typedArgs.simulation_id as string,
+                                    simulation_id: copilotSimId,
                                     enabled: true,
+                                    cwf_state: 'copilot_active',
+                                    auth_attempts: 0,
                                     activated_by: copilotAuthCode,
+                                    /** Explicitly set poll interval — DB default would be 15s */
+                                    poll_interval_sec: 6,
+                                    cooldown_sec: 30,
+                                    /** Allow Copilot to correct ALL out-of-range params in one cycle */
+                                    max_actions_per_minute: 20,
                                     last_heartbeat_at: new Date().toISOString(),
                                     updated_at: new Date().toISOString(),
                                 }, { onConflict: 'simulation_id' });
-                                toolResult = { success: true, message: 'Copilot enabled via database (engine will start on next poll).' };
+
+                                /** Also call the copilot engine endpoint if available */
+                                const copilotApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
+                                try {
+                                    const enableRes = await fetch(`${copilotApiBase}/api/cwf/copilot/enable`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            simulationId: copilotSimId,
+                                            activatedBy: copilotAuthCode,
+                                        }),
+                                    });
+                                    const enableData = await enableRes.json() as Record<string, unknown>;
+                                    toolResult = { ...enableData, cwfState: 'copilot_active', attemptsRemaining: COPILOT_MAX_AUTH_ATTEMPTS };
+                                } catch {
+                                    /** Engine endpoint unreachable — DB update above already set state */
+                                    toolResult = {
+                                        success: true,
+                                        message: 'Copilot enabled (engine will start on next poll).',
+                                        cwfState: 'copilot_active',
+                                        attemptsRemaining: COPILOT_MAX_AUTH_ATTEMPTS,
+                                    };
+                                }
                                 /** Track successful copilot enablement for the response */
                                 copilotStateChange = 'enabled';
+                            } catch (enableErr) {
+                                toolResult = { error: `Failed to enable copilot: ${String(enableErr)}` };
                             }
                         }
                         break;
                     }
                     case 'disable_copilot': {
-                        /** Disable copilot mode — no auth required */
+                        /**
+                         * Disable copilot mode — no auth required.
+                         * Resets state machine to 'normal' and clears auth_attempts.
+                         */
+                        const disableSimId = (typedArgs.simulation_id as string) || simulationId;
                         try {
-                            const disableApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
-                            const disableRes = await fetch(`${disableApiBase}/api/cwf/copilot/disable`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ simulationId: typedArgs.simulation_id as string }),
-                            });
-                            const disableData = await disableRes.json();
-                            toolResult = disableData;
-                            /** Track successful copilot disablement for the response */
-                            copilotStateChange = 'disabled';
-                        } catch {
-                            /** Fallback: disable via Supabase directly */
+                            /** First update Supabase state machine to normal */
                             await supabase.from('copilot_config')
-                                .update({ enabled: false, updated_at: new Date().toISOString() })
-                                .eq('simulation_id', typedArgs.simulation_id as string);
-                            toolResult = { success: true, message: 'Copilot disabled via database.' };
+                                .update({
+                                    cwf_state: 'normal',
+                                    auth_attempts: 0,
+                                    enabled: false,
+                                    updated_at: new Date().toISOString(),
+                                })
+                                .eq('simulation_id', disableSimId);
+
+                            /** Then call the copilot engine disable endpoint if available */
+                            const disableApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
+                            try {
+                                const disableRes = await fetch(`${disableApiBase}/api/cwf/copilot/disable`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ simulationId: disableSimId }),
+                                });
+                                const disableData = await disableRes.json() as Record<string, unknown>;
+                                toolResult = { ...disableData, cwfState: 'normal' };
+                            } catch {
+                                toolResult = { success: true, message: 'Copilot disabled.', cwfState: 'normal' };
+                            }
                             /** Track successful copilot disablement for the response */
                             copilotStateChange = 'disabled';
+                        } catch (disableErr) {
+                            toolResult = { error: `Failed to disable copilot: ${String(disableErr)}` };
                         }
                         break;
                     }
+
                     default:
                         toolResult = { error: `Unknown function: ${name}` };
                 }
