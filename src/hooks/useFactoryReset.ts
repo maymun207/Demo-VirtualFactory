@@ -24,6 +24,10 @@ import { useKPIStore } from '../store/kpiStore';
 import { useUIStore } from '../store/uiStore';
 /** Work Order store — reset pressLimitReached flag on factory reset */
 import { useWorkOrderStore } from '../store/workOrderStore';
+/** CWF store — clear chat history and detach from old simulation on reset */
+import { useCWFStore } from '../store/cwfStore';
+/** Copilot store — reset activation state / action history on factory reset */
+import { useCopilotStore } from '../store/copilotStore';
 import { syncService } from '../services/syncService';
 import { createLogger } from '../lib/logger';
 
@@ -128,6 +132,60 @@ export function useFactoryReset() {
      */
     useWorkOrderStore.getState().resetWorkOrderState();
     log.info('Work Order state reset (pressLimitReached cleared)');
+
+    /**
+     * STEP 9: Reset CWF and Copilot state.
+     *
+     * When the user resets the factory, CWF must stop tracking the OLD
+     * simulation UUID. Without this step:
+     *  - CWF would still show messages / tool calls from the last session.
+     *  - The Copilot pink theme might remain active even though the Copilot
+     *    engine stopped monitoring the (now-gone) simulation.
+     *  - When a NEW simulation starts, CWF could briefly send queries
+     *    against the old UUID until App.tsx updates setSimulationId().
+     *
+     * What we do:
+     *  a) resetCopilot()   — clears cwfState, action history, counters, pink theme
+     *  b) clearMessages()  — empties the CWF chat history
+     *  c) setSimulationId(null) — detaches CWF from old session UUID
+     *  d) Server-side disable call (fire-and-forget) — sets copilot_config.cwf_state
+     *     back to 'normal' in Supabase so the next session gets a clean slate
+     *  e) System message — visible session boundary in the conversation
+     *
+     * App.tsx will call setSimulationId(newUUID) again automatically when the
+     * new simulation's Supabase session row is created, reconnecting CWF.
+     */
+    const copilotSnapshot = useCopilotStore.getState();
+    const cwfSnapshot = useCWFStore.getState();
+    const prevSimId = cwfSnapshot.simulationId;
+
+    /** 9a. Reset all copilot Zustand state — clears pink theme and action feed */
+    copilotSnapshot.resetCopilot();
+
+    /** 9b. Clear CWF message history */
+    cwfSnapshot.clearMessages();
+
+    /** 9c. Detach from the old simulation UUID */
+    cwfSnapshot.setSimulationId(null, null);
+
+    /** 9d. Tell the server to reset copilot_config for the old simulation (fire-and-forget) */
+    if (prevSimId) {
+      fetch('/api/cwf/copilot/disable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ simulationId: prevSimId }),
+      }).catch(() => {
+        /** Server may already be clean — ignore errors */
+      });
+    }
+
+    /** 9e. Insert a visible session-boundary message so the user knows CWF was reset */
+    /** We re-read the store after clearMessages() to get the fresh addSystemMessage action */
+    useCWFStore.getState().addSystemMessage(
+      '🔄 Factory reset — CWF ready for new simulation. Start a new run to reconnect.'
+    );
+
+    log.info('CWF and Copilot state reset (simulation disconnected)');
 
     log.info('Full factory reset complete');
   }, []);
