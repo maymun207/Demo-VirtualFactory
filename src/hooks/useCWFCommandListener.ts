@@ -65,6 +65,22 @@ import {
 import {
     CWF_UI_ACTION_CLOSE,
 } from '../lib/params/cwfAgent';
+/**
+ * Scenario switch configuration — valid codes, display labels, and the
+ * isValidScenarioCode() type guard. Imported from the dedicated Params module
+ * for this feature (per project rule: new features → separate params module).
+ */
+import {
+    isValidScenarioCode,
+    SCENARIO_DISPLAY_LABELS,
+    CWF_SCENARIO_SWITCH_ACTION,
+} from '../lib/params/cwfScenarioSwitch';
+/**
+ * getScenarioByCode — looks up a ScenarioDefinition by its code string.
+ * REFERENCE_SCENARIO is the SCN-000 baseline (no overrides). Both are
+ * imported from scenarios.ts to avoid duplicating scenario data here.
+ */
+import { getScenarioByCode, REFERENCE_SCENARIO } from '../lib/scenarios';
 
 /**
  * Conveyor boolean parameter names that are stored as 0/1 numbers in the
@@ -490,6 +506,121 @@ async function processUIActionCommand(command: {
                 /** Clamp to valid range — setStationInterval clamps internally */
                 const clampedInterval = Math.max(2, Math.min(7, parsedInterval));
                 sim.setStationInterval(clampedInterval);
+                break;
+            }
+
+            // ── Scenario Switch ────────────────────────────────────────────────
+            case CWF_SCENARIO_SWITCH_ACTION: {
+                /**
+                 * switch_scenario — Load a new defect scenario live without
+                 * pausing the simulation or draining the conveyor.
+                 *
+                 * The scenario code is passed in action_value (e.g. 'SCN-002').
+                 * The handler:
+                 *   1. Validates the code against VALID_SCENARIO_CODES
+                 *   2. Calls resetToFactoryDefaults() to clear all prior overrides
+                 *   3. Calls loadScenario() to apply the new scenario's overrides
+                 *   4. Posts a rich confirmation message to the CWF chat panel
+                 *
+                 * Unlike the DemoSettingsPanel's manual flow, there is NO
+                 * toggleDataFlow() call here — the simulation keeps running
+                 * and new parameters take effect immediately on the next tick.
+                 *
+                 * AUTH: not required — mirrors the manual panel flow which
+                 * also has no auth gate for scenario selection.
+                 */
+
+                /** Step 1: Validate scenario code is one of the 5 known codes */
+                if (!actionValue || !isValidScenarioCode(actionValue)) {
+                    /** Reject immediately — never write an unsupported code to the store */
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: `switch_scenario requires a valid scenario code ('SCN-000'…'SCN-004'); got '${actionValue ?? 'undefined'}'.`,
+                        })
+                        .eq('id', command.id);
+                    /** Inform the user via the CWF chat panel */
+                    useCWFStore.getState().addSystemMessage(
+                        `⚠️ switch_scenario failed: unknown code '${actionValue}'. ` +
+                        `Valid codes: SCN-000, SCN-001, SCN-002, SCN-003, SCN-004.`,
+                    );
+                    return;
+                }
+
+                /** Step 2: Retrieve the ScenarioDefinition object from scenarios.ts */
+                const scenario = getScenarioByCode(actionValue);
+                if (!scenario) {
+                    /**
+                     * isValidScenarioCode() passed but getScenarioByCode returned undefined.
+                     * This is a programming error — valid codes and SCENARIOS array are out of sync.
+                     * Reject defensively rather than crashing.
+                     */
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: `Scenario '${actionValue}' validated but not found in SCENARIOS array (data integrity error).`,
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        `⚠️ switch_scenario: scenario '${actionValue}' not found (internal error).`,
+                    );
+                    return;
+                }
+
+                /** Step 3: Apply the scenario to the simulation store — same two-step
+                 *           logic as DemoSettingsPanel.handleLoadScenario() but WITHOUT
+                 *           the panel-open auto-pause that normally pauses the simulation.
+                 *
+                 *  resetToFactoryDefaults() first: ensures any previously active scenario's
+                 *  overrides are cleared before the new scenario's overrides are applied.
+                 *  Without this, switching SCN-004 → SCN-002 would leave SCN-004's
+                 *  press overrides on the store (since SCN-002 has no press overrides).
+                 */
+                const { resetToFactoryDefaults, loadScenario } =
+                    useSimulationDataStore.getState();
+
+                /** Clear all existing scenario overrides — restores factory defaults */
+                resetToFactoryDefaults();
+
+                /**
+                 * Apply the new scenario's parameterOverrides + conveyorSettings.
+                 * For REFERENCE_SCENARIO (SCN-000) parameterOverrides is [] so this
+                 * is effectively a no-op after resetToFactoryDefaults(), which is correct.
+                 */
+                loadScenario(scenario);
+
+                /** Step 4: Build a rich system message so the user knows what changed.
+                 *  Includes the scenario's human-readable label from SCENARIO_DISPLAY_LABELS,
+                 *  whether the simulation was already paused or is still running, and
+                 *  the number of parameter overrides applied.
+                 */
+                const isRunning = useSimulationStore.getState().isDataFlowing;
+                /** isReference: SCN-000 has no overrides, factory defaults were restored */
+                const isReference = scenario.id === REFERENCE_SCENARIO.id;
+                /** Count of overridden machine parameters for user-facing feedback */
+                const overrideCount = scenario.parameterOverrides.length;
+                /** Display label from the dedicated params map (avoids importing full scenarios.ts) */
+                const label = SCENARIO_DISPLAY_LABELS[actionValue];
+
+                /** Compose status line: "running" or "paused" */
+                const simStatus = isRunning ? '🟢 simulation running' : '⏸️ simulation paused';
+
+                /** Compose override summary: reference shows "factory defaults restored" */
+                const overrideSuffix = isReference
+                    ? '— factory defaults restored'
+                    : ` — ${overrideCount} parameter override${overrideCount !== 1 ? 's' : ''} applied`;
+
+                /** Post confirmation to CWF chat panel */
+                useCWFStore.getState().addSystemMessage(
+                    `✅ Switched to ${actionValue} — ${label}${overrideSuffix}. (${simStatus}; no pause required)`,
+                );
+
+                console.log(
+                    `[CWF Listener] ✅ switch_scenario: ${actionValue} applied. ` +
+                    `overrides=${overrideCount} running=${isRunning}`,
+                );
                 break;
             }
 

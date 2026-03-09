@@ -11,6 +11,12 @@
  *     Defines every action type CWF is allowed to trigger, the
  *     acknowledgement window, and the languages CWF can set.
  *
+ *   Phase 4 — CWF Scenario Switch (switch_scenario action)
+ *     Configuration for live scenario switching mid-simulation.
+ *     Source of truth for the action type string used in the
+ *     cwf_commands UI-action route. See cwfScenarioSwitch.ts
+ *     for scenario-specific constants (valid codes, labels).
+ *
  * WHY PARAMS?
  *   Per project convention, ALL numeric magic values, configuration flags,
  *   and valid-value sets must live here — NOT hardcoded in business logic.
@@ -138,6 +144,11 @@ export type TelemetryEventCategory =
  *
  *  Configuration (uiStore):
  *    set_language          → uiStore.setLanguage(action_value)  ['en' | 'tr']
+ *
+ *  Scenario Switch (simulationDataStore — NO simulation pause):
+ *    switch_scenario       → resetToFactoryDefaults() + loadScenario(scenario)
+ *                            action_value = ScenarioCode ('SCN-000'…'SCN-004')
+ *                            See cwfScenarioSwitch.ts for full config.
  */
 export const CWF_VALID_UI_ACTIONS = new Set([
     // ── Panel Toggles (11) ────────────────────────────────────────────────
@@ -187,6 +198,14 @@ export const CWF_VALID_UI_ACTIONS = new Set([
     // ── Configuration (1) ────────────────────────────────────────────────
     /** Change the interface language — action_value must be 'en' or 'tr' */
     'set_language',
+    // ── Scenario Switch (1) — live mid-simulation scenario change ─────────
+    /**
+     * Switch the active defect scenario without pausing the simulation.
+     * action_value = ScenarioCode string: 'SCN-000'…'SCN-004'.
+     * Handler: processUIActionCommand() in useCWFCommandListener.ts.
+     * Config:  src/lib/params/cwfScenarioSwitch.ts (VALID_SCENARIO_CODES, labels).
+     */
+    'switch_scenario',
 ] as const);
 
 /**

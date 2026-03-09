@@ -664,7 +664,8 @@ const tools: FunctionDeclaration[] = [
             'toggle_heatmap, toggle_kpi, toggle_tile_passport, toggle_demo_settings, ' +
             'start_simulation, stop_simulation, reset_simulation, ' +
             'set_conveyor_running, set_conveyor_stopped, set_conveyor_jammed, ' +
-            'set_conveyor_speed, set_sclk_period, set_station_interval, set_language.',
+            'set_conveyor_speed, set_sclk_period, set_station_interval, set_language, ' +
+            'switch_scenario (action_value=scenario code SCN-000…SCN-004 — switches defect scenario live, NO simulation pause).',
         parameters: {
             type: SchemaType.OBJECT,
             properties: {
@@ -680,7 +681,8 @@ const tools: FunctionDeclaration[] = [
                         'Simulation lifecycle: start_simulation | stop_simulation | reset_simulation\n' +
                         'Conveyor belt status: set_conveyor_running | set_conveyor_stopped | set_conveyor_jammed\n' +
                         'Simulation sliders: set_conveyor_speed | set_sclk_period | set_station_interval\n' +
-                        'Config: set_language',
+                        'Config: set_language\n' +
+                        'Scenario switch: switch_scenario (action_value=ScenarioCode e.g. SCN-002)',
                 },
                 action_value: {
                     type: SchemaType.STRING,
@@ -745,11 +747,74 @@ const tools: FunctionDeclaration[] = [
             type: SchemaType.OBJECT,
             properties: {
                 simulation_id: {
+                    /** UUID of the active simulation session — FK for cwf_commands row */
                     type: SchemaType.STRING,
                     description: 'UUID of the active simulation session.',
                 },
             },
             required: ['simulation_id'],
+        },
+    },
+    {
+        /**
+         * switch_scenario — Switch the active defect scenario on the live simulation.
+         *
+         * Calls resetToFactoryDefaults() — clears prior scenario overrides — then
+         * loadScenario() to apply the new scenario's parameter overrides and conveyor
+         * settings. The simulation continues running with NO pause, NO drain step.
+         *
+         * This mirrors the two-step logic in DemoSettingsPanel.handleLoadScenario()
+         * but skips the panel-open auto-pause useEffect (lines 1402–1408).
+         *
+         * ★ NO AUTHORIZATION REQUIRED — mirrors the manual panel flow which has no
+         *   auth gate for scenario selection. Call immediately when the user requests.
+         *
+         * Scenarios:
+         *   SCN-000 — Optimal Production (reference — no defects, factory defaults)
+         *   SCN-001 — Press Pressure Anomaly
+         *   SCN-002 — Kiln Temperature Crisis
+         *   SCN-003 — Glaze Drift
+         *   SCN-004 — Cascade Multi-station Defect
+         */
+        name: 'switch_scenario',
+        description:
+            'Switch the active defect scenario on the live simulation without pausing. ' +
+            'NO AUTHORIZATION REQUIRED — call immediately when the user asks to switch, load, or change a scenario. ' +
+            'resetToFactoryDefaults() is called first to clear prior overrides, then loadScenario() applies the new scenario. ' +
+            'The simulation keeps running — no pause, no drain, no restart needed. ' +
+            'SCN-000 = Optimal Production (reference/no defects). ' +
+            'SCN-001 = Press Pressure Anomaly. ' +
+            'SCN-002 = Kiln Temperature Crisis. ' +
+            'SCN-003 = Glaze Drift. ' +
+            'SCN-004 = Cascade Multi-station Defect.',
+        parameters: {
+            type: SchemaType.OBJECT,
+            properties: {
+                simulation_id: {
+                    type: SchemaType.STRING,
+                    /** UUID of the active simulation session — required FK for cwf_commands row */
+                    description: 'UUID of the active simulation session.',
+                },
+                scenario_code: {
+                    type: SchemaType.STRING,
+                    /**
+                     * Valid values documented in description — matches VALID_SCENARIO_CODES
+                     * in src/lib/params/cwfScenarioSwitch.ts. The Gemini SDK's EnumStringSchema
+                     * type requires a separate `format: 'enum'` field which is nonstandard here;
+                     * the description-only approach is used consistently in this file.
+                     */
+                    description:
+                        'The 5-character scenario code to switch to. ' +
+                        'Must be one of: SCN-000 (reference/no defects), SCN-001 (press anomaly), ' +
+                        'SCN-002 (kiln crisis), SCN-003 (glaze drift), SCN-004 (cascade defect).',
+                },
+                reason: {
+                    type: SchemaType.STRING,
+                    /** Brief user-facing reason included in the cwf_commands.reason column for audit */
+                    description: 'Short reason for switching (e.g. "User requested Kiln Temperature Crisis scenario").',
+                },
+            },
+            required: ['simulation_id', 'scenario_code', 'reason'],
         },
     },
 ];
@@ -1156,13 +1221,22 @@ const CWF_VALID_UI_ACTIONS = new Set([
     // ── Simulation parameter sliders (3 — mirror simulationStore setters) ────
     /** Set conveyor visual speed — action_value = float string e.g. "1.5" — range 0.3-2.0 */
     'set_conveyor_speed',
-    /** Set S-Clock period in ms — action_value = int string e.g. "300" — range 200-700 */
+    /** S-Clock period in ms — action_value = integer string, range 200–700 */
     'set_sclk_period',
-    /** Set station production interval — action_value = int string e.g. "3" — range 2-7 */
+    /** Station production interval — action_value = integer string, range 2–7 */
     'set_station_interval',
-    // ── Configuration (1 — mirrors uiStore.setLanguage()) ───────────────────
-    /** Change interface language — action_value must be CWF_UI_VALID_LANGUAGES */
+    // ── Configuration (1) ────────────────────────────────────────────────
+    /** Interface language change — action_value = 'en' | 'tr' */
     'set_language',
+    // ── Scenario Switch (1) — live mid-simulation scenario reload ─────────
+    /**
+     * Switch the active defect scenario without pausing the simulation.
+     * Action_value = ScenarioCode: 'SCN-000' through 'SCN-004'.
+     * SOURCE OF TRUTH: src/lib/params/uiTelemetry.ts — must stay in sync.
+     * Handler: processUIActionCommand() case CWF_SCENARIO_SWITCH_ACTION
+     *          in src/hooks/useCWFCommandListener.ts
+     */
+    'switch_scenario',
 ] as const);
 
 /**
@@ -2828,6 +2902,39 @@ export default async function handler(
                             typedArgs as unknown as Parameters<typeof executeUIAction>[0]
                         );
                         break;
+                    case 'switch_scenario': {
+                        /**
+                         * switch_scenario — Load a different defect scenario without pausing
+                         * the simulation. The tool re-uses the existing execute_ui_action transport:
+                         * INSERT a cwf_commands row with station='ui_action',
+                         * parameter='switch_scenario', reason=…| value: <scenario_code>.
+                         * The browser listener's processUIActionCommand() picks it up and
+                         * calls resetToFactoryDefaults() + loadScenario() directly on the store.
+                         *
+                         * Pin simulation_id to the server-authoritative value — same safeguard
+                         * used by get_simulation_summary and save_analysis above.
+                         */
+                        const scenarioCode = typedArgs.scenario_code as string;
+                        const switchReason = typedArgs.reason as string;
+
+                        /**
+                         * Delegate to executeUIAction() so the same ACK-wait polling loop
+                         * is shared for switch_scenario as for all other UI commands.
+                         * action_value carries the scenario code through the reason field
+                         * encoding ('…| value: SCN-002') to the browser listener.
+                         */
+                        toolResult = await executeUIAction({
+                            /** Always use server's authoritative simulationId */
+                            simulation_id: simulationId,
+                            /** action_type that processUIActionCommand() will dispatch on */
+                            action_type: 'switch_scenario',
+                            /** The scenario code to switch to, e.g. 'SCN-002' */
+                            action_value: scenarioCode,
+                            /** Human-readable reason forwarded to cwf_commands.reason column */
+                            reason: switchReason || `Switch to ${scenarioCode}`,
+                        });
+                        break;
+                    }
                     case 'enable_copilot': {
                         /**
                          * Enable copilot autonomous mode.
