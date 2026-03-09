@@ -40,14 +40,26 @@
  * Used by: Dashboard.tsx
  */
 import { useState } from "react";
-import { Play, Square, RotateCcw, Settings2, Settings } from "lucide-react";
+import {
+  Play,
+  Square,
+  RotateCcw,
+  Settings2,
+  Settings,
+  Presentation,
+} from "lucide-react";
 import { useUIStore } from "../../store/uiStore";
 import { useSimulationStore } from "../../store/simulationStore";
 import { useSimulationDataStore } from "../../store/simulationDataStore";
 import { useWorkOrderStore } from "../../store/workOrderStore";
 import { useTranslation } from "../../hooks/useTranslation";
 import { useFactoryReset } from "../../hooks/useFactoryReset";
-import { HEADER_GRADIENT, COLORS } from "../../lib/params";
+import {
+  HEADER_GRADIENT,
+  COLORS,
+  HEADER_BUTTON_FONT,
+  HEADER_BUTTON_ICON_GAP,
+} from "../../lib/params";
 import { SimulationSessionInfo } from "./SimulationSessionInfo";
 import { ModesMenu } from "./header/ModesMenu";
 import { translations } from "../../lib/translations";
@@ -75,6 +87,8 @@ export const Header = () => {
   const toggleControlPanel = useUIStore((s) => s.toggleControlPanel);
   /** Translation accessor for the "header" section */
   const t = useTranslation("header");
+  /** Whether DemoScreen panel is visible (for active-state highlight on Demo button) */
+  const showDemoScreen = useUIStore((s) => s.showDemoScreen);
 
   /**
    * isSimConfigured — Demo Settings Gate.
@@ -186,10 +200,53 @@ export const Header = () => {
         </div>
 
         {/* ── Pillar 2: Modes (Responsive Menu) ────────────────────── */}
+        {/* Demo standalone button — placed left of the ModesMenu pill for clear visual separation */}
+        <button
+          id="btn-demo"
+          onClick={() => {
+            /** Capture current open state before toggling for accurate telemetry */
+            const wasOpen = useUIStore.getState().showDemoScreen;
+            useUIStore.getState().toggleDemoScreen();
+            /** Record the DemoScreen toggle in the telemetry service */
+            telemetry.emit({
+              event_type: "panel_toggled",
+              event_category: "ui_action",
+              properties: {
+                panel: "demo_screen",
+                state: wasOpen ? "closed" : "opened",
+              },
+            });
+          }}
+          className={`hidden lg:flex relative items-center ${HEADER_BUTTON_ICON_GAP} px-3 py-1.5 rounded-xl border transition-all duration-200 active:scale-95 group ${
+            showDemoScreen
+              ? "bg-violet-500/20 border-violet-400/60 shadow-[0_0_12px_rgba(167,139,250,0.25)]"
+              : "bg-violet-500/10 border-violet-500/30 hover:bg-violet-500/20 hover:border-violet-400/50"
+          }`}
+          title="Demo — Toggle DemoScreen"
+        >
+          {/* Presentation icon — visually represents DemoScreen */}
+          <Presentation
+            size={14}
+            className={`group-hover:scale-110 transition-transform ${
+              showDemoScreen ? "text-violet-300" : "text-violet-400"
+            }`}
+          />
+          {/* Demo label text */}
+          <span
+            className={`${HEADER_BUTTON_FONT} ${
+              showDemoScreen ? "text-violet-200" : "text-violet-300"
+            } mx-0.5`}
+          >
+            Demo
+          </span>
+        </button>
         <ModesMenu />
 
         {/* ── Pillar 3: Intelligence (Status Grid) ────────────────────── */}
-        <div className="hidden md:flex items-center p-1.5 gap-2 border border-white/10 rounded-2xl backdrop-blur-md hover:border-white/20 transition-all duration-300">
+        <div
+          id="header-pillar3"
+          className="hidden md:flex items-center p-1.5 gap-2 border border-white/10 rounded-2xl backdrop-blur-md hover:border-white/20 transition-all duration-300"
+        >
           {/* S-Clock */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/5 group transition-colors">
             <span className="text-[0.7rem] sm:text-xs text-white font-bold uppercase tracking-wider hidden xl:inline">

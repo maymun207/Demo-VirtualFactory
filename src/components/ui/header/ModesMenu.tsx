@@ -98,7 +98,10 @@ export const ModesMenu: React.FC = () => {
         Visible only on large screens (lg breakpoint) and above.
         Implements a shared background with glassmorphic blur and subtle borders.
       */}
-      <div className="hidden lg:flex items-center p-1.5 gap-1.5 border border-white/10 rounded-2xl backdrop-blur-md hover:border-white/20 transition-all duration-300">
+      <div
+        id="header-modes-pill"
+        className="hidden lg:flex items-center p-1.5 gap-1.5 border border-white/10 rounded-2xl backdrop-blur-md hover:border-white/20 transition-all duration-300"
+      >
         {/* Basic Mode Button */}
         <button
           onClick={() =>

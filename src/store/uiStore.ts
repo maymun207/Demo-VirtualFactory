@@ -44,7 +44,7 @@ export type Language = 'tr' | 'en';
 /**
  * UIState — Shape of the UI store.
  */
-interface UIState {
+export interface UIState {
   /** Currently active language for all translated strings */
   currentLang: Language;
   /**
@@ -80,6 +80,8 @@ interface UIState {
   showAlarmLog: boolean;
   /** Whether the OEE Hierarchy 3D table is visible in the scene */
   showOEEHierarchy: boolean;
+  /** Whether the DemoScreen floating panel below the header is visible */
+  showDemoScreen: boolean;
   /**
    * isSimConfigured — Demo Settings Gate flag.
    *
@@ -147,6 +149,8 @@ interface UIState {
   setBasicPanelWidth: (width: number) => void;
   /** Toggle the OEE Hierarchy 3D table visibility in the scene */
   toggleOEEHierarchy: () => void;
+  /** Toggle the DemoScreen floating panel below the header */
+  toggleDemoScreen: () => void;
   /**
    * Set the simulation configured gate.
    * @param configured - true = user has visited Demo Settings; false = reset
@@ -189,6 +193,8 @@ export const useUIStore = create<UIState>((set) => ({
   showAlarmLog: UI_DEFAULTS.showAlarmLog,
   /** OEE Hierarchy 3D table hidden by default */
   showOEEHierarchy: UI_DEFAULTS.showOEEHierarchy,
+  /** DemoScreen hidden by default; shown when user clicks the Demo button */
+  showDemoScreen: false,
   /** Start unconfigured — user must visit Demo Settings before first run */
   isSimConfigured: UI_DEFAULTS.isSimConfigured,
   /** Start with no ended simulation — simulation has not run yet */
@@ -221,6 +227,8 @@ export const useUIStore = create<UIState>((set) => ({
     set({ basicPanelWidth: Math.max(BASIC_SIDE_PANEL_MIN_WIDTH, Math.min(BASIC_SIDE_PANEL_MAX_WIDTH, width)) }),
   /** Toggle the OEE Hierarchy 3D table on/off */
   toggleOEEHierarchy: () => set((s) => ({ showOEEHierarchy: !s.showOEEHierarchy })),
+  /** Toggle the DemoScreen panel below the header on/off */
+  toggleDemoScreen: () => set((s) => ({ showDemoScreen: !s.showDemoScreen })),
   /** Mark simulation as configured (true) or clear the flag (false) */
   setSimConfigured: (configured) => set({ isSimConfigured: configured }),
   /**

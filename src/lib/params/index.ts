@@ -35,4 +35,5 @@ export * from './oeeHierarchyTable';
 export * from './cwfCommands';
 /** UI Telemetry queue config + CWF UI action types, ACK timing, and sentinel values */
 export * from './uiTelemetry';
-
+/** SubHeaderPanel layout constants: height, resize debounce, z-index */
+export * from './subHeaderPanel';

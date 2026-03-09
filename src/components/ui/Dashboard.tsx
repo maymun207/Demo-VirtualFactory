@@ -22,6 +22,8 @@ import { ControlPanel } from "./ControlPanel";
 import { Playbook } from "./Playbook";
 import { MachineTooltip } from "./MachineTooltip";
 import { DemoSettingsPanel } from "./DemoSettingsPanel";
+/** DemoScreen — transparent glass panel toggled by the Demo button in the header */
+import { DemoScreen } from "../demo/DemoScreen";
 import { useAlarmMonitor } from "../../hooks/useAlarmMonitor";
 /** Auto-detects sim state transitions (jams, starts, speed changes) and emits telemetry events */
 import { useTelemetry } from "../../hooks/useTelemetry";
@@ -36,6 +38,8 @@ export const Dashboard = () => {
 
   return (
     <>
+      {/* DemoScreen — toggled by Demo button in header, anchored below header divider */}
+      <DemoScreen />
       <ControlPanel />
       <Playbook />
       <MachineTooltip />

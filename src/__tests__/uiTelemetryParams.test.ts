@@ -135,12 +135,12 @@ describe('uiTelemetry params — CWF_VALID_UI_ACTIONS', () => {
         expect(CWF_VALID_UI_ACTIONS).toBeInstanceOf(Set);
     });
 
-    it('should contain exactly 21 action types', () => {
+    it('should contain exactly 22 action types', () => {
         /**
-         * 11 panel toggles + 3 simulation + 3 conveyor status + 3 sliders + 1 config = 21 total.
+         * 11 panel toggles + 3 simulation + 3 conveyor status + 3 sliders + 1 config + 1 scenario switch = 22 total.
          * Any addition/removal must be documented and this test updated.
          */
-        expect(CWF_VALID_UI_ACTIONS.size).toBe(21);
+        expect(CWF_VALID_UI_ACTIONS.size).toBe(22);
     });
 
     it('should contain all 11 panel toggle actions', () => {
