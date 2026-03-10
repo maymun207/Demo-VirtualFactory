@@ -127,9 +127,35 @@ export function useCopilotLifecycle(): void {
                 );
 
                 graceTimerRef.current = setTimeout(() => {
-                    /** Grace period expired — truly disengage now */
-                    hasDisabledForStopRef.current = true;
                     graceTimerRef.current = null;
+
+                    /**
+                     * DOUBLE-CHECK: Before disengaging, verify the simulation
+                     * is TRULY stopped — not just experiencing a transient
+                     * isDataFlowing flicker (Realtime disconnect, Safari timer
+                     * throttling, etc.).
+                     *
+                     * Read the authoritative isRunning flag and session status
+                     * from the data store. If the simulation is still running
+                     * in the data layer, skip the disengage entirely — the
+                     * evaluate endpoint will continue processing, and the
+                     * heartbeat timeout (90s) serves as the ultimate safety net.
+                     */
+                    const dataStoreState = useSimulationDataStore.getState();
+                    const sessionStatus = dataStoreState.session?.status;
+                    const isStillRunning = dataStoreState.isRunning;
+
+                    if (isStillRunning || sessionStatus === 'running') {
+                        console.log(
+                            `[Copilot UI] ✅ Grace period expired but simulation is still ` +
+                            `running (isRunning=${isStillRunning}, status=${sessionStatus}) ` +
+                            `— skipping disengage, isDataFlowing was a false negative`
+                        );
+                        return;
+                    }
+
+                    /** Simulation truly stopped — disengage now */
+                    hasDisabledForStopRef.current = true;
 
                     /** Disable locally */
                     disableCopilot();
@@ -149,7 +175,10 @@ export function useCopilotLifecycle(): void {
                         });
                     }
 
-                    console.log('[Copilot UI] 🔴 Auto-disengaged: simulation stopped (grace period expired)');
+                    console.log(
+                        `[Copilot UI] 🔴 Auto-disengaged: simulation stopped ` +
+                        `(status=${sessionStatus}, grace period expired)`
+                    );
                 }, COPILOT_DISENGAGE_GRACE_PERIOD_MS);
             }
         }
