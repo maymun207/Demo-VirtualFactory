@@ -107,6 +107,14 @@ export interface DemoAct {
     panelActions: PanelAction[];
 
     /**
+     * If true, the demo engine will automatically call the Copilot enable API
+     * when this act begins, then update copilotStore locally.
+     * Used exclusively by the Autonomous AI act to engage the AI copilot without
+     * requiring any manual user interaction.
+     */
+    enableCopilot?: boolean;
+
+    /**
      * Per-act AI system context injected into the conversation.
      * This is APPENDED to DEMO_SYSTEM_PROMPT — it specialises ARIA's framing
      * for this specific act without replacing the base persona.
@@ -323,9 +331,13 @@ Encourage the audience to interact with the CWF panel directly. Tell them to try
         targetHeightKey: 'large',
         scenarioCode: 'SCN-004',    // Cascade failure — most dramatic scenario
         panelActions: [
-            { panel: 'cwf', state: 'close' },  // Close manual CWF
-            { panel: 'oeeHierarchy', state: 'open' },  // Show the 3D OEE hierarchy
+            // CWF panel must stay OPEN so the audience can watch Copilot corrections stream in
+            { panel: 'cwf', state: 'open' },
+            // Open the 3D OEE hierarchy so the OEE impact is visible alongside the CWF panel
+            { panel: 'oeeHierarchy', state: 'open' },
         ],
+        // Signal the engine to auto-call the Copilot enable API when this act starts
+        enableCopilot: true,
         systemContext: `
 We are at the final frontier — the Autonomous AI Copilot. SCN-004 (Cascade Multi-station failure)
 is active: simultaneous press + kiln failures causing a dramatic OEE drop.

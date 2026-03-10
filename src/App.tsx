@@ -32,10 +32,8 @@ import { useKPISync } from "./hooks/useKPISync";
 import { useConveyorBehaviour } from "./hooks/useConveyorBehaviour";
 /** CWF Command Listener: subscribes to Supabase Realtime for AI-driven parameter changes */
 import { useCWFCommandListener } from "./hooks/useCWFCommandListener";
-/** CWF store: chat state management for the AI agent panel */
-import { useCWFStore } from "./store/cwfStore";
 /** Simulation data store: tile lifecycle, machine states, and Supabase sync */
-import { useSimulationDataStore } from "./store/simulationDataStore";
+// simulationDataStore is consumed by child hooks directly; not imported here.
 import { useUIStore } from "./store/uiStore";
 import { CWF_SIDE_PANEL_ANIMATION_MS } from "./lib/params";
 import { Header } from "./components/ui/Header";
@@ -68,31 +66,7 @@ function App() {
     };
   }, []);
 
-  /**
-   * Sync simulation ID to CWF store.
-   * Subscribes to simulationDataStore and updates cwfStore.simulationId
-   * whenever the session changes. Also posts a system message when connected.
-   */
-  useEffect(() => {
-    const unsubscribe = useSimulationDataStore.subscribe((state) => {
-      /** Read the session ID from the simulation data store */
-      const sessionId = state.session?.id ?? null;
-      /** Read the current CWF simulation ID to avoid redundant updates */
-      const currentCWFId = useCWFStore.getState().simulationId;
 
-      if (sessionId !== currentCWFId) {
-        /** Update the CWF store with the new simulation ID and session code */
-        const sessionCode = state.session?.session_code ?? null;
-        useCWFStore.getState().setSimulationId(sessionId, sessionCode);
-        if (sessionId) {
-          /** Update UI state or trigger history refresh if needed */
-        }
-      }
-    });
-    return unsubscribe;
-  }, []);
-
-  /** Whether the DTXFR side panel is currently visible */
   const showDTXFR = useUIStore((s) => s.showDTXFR);
   /** Current width of the DTXFR side panel (user-resizable) */
   const dtxfrPanelWidth = useUIStore((s) => s.dtxfrPanelWidth);

@@ -7,11 +7,13 @@
  *   - clearMessages: empties the thread
  *   - sendMessage: user + assistant message lifecycle, error bubbles
  *   - advanceAct: increments act index, does not overflow past last act
- *   - restartDemo: resets act index, clears messages
+ *   - advanceAct to autonomous-ai: calls Copilot enable API + updates copilotStore
+ *   - advanceAct on non-copilot acts: does NOT call Copilot enable API
+ *   - restartDemo: resets act index, clears messages, disables Copilot if enabled
  *   - fetch payload shape: correct endpoint, headers, persona seed
  *
  * All tests use Vitest + mocked fetch — no real network calls.
- * uiStore and simulationDataStore are mocked for isolation.
+ * uiStore, simulationDataStore, and copilotStore are mocked for isolation.
  */
 
 /// <reference types="vitest/globals" />
@@ -66,9 +68,39 @@ vi.mock('./uiStore', () => ({
     },
 }));
 
+/** Stable mock functions for copilotStore enable/disable */
+const mockEnableCopilot = vi.fn();
+const mockDisableCopilot = vi.fn();
+let mockCopilotIsEnabled = false;
+
+/**
+ * Mock copilotStore — tracks enable/disable calls without hitting Supabase.
+ * isEnabled is a getter so tests can control it per-case.
+ */
+vi.mock('./copilotStore', () => ({
+    useCopilotStore: {
+        getState: () => ({
+            /** Reflect the current test-controlled enabled state */
+            get isEnabled() { return mockCopilotIsEnabled; },
+            /** Record enable calls for assertion */
+            enableCopilot: mockEnableCopilot,
+            /** Record disable calls for assertion */
+            disableCopilot: mockDisableCopilot,
+        }),
+    },
+}));
+
 /** Stub global fetch so we can mock it per test */
 const mockFetch = vi.fn() as Mock;
 vi.stubGlobal('fetch', mockFetch);
+
+/**
+ * COPILOT_ENABLE_URL — the URL that applyCopilotEnable() fires at.
+ * Defined here so tests assert against it without hardcoding the string.
+ */
+const COPILOT_ENABLE_URL = '/api/cwf/copilot/enable';
+/** COPILOT_DISABLE_URL — fired by restartDemo() when Copilot is active */
+const COPILOT_DISABLE_URL = '/api/cwf/copilot/disable';
 
 // =============================================================================
 // HELPERS
@@ -107,6 +139,11 @@ describe('demoStore', () => {
         });
         /** Reset fetch mock */
         mockFetch.mockReset();
+        /** Reset copilotStore mocks */
+        mockEnableCopilot.mockReset();
+        mockDisableCopilot.mockReset();
+        /** Default: Copilot starts disabled */
+        mockCopilotIsEnabled = false;
     });
 
     // ── Initial State ──────────────────────────────────────────────────────────
@@ -254,6 +291,103 @@ describe('demoStore', () => {
         const body = JSON.parse(options.body);
         /** The sent message should be the act 1 opening prompt */
         expect(body.message).toBe(DEMO_ACTS[1].openingPrompt);
+    });
+
+    // ── Copilot enable / disable mechanics ────────────────────────────────────
+
+    it('advanceAct to autonomous-ai act calls copilot enable API and updates copilotStore', async () => {
+        /**
+         * Find the index of the autonomous-ai act dynamically so the test is
+         * resilient to future reordering of DEMO_ACTS.
+         */
+        const autonomousIndex = DEMO_ACTS.findIndex((a) => a.id === 'autonomous-ai');
+        expect(autonomousIndex).toBeGreaterThan(0); // guard: act must exist
+
+        /** Place store at the act immediately before autonomous-ai */
+        act(() => useDemoStore.setState({ currentActIndex: autonomousIndex - 1 }));
+
+        /**
+         * mockFetch must answer TWO calls:
+         *   1) /api/cwf/chat     — the opening prompt
+         *   2) /api/cwf/copilot/enable — the Copilot enable API (fire-and-forget)
+         * We set up two responses so neither call hangs.
+         */
+        mockFetch
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ response: 'Autonomous narrative', toolCallCount: 0 }) })
+            .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+        await act(async () => {
+            await useDemoStore.getState().advanceAct();
+        });
+
+        /** The act must have advanced to the autonomous-ai act */
+        expect(useDemoStore.getState().currentActIndex).toBe(autonomousIndex);
+
+        /** copilotStore.enableCopilot() must have been called once */
+        expect(mockEnableCopilot).toHaveBeenCalledOnce();
+
+        /**
+         * One of the fetch calls must target the Copilot enable endpoint.
+         * We check all calls (order is non-deterministic for fire-and-forget).
+         */
+        const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
+        expect(calledUrls).toContain(COPILOT_ENABLE_URL);
+    });
+
+    it('advanceAct on a non-copilot act does NOT call copilot enable API', async () => {
+        /** Start at act 0 (Welcome) — no enableCopilot flag */
+        mockSuccessResponse('Act 1 narrative');
+
+        await act(async () => {
+            await useDemoStore.getState().advanceAct();
+        });
+
+        /** copilotStore.enableCopilot() must NOT have been called */
+        expect(mockEnableCopilot).not.toHaveBeenCalled();
+
+        /** No fetch call should target the Copilot enable endpoint */
+        const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
+        expect(calledUrls).not.toContain(COPILOT_ENABLE_URL);
+    });
+
+    it('restartDemo disables Copilot via store + API if Copilot was enabled', async () => {
+        /** Simulate Copilot being active when the demo restarts */
+        mockCopilotIsEnabled = true;
+
+        /**
+         * mockFetch answers:
+         *   1) /api/cwf/copilot/disable — from restartDemo cleanup
+         *   2) /api/cwf/chat            — from the welcome act opening prompt
+         */
+        mockFetch
+            .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ response: 'Welcome!', toolCallCount: 0 }) });
+
+        await act(async () => {
+            await useDemoStore.getState().restartDemo();
+        });
+
+        /** copilotStore.disableCopilot() must have been called */
+        expect(mockDisableCopilot).toHaveBeenCalledOnce();
+
+        /** One of the fetch calls must target the Copilot disable endpoint */
+        const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
+        expect(calledUrls).toContain(COPILOT_DISABLE_URL);
+    });
+
+    it('restartDemo does not call copilot disable if Copilot was not enabled', async () => {
+        /** Copilot starts disabled (default in beforeEach) */
+        mockSuccessResponse('Welcome to the demo!');
+
+        await act(async () => {
+            await useDemoStore.getState().restartDemo();
+        });
+
+        /** disableCopilot must NOT have been called */
+        expect(mockDisableCopilot).not.toHaveBeenCalled();
+        /** Disable endpoint must NOT have been hit */
+        const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
+        expect(calledUrls).not.toContain(COPILOT_DISABLE_URL);
     });
 
     // ── restartDemo ────────────────────────────────────────────────────────────

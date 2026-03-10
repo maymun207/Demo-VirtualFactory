@@ -48,6 +48,9 @@ import { getScenarioByCode } from '../lib/scenarios';
 /** uiStore — used ONLY for read-only getState() panel toggle calls */
 import { useUIStore } from './uiStore';
 
+/** copilotStore — used ONLY for enable/disable calls triggered by the demo engine */
+import { useCopilotStore } from './copilotStore';
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -183,9 +186,40 @@ function applyScenario(scenarioCode: string | null): void {
     }
 }
 
-// =============================================================================
-// SHARED API CALL — postToCWF
-// =============================================================================
+/**
+ * applyCopilotEnable — called when an act has enableCopilot: true.
+ *
+ * Enables the Copilot locally (copilotStore) and calls the server-side
+ * enable endpoint so the CWF server begins its autonomous polling loop.
+ * Uses the simulation UUID (simulationDataStore.session?.id) — the single
+ * source of truth for all Supabase-keyed operations.
+ *
+ * Fire-and-forget: errors are suppressed so they never break the demo flow.
+ */
+async function applyCopilotEnable(): Promise<void> {
+    /** Read the session UUID — required by the enable endpoint */
+    const simulationId = useSimulationDataStore.getState().session?.id ?? null;
+
+    /** Enable Copilot in the local Zustand store immediately so the UI reacts */
+    useCopilotStore.getState().enableCopilot();
+
+    /** Only make the server call if we have a valid session UUID */
+    if (!simulationId) {
+        console.warn('[Demo] applyCopilotEnable: no simulation session — skipping server call');
+        return;
+    }
+
+    /** Call the same copilot enable endpoint the CWF toggle button uses */
+    fetch('/api/cwf/copilot/enable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ simulationId }),
+    }).catch((err) => {
+        /** Log but do not throw — demo must continue even if the server is slow */
+        console.error('[Demo] applyCopilotEnable: server call failed', err);
+    });
+}
+
 
 /**
  * postToCWF — internal helper for all API calls (advanceAct, sendMessage).
@@ -400,6 +434,14 @@ export const useDemoStore = create<DemoState>((set, get) => ({
         /** Load scenario — no-op if scenarioCode is null or sim not running */
         applyScenario(nextAct.scenarioCode);
 
+        /**
+         * Auto-enable Copilot if this act requests it (Autonomous AI act).
+         * Fire-and-forget — does not block the opening prompt.
+         */
+        if (nextAct.enableCopilot === true) {
+            void applyCopilotEnable();
+        }
+
         /** Update act index in state */
         set({ currentActIndex: nextIndex });
 
@@ -438,6 +480,28 @@ export const useDemoStore = create<DemoState>((set, get) => ({
         /** Only close panels that are currently open */
         for (const p of panelsToClose) {
             if (p.current) p.toggle();
+        }
+
+        /**
+         * Disable Copilot if it was enabled by the Autonomous AI act.
+         * This ensures a clean slate when the demo restarts.
+         * Fire-and-forget — does not block the restart flow.
+         */
+        const copilot = useCopilotStore.getState();
+        if (copilot.isEnabled) {
+            /** Disable locally */
+            copilot.disableCopilot();
+            /** Notify server (fire-and-forget) */
+            const simulationId = useSimulationDataStore.getState().session?.id ?? null;
+            if (simulationId) {
+                fetch('/api/cwf/copilot/disable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ simulationId }),
+                }).catch((err) => {
+                    console.error('[Demo] restartDemo: copilot disable server call failed', err);
+                });
+            }
         }
 
         /** Load the restart scenario */

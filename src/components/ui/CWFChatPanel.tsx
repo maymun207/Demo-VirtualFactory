@@ -51,6 +51,8 @@ import {
   CWF_UI_CONFIG, // Centralized styling configuration for gradients/colors
 } from "../../lib/params"; // Parametrization module for all UI constants
 import { useCopilotStore } from "../../store/copilotStore"; // Copilot UI state
+/** Single source of truth for session UUID and session code */
+import { useSimulationDataStore } from "../../store/simulationDataStore";
 import { useCopilotHeartbeat } from "../../hooks/useCopilotHeartbeat"; // Browser heartbeat sender
 import { useCopilotLifecycle } from "../../hooks/useCopilotLifecycle"; // Auto-disengage + Realtime sync
 import { COPILOT_THEME } from "../../lib/params/copilot"; // Copilot pink theme constants
@@ -479,8 +481,12 @@ function SimulationHistoryDropdown() {
   const t = useTranslation("cwf");
 
   const history = useCWFStore((s) => s.simulationHistory);
-  const currentId = useCWFStore((s) => s.simulationId);
-  const currentSessionCode = useCWFStore((s) => s.sessionCode);
+  /**
+   * SINGLE SOURCE OF TRUTH: session data lives in simulationDataStore.
+   * Read directly from there instead of from a mirror copy in cwfStore.
+   */
+  const currentId = useSimulationDataStore((s) => s.session?.id ?? null);
+  const currentSessionCode = useSimulationDataStore((s) => s.session?.session_code ?? null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -654,8 +660,8 @@ function QuickActionsDropdown({
               {t("quickActions") || "Quick Questions"}
             </span>
           </div>
-          {/* Quick action buttons — 2-column grid matching WelcomeScreen layout */}
-          <div className="px-2 py-1 grid grid-cols-2 gap-1.5">
+          {/* Quick action buttons — 2-column grid; auto-rows-fr makes all cells in a row equal height */}
+          <div className="px-2 py-1 grid grid-cols-2 auto-rows-fr gap-1.5">
             {CWF_QUICK_ACTIONS.map((action, i) => {
               const Icon = ICON_MAP[action.icon] || MessageSquare; // Resolve icon component
               return (
@@ -665,13 +671,15 @@ function QuickActionsDropdown({
                     onSelect(action.query[language]); // Dispatch the localized query
                     setIsOpen(false); // Close dropdown after selection
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 rounded-lg transition-all duration-200 text-left group"
+                  // min-h ensures short labels stay tall; h-full stretches button to fill the grid cell
+                  className="flex items-start gap-2 px-2.5 py-2 min-h-[44px] h-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 rounded-lg transition-all duration-200 text-left group"
                 >
                   <Icon
                     size={11}
-                    className="text-white/30 group-hover:text-cyan-400 transition-colors shrink-0"
+                    className="text-white/30 group-hover:text-cyan-400 transition-colors shrink-0 mt-px"
                   />
-                  <span className="text-white/60 group-hover:text-white/90 text-[10px] transition-colors leading-tight">
+                  {/* break-words allows long labels like "Recommendations" to wrap cleanly */}
+                  <span className="text-white/60 group-hover:text-white/90 text-[10px] transition-colors leading-tight wrap-break-word min-w-0">
                     {action.label[language]}
                   </span>
                 </button>
@@ -700,8 +708,8 @@ export function CWFChatPanel() {
   const isLoading = useCWFStore((s) => s.isLoading); // Track agent processing status
   const sendMessage = useCWFStore((s) => s.sendMessage); // Access send logic
   const clearMessages = useCWFStore((s) => s.clearMessages); // Access purge logic
-  /** Simulation session ID — needed for direct disable API call from toggle button */
-  const simulationId = useCWFStore((s) => s.simulationId);
+  /** Simulation session ID — read from the single source of truth: simulationDataStore */
+  const simulationId = useSimulationDataStore((s) => s.session?.id ?? null);
 
   /** ── Copilot State ───────────────────────────────────────────────────── */
   const isCopilotEnabled = useCopilotStore((s) => s.isEnabled); // Whether copilot is active

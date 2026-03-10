@@ -157,16 +157,18 @@ export function useFactoryReset() {
      */
     const copilotSnapshot = useCopilotStore.getState();
     const cwfSnapshot = useCWFStore.getState();
-    const prevSimId = cwfSnapshot.simulationId;
+    /**
+     * Read prevSimId from simulationDataStore BEFORE resetDataStore() clears it.
+     * This is the single source of truth for the session UUID — cwfStore no
+     * longer holds a mirror copy.
+     */
+    const prevSimId = useSimulationDataStore.getState().session?.id ?? null;
 
     /** 9a. Reset all copilot Zustand state — clears pink theme and action feed */
     copilotSnapshot.resetCopilot();
 
     /** 9b. Clear CWF message history */
     cwfSnapshot.clearMessages();
-
-    /** 9c. Detach from the old simulation UUID */
-    cwfSnapshot.setSimulationId(null, null);
 
     /** 9d. Tell the server to reset copilot_config for the old simulation (fire-and-forget) */
     if (prevSimId) {

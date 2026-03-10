@@ -21,24 +21,25 @@
  *
  * Dependencies:
  *   - src/store/copilotStore.ts    (writes state changes)
- *   - src/store/cwfStore.ts        (reads simulationId — the Supabase UUID)
+ *   - src/store/simulationDataStore.ts (reads session?.id — the Supabase UUID)
  *   - src/store/simulationStore.ts (reads isDataFlowing)
  *   - src/lib/supabaseClient.ts    (Supabase client for Realtime)
  *   - src/lib/params/copilot.ts    (table names, feature flag)
  *
  * IMPORTANT — Simulation ID:
  *   All Supabase operations (Realtime filter, disable call) use
- *   cwfStore.simulationId which is the UUID from simulation_sessions.id.
+ *   simulationDataStore.session?.id — the SINGLE SOURCE OF TRUTH for the UUID.
+ *   Do NOT read from cwfStore.simulationId — that mirror has been removed.
  *   Do NOT use simulationStore.sessionId — that is the 6-digit human-readable
- *   display code (e.g., "585749") and does NOT match the UUID primary key
- *   used in copilot_config.simulation_id.
+ *   display code and does NOT match the UUID primary key in copilot_config.
  */
 
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useCopilotStore } from '../store/copilotStore';
 import { useSimulationStore } from '../store/simulationStore';
-import { useCWFStore } from '../store/cwfStore';
+/** SINGLE SOURCE OF TRUTH: session UUID lives in simulationDataStore */
+import { useSimulationDataStore } from '../store/simulationDataStore';
 import {
     COPILOT_FEATURE_ENABLED,
     COPILOT_CONFIG_TABLE,
@@ -58,7 +59,7 @@ import type { CwfState } from '../lib/params/copilot';
  *   - Subscribes to copilot_config Realtime changes → syncs enable/disable
  *   - Subscribes to copilot_actions Realtime inserts → feeds action history
  *
- * All Supabase operations key on the simulation UUID (cwfStore.simulationId),
+ * All Supabase operations key on the simulation UUID (simulationDataStore.session?.id),
  * NOT the 6-digit session code (simulationStore.sessionId).
  */
 export function useCopilotLifecycle(): void {
@@ -71,17 +72,13 @@ export function useCopilotLifecycle(): void {
     const isDataFlowing = useSimulationStore((s) => s.isDataFlowing);
 
     /**
-     * Read the SUPABASE UUID for this simulation from cwfStore.
+     * SINGLE SOURCE OF TRUTH: read the simulation UUID from simulationDataStore.
      *
-     * CRITICAL: This is simulation_sessions.id (UUID like "29bf4242-..."),
-     * set by App.tsx via simulationDataStore.session?.id.
-     *
-     * Do NOT use simulationStore.sessionId — that is a 6-digit display code
-     * (e.g., "585749") and does NOT match copilot_config.simulation_id.
-     * Using the wrong ID means Realtime subscriptions and disable calls
-     * target the wrong row, breaking all copilot sync.
+     * simulationDataStore.session?.id is the Supabase UUID (simulation_sessions.id)
+     * used as the primary key in copilot_config and copilot_actions.
+     * This replaces the removed cwfStore.simulationId mirror.
      */
-    const simulationId = useCWFStore((s) => s.simulationId);
+    const simulationId = useSimulationDataStore((s) => s.session?.id ?? null);
 
     /** Get store actions (stable references from Zustand) */
     const syncStateFromCloud = useCopilotStore((s) => s.syncStateFromCloud);

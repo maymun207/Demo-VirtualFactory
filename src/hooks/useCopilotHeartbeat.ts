@@ -7,12 +7,9 @@
  * browser stops sending heartbeats (tab closed, network lost, etc.).
  *
  * IMPORTANT — Simulation ID used for heartbeats:
- *   Heartbeats MUST use the Supabase UUID (cwfStore.simulationId), NOT the
- *   human-readable session code from simulationStore.sessionId.
- *   The copilot_config table is keyed on simulation_id = UUID.
- *   Using the session code causes the engine to never find the copilot_config
- *   row, leaving last_heartbeat_at perpetually stale and triggering a false
- *   auto-disengage on first poll after the 30-second grace window.
+ *   Heartbeats use the Supabase UUID from simulationDataStore.session?.id
+ *   (the single source of truth). This is the UUID keyed on copilot_config.
+ *   Do NOT use the human-readable session code from simulationStore.sessionId.
  *
  * Timing:
  *   - Sends every COPILOT_HEARTBEAT_INTERVAL_MS (5 seconds)
@@ -25,14 +22,15 @@
  * Used by: CWFChatPanel.tsx (mounted when CWF panel is open)
  *
  * Dependencies:
- *   - src/store/copilotStore.ts  (reads isEnabled)
- *   - src/store/cwfStore.ts      (reads simulationId — the Supabase UUID)
- *   - src/lib/params/copilot.ts  (COPILOT_HEARTBEAT_INTERVAL_MS)
+ *   - src/store/copilotStore.ts         (reads isEnabled)
+ *   - src/store/simulationDataStore.ts  (reads session?.id — the Supabase UUID)
+ *   - src/lib/params/copilot.ts         (COPILOT_HEARTBEAT_INTERVAL_MS)
  */
 
 import { useEffect, useRef } from 'react';
 import { useCopilotStore } from '../store/copilotStore';
-import { useCWFStore } from '../store/cwfStore';
+/** SINGLE SOURCE OF TRUTH: session UUID lives in simulationDataStore */
+import { useSimulationDataStore } from '../store/simulationDataStore';
 import {
     COPILOT_HEARTBEAT_INTERVAL_MS,
     COPILOT_FEATURE_ENABLED,
@@ -61,17 +59,11 @@ export function useCopilotHeartbeat(): void {
     const isEnabled = useCopilotStore((s) => s.isEnabled);
 
     /**
-     * Read the active simulation UUID from cwfStore.
-     *
-     * CRITICAL: This is the Supabase UUID used as the primary key in
-     * copilot_config (e.g., "29bf4242-140b-417d-9442-9904797171d7").
-     *
-     * DO NOT use simulationStore.sessionId — that is a short human-readable
-     * numeric code (e.g., "585749") and does NOT match the
-     * copilot_config.simulation_id column, causing every heartbeat to target
-     * the wrong row and triggering a false auto-disengage.
+     * SINGLE SOURCE OF TRUTH: read the simulation UUID from simulationDataStore.
+     * The copilot_config table is keyed on this UUID (simulation_sessions.id).
+     * Do NOT use the 6-digit display code — it does NOT match the DB primary key.
      */
-    const simulationId = useCWFStore((s) => s.simulationId);
+    const simulationId = useSimulationDataStore((s) => s.session?.id ?? null);
 
     useEffect(() => {
         /** Guard: feature flag must be on, copilot must be enabled, UUID must exist */
