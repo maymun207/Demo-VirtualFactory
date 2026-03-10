@@ -11,13 +11,14 @@
  *  │                                                                  │ [⟳ Restart] │
  *  └──────────────────────────────────────────────────────────────────┘
  *
- *  Left   : Demo label + horizontal act progress dots
- *  Centre : Continue / Restart button (advances act or restarts)
+ *  Left   : Demo label + horizontal act progress dots + current act label
+ *  Centre : Continue → / ↺ Restart button (advances act or full restart)
  *  Middle : Free-form text input + Send + Clear
  *  Right  : Active scenario badge + Restart button (stacked)
  *
- * Uses `fixed bottom-0 left-0 right-0` so it spans the full viewport
- * width and sits on top of the 3D scene / other panels.
+ * GUARD: The Continue button is disabled when no simulation session is
+ * running (simHasSession === false) to prevent the "No simulation running"
+ * error message from appearing in the chat window.
  *
  * Used by: src/components/ui/Dashboard.tsx
  */
@@ -38,7 +39,7 @@ import { useUIStore } from "../../store/uiStore";
 import { SUB_HEADER_PANEL_Z_INDEX } from "../../lib/params/subHeaderPanel";
 
 /**
- * DemoControlBar — the full-width, bottom-pinned demo HUD strip.
+ * DemoControlBar — the centred, bottom-pinned demo HUD strip.
  * Returns null when demo is not active.
  */
 export const DemoControlBar: React.FC = () => {
@@ -55,7 +56,15 @@ export const DemoControlBar: React.FC = () => {
   const sendMessage = useDemoStore((s: DemoState) => s.sendMessage);
   const clearMessages = useDemoStore((s: DemoState) => s.clearMessages);
 
-  /** Active scenario code for the badge (null when no sim configured) */
+  /**
+   * simHasSession — guard flag.
+   * The Continue button is disabled when false to prevent postToCWF
+   * being called without an active session (which produces the red
+   * "No simulation running" banner in the chat window).
+   */
+  const simHasSession = useSimulationDataStore((s) => !!s.session?.id);
+
+  /** Active scenario code displayed in the right badge */
   const activeScenarioCode = useSimulationDataStore(
     (s) => s.activeScenario?.code ?? null,
   );
@@ -73,7 +82,7 @@ export const DemoControlBar: React.FC = () => {
   /** Sends the typed free-form message to the CWF endpoint */
   const handleSend = () => {
     const trimmed = inputText.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed || isLoading || !simHasSession) return;
     setInputText("");
     void sendMessage(trimmed);
   };
@@ -94,11 +103,12 @@ export const DemoControlBar: React.FC = () => {
       id="demo-control-bar"
       className={`fixed bottom-0 left-0 right-0 ${SUB_HEADER_PANEL_Z_INDEX} pointer-events-none`}
     >
-      {/* Glass HUD strip — full viewport width, fixed height */}
+      {/* Glass HUD strip — centred, ~48vw width, pill rising from bottom */}
       <div className="
-        w-full pointer-events-auto
+        mx-auto w-full max-w-[48vw] pointer-events-auto
         bg-black/60 backdrop-blur-xl
-        border-t border-white/10
+        border border-b-0 border-white/10
+        rounded-t-2xl
         shadow-[0_-8px_32px_rgba(0,0,0,0.5)]
         px-4 py-2
         flex items-center gap-3
@@ -117,7 +127,7 @@ export const DemoControlBar: React.FC = () => {
           {/* Thin separator */}
           <div className="w-px h-5 bg-white/10" />
 
-          {/* Horizontal act progress dots */}
+          {/* Horizontal act progress dots — tooltip shows act name on hover */}
           <div className="flex items-center gap-1.5">
             {DEMO_ACTS.map((act, index) => {
               /** Classify this act relative to current position */
@@ -147,7 +157,7 @@ export const DemoControlBar: React.FC = () => {
             })}
           </div>
 
-          {/* Current act label (readable at a glance) */}
+          {/* Current act label — readable at a glance */}
           <span className="text-white/50 text-[10px] font-medium whitespace-nowrap hidden sm:inline">
             {DEMO_ACTS[currentActIndex]?.eraEmoji}{" "}
             {DEMO_ACTS[currentActIndex]?.eraLabel}
@@ -158,6 +168,11 @@ export const DemoControlBar: React.FC = () => {
         <div className="w-px h-5 bg-white/10 shrink-0" />
 
         {/* ── CONTINUE BUTTON ──────────────────────────────────── */}
+        {/*
+          Disabled when simHasSession is false — prevents postToCWF from
+          being called without an active session, which would show the
+          "No simulation running" error banner in the chat window.
+        */}
         <button
           onClick={() => {
             if (isLastAct) {
@@ -166,11 +181,13 @@ export const DemoControlBar: React.FC = () => {
               void advanceAct();
             }
           }}
-          disabled={isLoading}
+          disabled={isLoading || (!isLastAct && !simHasSession)}
           title={
-            isLastAct
-              ? "Restart the demo"
-              : `Advance to: ${nextAct?.eraLabel ?? "Continue"}`
+            !simHasSession && !isLastAct
+              ? "Start the simulation first"
+              : isLastAct
+                ? "Restart the demo"
+                : `Advance to: ${nextAct?.eraLabel ?? "Continue"}`
           }
           className="
             shrink-0 flex items-center gap-1.5
@@ -199,15 +216,15 @@ export const DemoControlBar: React.FC = () => {
 
         {/* ── FREE-FORM INPUT (flex-1) ──────────────────────────── */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          {/* Text input */}
+          {/* Text input — disabled when no session active */}
           <input
             ref={inputRef}
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask ARIA a question…"
-            disabled={isLoading}
+            placeholder={simHasSession ? "Ask ARIA a question…" : "Start simulation to chat…"}
+            disabled={isLoading || !simHasSession}
             className="
               flex-1 min-w-0
               bg-white/5 border border-white/10
@@ -222,7 +239,7 @@ export const DemoControlBar: React.FC = () => {
           {/* Send icon button */}
           <button
             onClick={handleSend}
-            disabled={isLoading || !inputText.trim()}
+            disabled={isLoading || !inputText.trim() || !simHasSession}
             title="Send"
             className="
               shrink-0 p-1.5 rounded-lg
@@ -256,10 +273,6 @@ export const DemoControlBar: React.FC = () => {
         <div className="w-px h-5 bg-white/10 shrink-0" />
 
         {/* ── RIGHT: SCENARIO + RESTART stacked ────────────────── */}
-        {/*
-          Two controls stacked vertically so they share the same
-          horizontal footprint, aligned with the other row items.
-        */}
         <div className="flex flex-col gap-0.5 shrink-0 items-stretch min-w-[100px]">
           {/* Scenario badge */}
           <div className="
@@ -267,7 +280,7 @@ export const DemoControlBar: React.FC = () => {
             bg-white/5 border border-white/8
             whitespace-nowrap
           ">
-            {/* Status dot: green if active scenario loaded */}
+            {/* Status dot: green when active scenario is loaded */}
             <div
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                 activeScenarioCode
