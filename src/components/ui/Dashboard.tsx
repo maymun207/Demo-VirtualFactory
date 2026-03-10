@@ -22,8 +22,10 @@ import { ControlPanel } from "./ControlPanel";
 import { Playbook } from "./Playbook";
 import { MachineTooltip } from "./MachineTooltip";
 import { DemoSettingsPanel } from "./DemoSettingsPanel";
-/** DemoScreen — transparent glass panel toggled by the Demo button in the header */
+/** DemoScreen — transparent glass chat panel toggled by the Demo button in the header */
 import { DemoScreen } from "../demo/DemoScreen";
+/** DemoControlBar — fixed bottom-of-viewport control strip (act progress + navigation) */
+import { DemoControlBar } from "../demo/DemoControlBar";
 import { useAlarmMonitor } from "../../hooks/useAlarmMonitor";
 /** Auto-detects sim state transitions (jams, starts, speed changes) and emits telemetry events */
 import { useTelemetry } from "../../hooks/useTelemetry";
@@ -38,8 +40,10 @@ export const Dashboard = () => {
 
   return (
     <>
-      {/* DemoScreen — toggled by Demo button in header, anchored below header divider */}
+      {/* DemoScreen — chat window anchored below header */}
       <DemoScreen />
+      {/* DemoControlBar — act progress + navigation, fixed at viewport bottom */}
+      <DemoControlBar />
       <ControlPanel />
       <Playbook />
       <MachineTooltip />

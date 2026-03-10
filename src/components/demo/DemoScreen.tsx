@@ -1,12 +1,15 @@
 /**
- * DemoScreen.tsx — Root Demo Panel with Dynamic Height
+ * DemoScreen.tsx — Root Demo Chat Panel
  *
- * Single-column layout:
- *   - DemoChatView fills all available vertical space (flex-1, scrollable)
- *   - DemoActBreadcrumb is a fixed-height horizontal control bar at the bottom
+ * The fixed-position, glass-effect chat window that appears below the header
+ * when the Demo button is clicked. Shows only the narrative chat thread.
  *
- * The old 22% left breadcrumb column is removed — all horizontal space is
- * now used for the narrative chat thread, making it much more readable.
+ * The act progress and navigation controls live in a separate
+ * DemoControlBar (fixed at the very bottom of the viewport).
+ *
+ * DYNAMIC HEIGHT:
+ *   Each DemoAct defines a `targetHeightKey`. The panel height animates
+ *   smoothly between acts — the "breathing panel" effect.
  *
  * POSITIONING: Anchored via getBoundingClientRect() to:
  *   LEFT  edge: left edge of #btn-demo
@@ -31,7 +34,6 @@ import {
   SUB_HEADER_PANEL_RESIZE_DEBOUNCE_MS,
   SUB_HEADER_PANEL_Z_INDEX,
 } from "../../lib/params/subHeaderPanel";
-import { DemoActBreadcrumb } from "./DemoActBreadcrumb";
 import { DemoChatView } from "./DemoChatView";
 
 /** Viewport-relative bounds for fixed positioning */
@@ -68,7 +70,7 @@ const computeBounds = (): PanelBounds | null => {
 };
 
 /**
- * DemoScreen — the root demo panel component.
+ * DemoScreen — the root demo chat panel component.
  * Returns null when hidden or when DOM anchors cannot be measured.
  */
 export const DemoScreen: React.FC = () => {
@@ -130,17 +132,9 @@ export const DemoScreen: React.FC = () => {
         transition: `height ${DEMO_HEIGHT_TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       }}
     >
-      {/* Glass panel body — single flex-col column */}
-      <div className="w-full h-full bg-black/35 backdrop-blur-md border border-white/8 border-t-0 rounded-b-2xl overflow-hidden pointer-events-auto shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex flex-col">
-        {/* Chat thread — grows to fill all available space */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <DemoChatView />
-        </div>
-
-        {/* Horizontal control bar — act stepper + navigation + input */}
-        <div className="shrink-0 border-t border-white/8">
-          <DemoActBreadcrumb />
-        </div>
+      {/* Glass panel body — chat thread only */}
+      <div className="w-full h-full bg-black/35 backdrop-blur-md border border-white/8 border-t-0 rounded-b-2xl overflow-hidden pointer-events-auto shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+        <DemoChatView />
       </div>
     </div>
   );
