@@ -30,8 +30,6 @@ export const DemoChatView: React.FC = () => {
   const messages = useDemoStore((s: DemoState) => s.messages);
   /** Current act index for welcome card conditional */
   const currentActIndex = useDemoStore((s: DemoState) => s.currentActIndex);
-  /** Store actions */
-  const advanceAct = useDemoStore((s: DemoState) => s.advanceAct);
 
   /** Ref for auto-scroll to latest message */
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -120,9 +118,9 @@ export const DemoChatView: React.FC = () => {
               ))}
             </div>
 
-            {/* ── Action buttons ───────────────────────────────────── */}
+            {/* ── Action buttons ─────────────────────────────────────── */}
             <div className="flex flex-col gap-2 mt-auto pb-1">
-              {/* Step 1 — Start Simulation (shown when sim not running) */}
+              {/* Start Simulation — shown only when sim is not running yet */}
               {!simHasSession && (
                 <button
                   onClick={() => useSimulationStore.getState().toggleDataFlow()}
@@ -142,31 +140,6 @@ export const DemoChatView: React.FC = () => {
                   <span>Step 1 — Start Simulation</span>
                 </button>
               )}
-
-              {/* Step 2 — Start Demo (active only when sim is running) */}
-              <button
-                onClick={() => void advanceAct()}
-                disabled={!simHasSession}
-                className="
-                  w-full flex items-center justify-center gap-2
-                  px-4 py-3 rounded-xl
-                  bg-blue-500/25 hover:bg-blue-500/45
-                  border border-blue-400/35 hover:border-blue-400/70
-                  text-blue-200 hover:text-white
-                  text-sm font-bold tracking-wide
-                  transition-all duration-200
-                  shadow-[0_4px_20px_rgba(96,165,250,0.15)]
-                  hover:shadow-[0_4px_28px_rgba(96,165,250,0.35)]
-                  disabled:opacity-35 disabled:cursor-not-allowed
-                "
-              >
-                <span>▶</span>
-                <span>
-                  {simHasSession
-                    ? "Step 2 — Start Demo"
-                    : "Start Demo (start simulation first)"}
-                </span>
-              </button>
             </div>
           </div>
         )}
