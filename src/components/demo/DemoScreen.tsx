@@ -60,13 +60,16 @@ const computeBounds = (): PanelBounds | null => {
 
   if (!header || !demoBtn || !pillar3) return null;
 
+  /** Panel width = 80% of original span */
+  const computedWidth =
+    (pillar3.getBoundingClientRect().right -
+      demoBtn.getBoundingClientRect().left) * 0.8;
+
   return {
     top: header.getBoundingClientRect().bottom,
-    left: demoBtn.getBoundingClientRect().left,
-    /** 20% narrower than the original full span — left edge stays anchored to Demo button */
-    width:
-      (pillar3.getBoundingClientRect().right -
-        demoBtn.getBoundingClientRect().left) * 0.8,
+    /** Shift 20% of panel width further left of the Demo button */
+    left: demoBtn.getBoundingClientRect().left - computedWidth * 0.2,
+    width: computedWidth,
   };
 };
 
