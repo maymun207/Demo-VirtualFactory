@@ -460,7 +460,6 @@ export class CopilotEngine {
                     .update({
                         cwf_state: 'normal',
                         auth_attempts: 0,
-                        enabled: false,
                         updated_at: new Date().toISOString(),
                     })
                     .eq('simulation_id', this.simulationId);
@@ -931,7 +930,7 @@ export class CopilotEngine {
 
         const { data: config } = await this.supabase
             .from('copilot_config')
-            .select('last_heartbeat_at, enabled')
+            .select('last_heartbeat_at, cwf_state')
             .eq('simulation_id', this.simulationId)
             .single();
 
@@ -943,8 +942,8 @@ export class CopilotEngine {
         }
 
         /** Check if copilot was externally disabled (user clicked button, sim stopped, etc.) */
-        if (!config.enabled) {
-            console.log('[Copilot] 🔴 Copilot disabled externally — stopping engine');
+        if (config.cwf_state !== 'copilot_active') {
+            console.log('[Copilot] 🔴 Copilot disabled externally (cwf_state=' + config.cwf_state + ') — stopping engine');
             this.stop();
             return false;
         }
@@ -958,7 +957,6 @@ export class CopilotEngine {
             await this.supabase
                 .from('copilot_config')
                 .update({
-                    enabled: false,
                     cwf_state: 'normal',
                     auth_attempts: 0,
                     updated_at: new Date().toISOString(),

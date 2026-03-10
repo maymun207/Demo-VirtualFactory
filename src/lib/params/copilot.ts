@@ -383,8 +383,6 @@ export interface CopilotConfig {
     id: string;
     /** FK to simulation_sessions */
     simulation_id: string;
-    /** Master on/off switch */
-    enabled: boolean;
     /** CWF State Machine state: 'normal' | 'copilot_pending_auth' | 'copilot_active' */
     cwf_state: CwfState;
     /** Number of failed auth attempts in the current COPILOT_PENDING_AUTH phase */

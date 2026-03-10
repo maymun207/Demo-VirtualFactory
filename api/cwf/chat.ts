@@ -2348,7 +2348,6 @@ export default async function handler(
                     simulation_id: simulationId,
                     cwf_state: 'copilot_pending_auth',
                     auth_attempts: 0,
-                    enabled: false,
                     /** Explicitly set poll interval so DB default (15s) is never used */
                     poll_interval_sec: 6,
                     cooldown_sec: 30,
@@ -3042,7 +3041,6 @@ export default async function handler(
                                 .update({
                                     cwf_state: 'normal',
                                     auth_attempts: 0,
-                                    enabled: false,
                                     updated_at: new Date().toISOString(),
                                 })
                                 .eq('simulation_id', disableSimId);

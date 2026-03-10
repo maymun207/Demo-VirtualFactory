@@ -176,10 +176,19 @@ export function useCopilotHeartbeat(): void {
                         /**
                          * If the evaluate endpoint reports copilot was auto-disengaged
                          * (heartbeat timeout, simulation ended, or copilot disabled
-                         * externally), update the local copilot store to reflect this.
+                         * externally), we do NOT call disableCopilot() directly here.
+                         *
+                         * The evaluate endpoint already wrote cwf_state='normal' to
+                         * Supabase. The Realtime subscription in useCopilotLifecycle
+                         * EFFECT 2 will detect this change and call syncStateFromCloud(),
+                         * ensuring a single, consistent state-sync path.
+                         *
+                         * Calling disableCopilot() here would bypass the 30s grace
+                         * period in EFFECT 1, causing the pink theme to drop prematurely
+                         * during brief data-flow interruptions.
                          */
                         if (data.decision === 'disengaged' || data.decision === 'disabled') {
-                            useCopilotStore.getState().disableCopilot();
+                            console.log(`[CopilotHeartbeat] ℹ️ Evaluate returned '${data.decision}' — Realtime will sync state`);
                         }
                     } else {
                         console.warn('[CopilotHeartbeat] ⚠️ Evaluate endpoint returned:', response.status);

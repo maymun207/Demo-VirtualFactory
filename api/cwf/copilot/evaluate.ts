@@ -58,7 +58,15 @@ const COPILOT_MSG_STATION = 'copilot_message';
  * 45s — generous enough to avoid false-positive disconnections
  * while still catching genuinely closed tabs.
  */
-const HEARTBEAT_TIMEOUT_MS = 45_000;
+/**
+ * Heartbeat timeout in milliseconds.
+ *
+ * 90_000ms = 90 seconds. Gemini evaluation calls can take 15-30s + 6s poll
+ * interval = 21-36s between heartbeat updates. The previous 45s timeout was
+ * dangerously close to normal cadence, causing false disengagements during
+ * heavy Gemini load. 90s provides ample safety margin.
+ */
+const HEARTBEAT_TIMEOUT_MS = 90_000;
 
 /**
  * Mapping from station name to its Supabase machine_*_states table.
@@ -285,7 +293,7 @@ async function logAction(
  * POST /api/cwf/copilot/evaluate
  *
  * Runs a single copilot evaluation cycle:
- *   1. Validate simulationId and check copilot is enabled
+ *   1. Validate simulationId and check copilot is active (cwf_state)
  *   2. Update heartbeat timestamp (combined heartbeat + evaluate)
  *   3. Check simulation status (auto-disengage if ended)
  *   4. Read latest OEE snapshot
@@ -325,7 +333,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const genAI = new GoogleGenerativeAI(geminiKey);
 
         // -----------------------------------------------------------------
-        // STEP 1: Check copilot is enabled and update heartbeat
+        // STEP 1: Check copilot is active and update heartbeat
         // -----------------------------------------------------------------
 
         /** Read copilot_config for this simulation */
@@ -341,9 +349,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         /**
          * Check copilot is active using cwf_state as the SINGLE SOURCE OF TRUTH.
-         * The legacy `enabled` boolean is no longer authoritative — it can be out
-         * of sync with cwf_state. The 3-state machine (normal, copilot_pending_auth,
-         * copilot_active) is the correct way to determine if copilot is running.
+         * cwf_state is the SINGLE SOURCE OF TRUTH for copilot activation.
+         * The legacy `enabled` boolean has been fully deprecated and is no
+         * longer read or written anywhere in the codebase.
          */
         if (config.cwf_state !== 'copilot_active') {
             return res.status(200).json({

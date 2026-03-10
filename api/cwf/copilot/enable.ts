@@ -2,7 +2,7 @@
  * api/cwf/copilot/enable.ts — Vercel Serverless Copilot Enable Endpoint
  *
  * Enables Copilot autonomous monitoring mode for a simulation.
- * Upserts the copilot_config row in Supabase with enabled=true and
+ * Upserts the copilot_config row in Supabase with
  * cwf_state='copilot_active'. The actual polling is then driven by the
  * browser calling /api/cwf/copilot/evaluate every 6 seconds.
  *
@@ -21,7 +21,7 @@ import { createClient } from '@supabase/supabase-js';
  * POST /api/cwf/copilot/enable
  *
  * Creates or updates the copilot_config row for the given simulation,
- * setting enabled=true and cwf_state='copilot_active'.
+ * setting cwf_state='copilot_active'.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     /** Only accept POST requests */

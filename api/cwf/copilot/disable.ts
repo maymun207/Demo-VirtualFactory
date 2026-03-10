@@ -2,8 +2,8 @@
  * api/cwf/copilot/disable.ts — Vercel Serverless Copilot Disable Endpoint
  *
  * Disables Copilot autonomous monitoring mode for a simulation.
- * Updates the copilot_config row in Supabase with enabled=false,
- * cwf_state='normal', and resets auth_attempts to 0.
+ * Updates the copilot_config row in Supabase with cwf_state='normal'
+ * and resets auth_attempts to 0.
  *
  * No authorization required — stopping is always safe and immediate.
  *
