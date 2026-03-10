@@ -52,6 +52,11 @@ interface CopilotToggleButtonProps {
   onSendMessage: (message: string, language: "en" | "tr") => void;
   /** Optional callback fired after direct disable succeeds (e.g., add a chat message) */
   onDisabled?: () => void;
+  /**
+   * Fallback local disable — called when simulationId is null (e.g., after
+   * factory reset) so the pink theme can still be cleared without a server call.
+   */
+  onLocalDisable?: () => void;
 }
 
 // =============================================================================
@@ -72,6 +77,7 @@ export function CopilotToggleButton({
   simulationId,
   onSendMessage,
   onDisabled,
+  onLocalDisable,
 }: CopilotToggleButtonProps) {
   /** Resolve bilingual labels from the centralised params module */
   const labels = COPILOT_UI_LABELS;
@@ -98,10 +104,21 @@ export function CopilotToggleButton({
      * We do NOT update Zustand directly here — the Realtime event is the source of truth.
      */
     const handleDirectDisable = async () => {
-      if (isDisabling || !simulationId) return;
+      if (isDisabling) return;
 
       setIsDisabling(true);
       try {
+        /**
+         * When simulationId is null (factory reset cleared the session),
+         * we can't call the server endpoint. Instead, perform a LOCAL-ONLY
+         * disable so the pink theme clears and the UI returns to normal.
+         */
+        if (!simulationId) {
+          onLocalDisable?.();
+          onDisabled?.();
+          return;
+        }
+
         /** Call the disable endpoint — CWF dev server or Vercel function */
         await fetch("/api/cwf/copilot/disable", {
           method: "POST",

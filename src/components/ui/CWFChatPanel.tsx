@@ -918,6 +918,7 @@ export function CWFChatPanel() {
               isLoading={isLoading}
               simulationId={simulationId}
               onSendMessage={sendMessage}
+              onLocalDisable={() => useCopilotStore.getState().disableCopilot()}
             />
             {/* Quick Actions dropdown — always accessible for predefined queries */}
             <QuickActionsDropdown
