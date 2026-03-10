@@ -111,109 +111,12 @@ export const DemoControlBar: React.FC = () => {
         border border-b-0 border-white/10
         rounded-t-2xl
         shadow-[0_-8px_32px_rgba(0,0,0,0.5)]
-        px-6 py-3
-        flex items-center gap-3
+        px-5 pt-2.5 pb-2
+        flex flex-col gap-2
       ">
 
-        {/* ── DEMO LABEL + ACT PROGRESS DOTS ──────────────────── */}
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Demo wordmark */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xl leading-none">🏭</span>
-            <span className="text-white/60 text-[13px] font-black uppercase tracking-widest">
-              Demo
-            </span>
-          </div>
-
-          {/* Thin separator */}
-          <div className="w-px h-7 bg-white/10" />
-
-          {/* Horizontal act progress dots — tooltip shows act name on hover */}
-          <div className="flex items-center gap-1.5">
-            {DEMO_ACTS.map((act, index) => {
-              /** Classify this act relative to current position */
-              const isCompleted = index < currentActIndex;
-              const isCurrent = index === currentActIndex;
-
-              return (
-                <div
-                  key={act.id}
-                  title={`${act.eraEmoji} ${act.eraLabel}`}
-                  className="flex items-center justify-center"
-                >
-                  {isCompleted && (
-                    <div className="w-3 h-3 rounded-full bg-white/35" />
-                  )}
-                  {isCurrent && (
-                    <div className="w-3.5 h-3.5 rounded-full bg-blue-400 shadow-[0_0_6px_2px_rgba(96,165,250,0.55)] animate-pulse" />
-                  )}
-                  {!isCompleted && !isCurrent && (
-                    <div className="w-3 h-3 rounded-full border border-white/20" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Current act label — readable at a glance */}
-          <span className="text-white/50 text-[13px] font-medium whitespace-nowrap hidden sm:inline">
-            {DEMO_ACTS[currentActIndex]?.eraEmoji}{" "}
-            {DEMO_ACTS[currentActIndex]?.eraLabel}
-          </span>
-        </div>
-
-        {/* Thin separator */}
-        <div className="w-px h-7 bg-white/10 shrink-0" />
-
-        {/* ── CONTINUE BUTTON ──────────────────────────────────── */}
-        {/*
-          Disabled when simHasSession is false — prevents postToCWF from
-          being called without an active session, which would show the
-          "No simulation running" error banner in the chat window.
-        */}
-        <button
-          onClick={() => {
-            if (isLastAct) {
-              void restartDemo();
-            } else {
-              void advanceAct();
-            }
-          }}
-          disabled={isLoading || (!isLastAct && !simHasSession)}
-          title={
-            !simHasSession && !isLastAct
-              ? "Start the simulation first"
-              : isLastAct
-                ? "Restart the demo"
-                : `Advance to: ${nextAct?.eraLabel ?? "Continue"}`
-          }
-          className="
-            shrink-0 flex items-center gap-2
-            px-4 py-2.5 rounded-lg
-            bg-blue-500/20 hover:bg-blue-500/35
-            border border-blue-400/30 hover:border-blue-400/60
-            text-blue-300 hover:text-blue-100
-            text-[15px] font-semibold tracking-wide
-            transition-all duration-200
-            disabled:opacity-40 disabled:cursor-not-allowed
-            shadow-[0_2px_10px_rgba(96,165,250,0.12)]
-            hover:shadow-[0_2px_16px_rgba(96,165,250,0.28)]
-            whitespace-nowrap
-          "
-        >
-          {isLastAct ? <RefreshCw size={16} /> : <ChevronRight size={16} />}
-          <span>
-            {isLastAct
-              ? "↺ Restart"
-              : `${nextAct?.eraEmoji ?? "→"} ${nextAct?.eraLabel ?? "Continue"}`}
-          </span>
-        </button>
-
-        {/* Thin separator */}
-        <div className="w-px h-5 bg-white/10 shrink-0" />
-
-        {/* ── FREE-FORM INPUT (flex-1) ──────────────────────────── */}
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        {/* ── TOP ROW: Input + Send + Clear (full width) ─────────── */}
+        <div className="flex items-center gap-2">
           {/* Text input — disabled when no session active */}
           <input
             ref={inputRef}
@@ -225,16 +128,16 @@ export const DemoControlBar: React.FC = () => {
             disabled={isLoading || !simHasSession}
             className="
               flex-1 min-w-0
-              bg-white/5 border border-white/10
-              rounded-lg px-4 py-2.5
+              bg-white/6 border border-white/12
+              rounded-lg px-4 py-2
               text-[17px] text-white placeholder-white/25
-              focus:outline-none focus:border-white/30 focus:bg-white/8
+              focus:outline-none focus:border-white/30 focus:bg-white/10
               transition-all duration-150
               disabled:opacity-40 disabled:cursor-not-allowed
             "
           />
 
-          {/* Send icon button */}
+          {/* Send button */}
           <button
             onClick={handleSend}
             disabled={isLoading || !inputText.trim() || !simHasSession}
@@ -251,7 +154,7 @@ export const DemoControlBar: React.FC = () => {
             <Send size={18} />
           </button>
 
-          {/* Clear conversation icon button */}
+          {/* Clear conversation button */}
           <button
             onClick={clearMessages}
             title="Clear conversation"
@@ -267,54 +170,148 @@ export const DemoControlBar: React.FC = () => {
           </button>
         </div>
 
-        {/* Thin separator */}
-        <div className="w-px h-7 bg-white/10 shrink-0" />
+        {/* Thin divider between rows */}
+        <div className="h-px w-full bg-white/8" />
 
-        {/* ── RIGHT: SCENARIO + RESTART stacked ────────────────── */}
-        <div className="flex flex-col gap-0.5 shrink-0 items-stretch min-w-[132px]">
-          {/* Scenario badge */}
-          <div className="
-            flex items-center gap-1.5 px-3 py-1.5 rounded-md
-            bg-white/5 border border-white/8
-            whitespace-nowrap
-          ">
-            {/* Status dot: green when active scenario is loaded */}
-            <div
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                activeScenarioCode
-                  ? "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.7)]"
-                  : "bg-white/20"
-              }`}
-            />
-            <span
-              className={`font-mono font-bold text-xs tracking-wider ${
-                activeScenarioCode ? "text-white/85" : "text-white/25"
-              }`}
-            >
-              {activeScenarioCode ?? "NO SCENARIO"}
+        {/* ── BOTTOM ROW: Demo label / dots / Continue / Scenario+Restart ── */}
+        <div className="flex items-center gap-3">
+
+          {/* Demo wordmark + dots + act label */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl leading-none">🏭</span>
+              <span className="text-white/60 text-[13px] font-black uppercase tracking-widest">
+                Demo
+              </span>
+            </div>
+
+            <div className="w-px h-7 bg-white/10" />
+
+            {/* Act progress dots */}
+            <div className="flex items-center gap-1.5">
+              {DEMO_ACTS.map((act, index) => {
+                const isCompleted = index < currentActIndex;
+                const isCurrent = index === currentActIndex;
+                return (
+                  <div
+                    key={act.id}
+                    title={`${act.eraEmoji} ${act.eraLabel}`}
+                    className="flex items-center justify-center"
+                  >
+                    {isCompleted && (
+                      <div className="w-3 h-3 rounded-full bg-white/35" />
+                    )}
+                    {isCurrent && (
+                      <div className="w-3.5 h-3.5 rounded-full bg-blue-400 shadow-[0_0_6px_2px_rgba(96,165,250,0.55)] animate-pulse" />
+                    )}
+                    {!isCompleted && !isCurrent && (
+                      <div className="w-3 h-3 rounded-full border border-white/20" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Current act label */}
+            <span className="text-white/50 text-[13px] font-medium whitespace-nowrap hidden sm:inline">
+              {DEMO_ACTS[currentActIndex]?.eraEmoji}{" "}
+              {DEMO_ACTS[currentActIndex]?.eraLabel}
             </span>
           </div>
 
-          {/* Restart button */}
+          {/* Spacer — pushes Continue + right column to the right */}
+          <div className="flex-1" />
+
+          {/* Thin separator */}
+          <div className="w-px h-7 bg-white/10 shrink-0" />
+
+          {/* ── CONTINUE BUTTON ──────────────────────────────── */}
           <button
-            onClick={() => void restartDemo()}
-            disabled={isLoading}
-            title="Restart Demo from the beginning"
+            onClick={() => {
+              if (isLastAct) {
+                void restartDemo();
+              } else {
+                void advanceAct();
+              }
+            }}
+            disabled={isLoading || (!isLastAct && !simHasSession)}
+            title={
+              !simHasSession && !isLastAct
+                ? "Start the simulation first"
+                : isLastAct
+                  ? "Restart the demo"
+                  : `Advance to: ${nextAct?.eraLabel ?? "Continue"}`
+            }
             className="
-              flex items-center justify-center gap-2
-              px-3 py-1.5 rounded-md
-              bg-white/5 hover:bg-white/10
-              border border-white/10 hover:border-white/25
-              text-white/40 hover:text-white/75
-              text-xs font-medium tracking-wide
+              shrink-0 flex items-center gap-2
+              px-4 py-2 rounded-lg
+              bg-blue-500/20 hover:bg-blue-500/35
+              border border-blue-400/30 hover:border-blue-400/60
+              text-blue-300 hover:text-blue-100
+              text-[15px] font-semibold tracking-wide
               transition-all duration-200
-              disabled:opacity-30 disabled:cursor-not-allowed
+              disabled:opacity-40 disabled:cursor-not-allowed
+              shadow-[0_2px_10px_rgba(96,165,250,0.12)]
+              hover:shadow-[0_2px_16px_rgba(96,165,250,0.28)]
               whitespace-nowrap
             "
           >
-            <RotateCcw size={12} />
-            <span>Restart</span>
+            {isLastAct ? <RefreshCw size={16} /> : <ChevronRight size={16} />}
+            <span>
+              {isLastAct
+                ? "↺ Restart"
+                : `${nextAct?.eraEmoji ?? "→"} ${nextAct?.eraLabel ?? "Continue"}`}
+            </span>
           </button>
+
+          {/* Thin separator */}
+          <div className="w-px h-7 bg-white/10 shrink-0" />
+
+          {/* ── RIGHT: SCENARIO + RESTART stacked ─────────── */}
+          <div className="flex flex-col gap-0.5 shrink-0 items-stretch min-w-[132px]">
+            {/* Scenario badge */}
+            <div className="
+              flex items-center gap-1.5 px-3 py-1.5 rounded-md
+              bg-white/5 border border-white/8
+              whitespace-nowrap
+            ">
+              <div
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  activeScenarioCode
+                    ? "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.7)]"
+                    : "bg-white/20"
+                }`}
+              />
+              <span
+                className={`font-mono font-bold text-xs tracking-wider ${
+                  activeScenarioCode ? "text-white/85" : "text-white/25"
+                }`}
+              >
+                {activeScenarioCode ?? "NO SCENARIO"}
+              </span>
+            </div>
+
+            {/* Restart button */}
+            <button
+              onClick={() => void restartDemo()}
+              disabled={isLoading}
+              title="Restart Demo from the beginning"
+              className="
+                flex items-center justify-center gap-2
+                px-3 py-1.5 rounded-md
+                bg-white/5 hover:bg-white/10
+                border border-white/10 hover:border-white/25
+                text-white/40 hover:text-white/75
+                text-xs font-medium tracking-wide
+                transition-all duration-200
+                disabled:opacity-30 disabled:cursor-not-allowed
+                whitespace-nowrap
+              "
+            >
+              <RotateCcw size={12} />
+              <span>Restart</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
