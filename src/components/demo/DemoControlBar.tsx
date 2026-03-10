@@ -107,10 +107,10 @@ export const DemoControlBar: React.FC = () => {
       {/* Glass HUD strip — centred, ~48vw width, pill rising from bottom */}
       <div className="
         mx-auto w-full max-w-[48vw] pointer-events-auto
-        bg-black/60 backdrop-blur-xl
-        border border-b-0 border-white/10
+        bg-black/65 backdrop-blur-xl
+        border border-b-0 border-white/25
         rounded-t-2xl
-        shadow-[0_-8px_32px_rgba(0,0,0,0.5)]
+        shadow-[0_-8px_40px_rgba(0,0,0,0.6),0_-1px_0_rgba(255,255,255,0.12)]
         px-5 pt-2.5 pb-2
         flex flex-col gap-2
       ">

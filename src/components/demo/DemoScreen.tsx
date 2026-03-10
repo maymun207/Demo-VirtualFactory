@@ -133,7 +133,7 @@ export const DemoScreen: React.FC = () => {
       }}
     >
       {/* Glass panel body — chat thread only */}
-      <div className="w-full h-full bg-black/35 backdrop-blur-md border border-white/8 border-t-0 rounded-b-2xl overflow-hidden pointer-events-auto shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+      <div className="w-full h-full bg-black/40 backdrop-blur-md border border-white/25 border-t-0 rounded-b-2xl overflow-hidden pointer-events-auto shadow-[0_8px_40px_rgba(0,0,0,0.6)]">
         <DemoChatView />
       </div>
     </div>
