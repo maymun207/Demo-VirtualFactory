@@ -459,10 +459,17 @@ export const useDemoStore = create<DemoState>((set, get) => ({
      * restartDemo — resets the entire demo to act 0.
      *
      * 1. Closes all panels that were opened during the demo
-     * 2. Loads the restart scenario
-     * 3. Clears the message thread
-     * 4. Resets currentActIndex to 0
-     * 5. Sends the welcome act's opening prompt
+     * 2. Disables Copilot if it was active (Autonomous AI act cleanup)
+     * 3. Loads the restart scenario (SCN-001 baseline)
+     * 4. Clears the message thread and resets currentActIndex to 0
+     *
+     * NOTE: We intentionally do NOT auto-send the welcome opening prompt here.
+     * applyScenario() calls loadScenario() which tears down and recreates the
+     * simulation session — at the moment postToCWF would fire, session?.id is
+     * transiently null, causing a "No simulation running" error message.
+     * The static welcome card in DemoChatView (shown when messages is empty
+     * and currentActIndex is 0) provides the correct UI without a race condition.
+     * The user drives act progression by clicking "▶ Start Demo" themselves.
      */
     restartDemo: async () => {
         /** Close all panels that the demo engine may have opened */
@@ -514,15 +521,13 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             currentActIndex: DEMO_FIRST_ACT_INDEX,
         });
 
-        /** Auto-send the welcome act opening prompt */
-        const welcomeAct = DEMO_ACTS[DEMO_FIRST_ACT_INDEX];
-        await postToCWF(
-            welcomeAct.openingPrompt,
-            welcomeAct.id,
-            welcomeAct.systemContext,
-            get,
-            set,
-        );
+        /**
+         * Do NOT call postToCWF here.
+         * applyScenario() above may have caused a transient session teardown
+         * (simulationDataStore.session becomes null briefly during loadScenario).
+         * The DemoChatView welcome card renders automatically when messages is
+         * empty and currentActIndex is 0 — no API call needed.
+         */
     },
 
     /**

@@ -355,13 +355,12 @@ describe('demoStore', () => {
         mockCopilotIsEnabled = true;
 
         /**
-         * mockFetch answers:
-         *   1) /api/cwf/copilot/disable — from restartDemo cleanup
-         *   2) /api/cwf/chat            — from the welcome act opening prompt
+         * mockFetch answers only the Copilot disable call.
+         * No /api/cwf/chat call is expected — restartDemo no longer auto-sends
+         * the welcome prompt to avoid racing against session teardown.
          */
         mockFetch
-            .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
-            .mockResolvedValueOnce({ ok: true, json: async () => ({ response: 'Welcome!', toolCallCount: 0 }) });
+            .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
         await act(async () => {
             await useDemoStore.getState().restartDemo();
@@ -373,11 +372,12 @@ describe('demoStore', () => {
         /** One of the fetch calls must target the Copilot disable endpoint */
         const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
         expect(calledUrls).toContain(COPILOT_DISABLE_URL);
+        /** /api/cwf/chat must NOT have been called (no welcome prompt race) */
+        expect(calledUrls).not.toContain('/api/cwf/chat');
     });
 
     it('restartDemo does not call copilot disable if Copilot was not enabled', async () => {
-        /** Copilot starts disabled (default in beforeEach) */
-        mockSuccessResponse('Welcome to the demo!');
+        /** Copilot starts disabled (default in beforeEach) — no fetch mocking needed */
 
         await act(async () => {
             await useDemoStore.getState().restartDemo();
@@ -385,15 +385,13 @@ describe('demoStore', () => {
 
         /** disableCopilot must NOT have been called */
         expect(mockDisableCopilot).not.toHaveBeenCalled();
-        /** Disable endpoint must NOT have been hit */
-        const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
-        expect(calledUrls).not.toContain(COPILOT_DISABLE_URL);
+        /** No fetch calls at all — no welcome prompt, no disable call */
+        expect(mockFetch).not.toHaveBeenCalled();
     });
 
     // ── restartDemo ────────────────────────────────────────────────────────────
 
-    it('restartDemo resets currentActIndex to 0 and clears messages before re-sending welcome', async () => {
-        mockSuccessResponse('Welcome narrative...');
+    it('restartDemo resets currentActIndex to 0 and clears messages without sending welcome prompt', async () => {
         /** Move to a later act and add some messages */
         act(() => useDemoStore.setState({ currentActIndex: 3 }));
         mockSuccessResponse();
@@ -402,16 +400,20 @@ describe('demoStore', () => {
         });
         mockFetch.mockReset();
 
-        /** Restart — sends the welcome opening prompt */
-        mockSuccessResponse('Welcome to the demo!');
+        /**
+         * Restart — must NOT call fetch for the welcome prompt.
+         * The static welcome card in DemoChatView handles the empty-state UI.
+         */
         await act(async () => {
             await useDemoStore.getState().restartDemo();
         });
 
-        /** Act index reset */
+        /** Act index must be reset to 0 */
         expect(useDemoStore.getState().currentActIndex).toBe(0);
-        /** Fetch called once for the welcome act */
-        expect(mockFetch).toHaveBeenCalledOnce();
+        /** Messages must be cleared */
+        expect(useDemoStore.getState().messages).toHaveLength(0);
+        /** fetch must NOT have been called — no welcome prompt race condition */
+        expect(mockFetch).not.toHaveBeenCalled();
     });
 
     // ── fetch payload shape ────────────────────────────────────────────────────
