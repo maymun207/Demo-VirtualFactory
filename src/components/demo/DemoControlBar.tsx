@@ -36,7 +36,7 @@ import type { DemoState } from "../../store/demoStore";
 import { DEMO_ACTS } from "../../lib/params/demoSystem/demoScript";
 import { useSimulationDataStore } from "../../store/simulationDataStore";
 import { useUIStore } from "../../store/uiStore";
-import { SUB_HEADER_PANEL_Z_INDEX } from "../../lib/params/subHeaderPanel";
+
 
 /**
  * DemoControlBar — the centred, bottom-pinned demo HUD strip.
@@ -101,7 +101,8 @@ export const DemoControlBar: React.FC = () => {
   return (
     <div
       id="demo-control-bar"
-      className={`fixed bottom-0 left-0 right-0 ${SUB_HEADER_PANEL_Z_INDEX} pointer-events-none`}
+      style={{ transform: "translateZ(0)" }}
+      className="fixed bottom-0 left-0 right-0 z-[9999] pointer-events-none"
     >
       {/* Glass HUD strip — centred, ~48vw width, pill rising from bottom */}
       <div className="
