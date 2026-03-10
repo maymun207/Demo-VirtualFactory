@@ -137,8 +137,8 @@ export const FORKLIFT_ROTATION: [number, number, number] = [0, Math.PI, 0];
 export const FORKLIFT_COLLECT_TARGET: [number, number, number] = [20, 0, 0];
 
 
-/** World position [x, y, z] of the 3D production status table */
-export const PRODUCTION_TABLE_POSITION: [number, number, number] = [0, -1.15, 8.5];
+/** World position [x, y, z] of the 3D production status table (Z reduced from 8.5 to 2.55 — 70% closer to conveyor) */
+export const PRODUCTION_TABLE_POSITION: [number, number, number] = [0, -1.15, 2.55];
 /** Euler rotation [x, y, z] of the production table (tilted toward camera) */
 export const PRODUCTION_TABLE_ROTATION: [number, number, number] = [-1.26, 0, 0];
 

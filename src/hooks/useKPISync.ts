@@ -183,18 +183,43 @@ export function useKPISync() {
         // Step 5: Use FOEE as the OEE value for the KPI card (replaces legacy formula)
         const oee = foee.oee;
 
+        // ── Compute cumulative energy totals for KPI display ─────
+        // The Basic panel must show the SAME cumulative values as the OEE table.
+        // Previously updateKPIs received the per-tick `energy` result (~16 kWh/tick),
+        // while the OEE table used `newCumEnergy` (all ticks summed, ~12,000 kWh).
+        // Fix: sum all station entries from newCumEnergy to produce true cumulative totals.
+        let cumKwh = 0;  // Total accumulated kWh since simulation start
+        let cumGas = 0;  // Total accumulated gas (m³) since simulation start
+        let cumCo2 = 0;  // Total accumulated CO₂ (kg) since simulation start
+        for (const e of Object.values(newCumEnergy)) {
+          cumKwh += e.kWh;  // Accumulate electricity across all stations
+          cumGas += e.gas;  // Accumulate gas (only dryer + kiln contribute)
+          cumCo2 += e.co2;  // Accumulate CO₂ (electric + gas combined)
+        }
+
+        // Build a synthetic EnergyResult using cumulative totals.
+        // perStation is kept as the per-tick breakdown (used for internal OEE pipeline).
+        const cumulativeEnergyForDisplay = {
+          ...energy,             // Keep per-tick perStation and other fields for OEE pipeline
+          totalKwh: cumKwh,     // Override with cumulative total for display
+          totalGas: cumGas,     // Override with cumulative total for display
+          totalCO2: cumCo2,     // Override with cumulative total for display
+        };
+
         // ── Update KPI display values (format numbers, set units) ─
-        let newKpis = updateKPIs(kpiState.kpis, { energy, ftq, totalKpi, scrap, oee });
+        let newKpis = updateKPIs(kpiState.kpis, { energy: cumulativeEnergyForDisplay, ftq, totalKpi, scrap, oee });
 
         // ── Calculate trends (compare current vs. historical) ────
+        // Use cumulative totals (cumKwh/cumGas/cumCo2) so the trend arrows
+        // compare cumulative-vs-cumulative, not per-tick-vs-per-tick.
         const currentVals = {
           oee,
           ftq,
           total_kpi: totalKpi,
           scrap,
-          energy: energy.totalKwh,
-          gas: energy.totalGas,
-          co2: energy.totalCO2,
+          energy: cumKwh,  // Cumulative electricity (kWh) for trend tracking
+          gas: cumGas,     // Cumulative gas (m³) for trend tracking
+          co2: cumCo2,     // Cumulative CO₂ (kg) for trend tracking
         };
         const trendResult = calculateTrends(
           newKpis,

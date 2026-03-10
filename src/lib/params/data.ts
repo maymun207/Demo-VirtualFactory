@@ -198,16 +198,16 @@ export const INITIAL_KPIS: KPI[] = [
 /** Factory function: returns fresh defect array */
 export const createInitialDefects = (): Defect[] => JSON.parse(JSON.stringify(INITIAL_DEFECTS));
 
-/** Initial defect types for the heatmap visualization */
+/** Initial defect types for the heatmap visualization — all start at 0.0 (clean slate). */
 export const INITIAL_DEFECTS: Defect[] = [
-  { name: 'pinhole', value: 0.8, label: { tr: 'Pinhole', en: 'Pinhole' } },
-  { name: 'glaze', value: 1.2, label: { tr: 'Glaze Akması', en: 'Glaze Flow' } },
-  { name: 'banding', value: 0.5, label: { tr: 'Banding', en: 'Banding' } },
-  { name: 'black', value: 0.4, label: { tr: 'Siyah Çekirdek', en: 'Black Core' } },
-  { name: 'ghosting', value: 0.2, label: { tr: 'Ghosting', en: 'Ghosting' } },
-  { name: 'edge', value: 2.1, label: { tr: 'Kenar Kırığı', en: 'Edge Break' } },
-  { name: 'crack', value: 0.1, label: { tr: 'Çatlak', en: 'Crack' } },
-  { name: 'pattern', value: 0.3, label: { tr: 'Desen Kayması', en: 'Pattern Shift' } },
+  { name: 'pinhole', value: 0.0, label: { tr: 'Pinhole',        en: 'Pinhole'       } },
+  { name: 'glaze',   value: 0.0, label: { tr: 'Glaze Akması',   en: 'Glaze Flow'    } },
+  { name: 'banding', value: 0.0, label: { tr: 'Banding',        en: 'Banding'       } },
+  { name: 'black',   value: 0.0, label: { tr: 'Siyah Çekirdek', en: 'Black Core'    } },
+  { name: 'ghosting',value: 0.0, label: { tr: 'Ghosting',       en: 'Ghosting'      } },
+  { name: 'edge',    value: 0.0, label: { tr: 'Kenar Kırığı',   en: 'Edge Break'    } },
+  { name: 'crack',   value: 0.0, label: { tr: 'Çatlak',         en: 'Crack'         } },
+  { name: 'pattern', value: 0.0, label: { tr: 'Desen Kayması',  en: 'Pattern Shift' } },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -223,8 +223,8 @@ export const DEFECT_THRESHOLD_MEDIUM = 1;
 // STATUS MATRIX — Dimensions
 // ═══════════════════════════════════════════════════════════════════
 
-/** Number of rows in the production status matrix */
-export const STATUS_MATRIX_ROWS = 9;
+/** Number of rows in the production status matrix (reduced from 9 to 5 to match the shortened table display) */
+export const STATUS_MATRIX_ROWS = 5;
 /** Number of columns in the production status matrix */
 export const STATUS_MATRIX_COLS = 7;
 

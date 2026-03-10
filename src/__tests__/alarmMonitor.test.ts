@@ -2,7 +2,7 @@
  * alarmMonitor.test.ts — Unit Tests for Alarm Threshold Logic
  *
  * Tests the core decision logic used by useAlarmMonitor.ts:
- *  - KPI threshold evaluation (OEE < critical, FTQ < warning, etc.)
+ *  - KPI threshold evaluation (FTQ < warning, scrap > warning, energy > warning)
  *  - Cooldown mechanism (no re-alarm within ALARM_COOLDOWN_TICKS)
  *  - Station status change detection
  *
@@ -14,12 +14,12 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  ALARM_OEE_CRITICAL,
   ALARM_FTQ_WARNING,
   ALARM_SCRAP_WARNING,
   ALARM_ENERGY_WARNING,
   ALARM_COOLDOWN_TICKS,
 } from '../lib/params';
+// Note: ALARM_OEE_CRITICAL import removed — OEE alert was eliminated from useAlarmMonitor.
 
 // =============================================================================
 // EXTRACTED PURE LOGIC — Mirrors useAlarmMonitor's decision functions
@@ -93,21 +93,17 @@ function detectStatusTransition(
 // =============================================================================
 
 describe('Alarm Threshold Evaluation', () => {
-  it('should trigger OEE alert when OEE drops below critical threshold', () => {
-    /** OEE at threshold - 1 should trigger */
-    const oee = ALARM_OEE_CRITICAL - 1;
-    expect(oee < ALARM_OEE_CRITICAL).toBe(true);
-  });
-
-  it('should NOT trigger OEE alert when OEE is at or above threshold', () => {
-    /** OEE exactly at threshold should NOT trigger */
-    const oee = ALARM_OEE_CRITICAL;
-    expect(oee < ALARM_OEE_CRITICAL).toBe(false);
-  });
+  // Note: OEE alert was intentionally removed from the alarm monitor.
+  // It was noisy at startup and redundant with the OEE Hierarchy Table.
 
   it('should trigger FTQ alert when FTQ drops below warning threshold', () => {
     const ftq = ALARM_FTQ_WARNING - 5;
     expect(ftq < ALARM_FTQ_WARNING).toBe(true);
+  });
+
+  it('should NOT trigger FTQ alert when FTQ is at or above threshold', () => {
+    const ftq = ALARM_FTQ_WARNING;
+    expect(ftq < ALARM_FTQ_WARNING).toBe(false);
   });
 
   it('should trigger scrap alert when scrap exceeds warning threshold', () => {
@@ -135,32 +131,32 @@ describe('Alarm Cooldown Mechanism', () => {
 
   it('should allow alarm to fire on first occurrence (no prior cooldown)', () => {
     /** No previous entry for this alarm type → should fire */
-    expect(shouldFireAlarm(cooldowns, 'oee_alert', 10)).toBe(true);
+    expect(shouldFireAlarm(cooldowns, 'test_alarm', 10)).toBe(true);
   });
 
   it('should block alarm within cooldown window', () => {
     /** Simulate: alarm fired at tick 100, try again at tick 100 + half cooldown */
-    cooldowns['oee_alert'] = 100;
+    cooldowns['test_alarm'] = 100;
     const halfCooldown = Math.floor(ALARM_COOLDOWN_TICKS / 2);
-    expect(shouldFireAlarm(cooldowns, 'oee_alert', 100 + halfCooldown)).toBe(false);
+    expect(shouldFireAlarm(cooldowns, 'test_alarm', 100 + halfCooldown)).toBe(false);
   });
 
   it('should allow alarm after cooldown period has passed', () => {
     /** Simulate: alarm fired at tick 100, try again after full cooldown */
-    cooldowns['oee_alert'] = 100;
-    expect(shouldFireAlarm(cooldowns, 'oee_alert', 100 + ALARM_COOLDOWN_TICKS)).toBe(true);
+    cooldowns['test_alarm'] = 100;
+    expect(shouldFireAlarm(cooldowns, 'test_alarm', 100 + ALARM_COOLDOWN_TICKS)).toBe(true);
   });
 
   it('should track independent cooldowns per alarm type', () => {
-    /** OEE alarm just fired, but scrap alarm has no cooldown → scrap should fire */
-    cooldowns['oee_alert'] = 50;
-    expect(shouldFireAlarm(cooldowns, 'oee_alert', 51)).toBe(false);
+    /** quality alarm just fired, but scrap alarm has no cooldown → scrap should fire */
+    cooldowns['quality_alert'] = 50;
+    expect(shouldFireAlarm(cooldowns, 'quality_alert', 51)).toBe(false);
     expect(shouldFireAlarm(cooldowns, 'scrap_alert', 51)).toBe(true);
   });
 
   it('should handle tick 0 edge case', () => {
     /** Alarm at tick 0 should be allowed (no prior history) */
-    expect(shouldFireAlarm(cooldowns, 'oee_alert', 0)).toBe(true);
+    expect(shouldFireAlarm(cooldowns, 'test_alarm', 0)).toBe(true);
   });
 });
 

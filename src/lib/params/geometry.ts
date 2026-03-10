@@ -154,10 +154,10 @@ export const TEXT_SIZES = {
 // PRODUCTION TABLE — Layout parameters
 // ═══════════════════════════════════════════════════════════════════
 
-/** Number of rows in the production status table */
-export const TABLE_ROW_COUNT = 9;
-/** Total height of the table mesh */
-export const TABLE_HEIGHT = 10;
+/** Number of rows in the production status table (reduced from 9 to 5 to shorten the table display) */
+export const TABLE_ROW_COUNT = 5;
+/** Total height of the table mesh (halved from 6.67 to 3.34 to reduce each row height by half) */
+export const TABLE_HEIGHT = 3.34;
 /** Total width of the table mesh (from -17 to +15 to cover all stations) */
 export const TABLE_WIDTH = 32;
 /** X centering offset for the table group (midpoint of -17 to +15) */

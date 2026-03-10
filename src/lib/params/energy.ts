@@ -17,10 +17,10 @@ export const CO2_FACTOR_GAS = 1.9;
 export const AVAILABILITY_FACTOR = 0.96;
 /** Benchmark conveyor speed for 100% performance rating */
 export const DESIGN_SPEED = 2.0;
-/** Number of recent ticks kept for rolling trend calculations */
-export const KPI_TREND_WINDOW = 30;
-/** Minimum ticks required before showing a trend arrow */
-export const KPI_TREND_MIN_TICKS = 5;
+/** Number of recent ticks kept for rolling trend calculations (shortened to 5 for faster trend updates) */
+export const KPI_TREND_WINDOW = 5;
+/** Minimum ticks required before showing a trend arrow (reduced to 2 to match the shorter window) */
+export const KPI_TREND_MIN_TICKS = 2;
 /** ±range for random jitter applied to defect values each tick */
 export const DEFECT_RANDOMIZATION = 0.2;
 

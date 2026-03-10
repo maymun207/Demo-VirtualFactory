@@ -494,100 +494,84 @@ export const useSimulationStore = create<SimulationState>()(
     }),
 
     /**
-     * Transition conveyor status with side effects:
-     *  - Running → Jammed: increment faultCount, record jam start alarm
-     *  - Jammed → Running: log jam cleared alarm
-     *  - Running → also ensures isDataFlowing is true
+     * setConveyorStatus — Transition conveyor operational status with alarm side-effects.
+     *
+     * Transition map (previous → next → alarm):
+     *   running       → jam_scrapping  :  CRITICAL  jam_start   (auto-jam, Phase 1 entry)
+     *   running       → jammed         :  CRITICAL  jam_start   (manual Jammed button / CWF)
+     *   jam_scrapping → jammed         :  WARNING   jam_start   (Phase 1 done, belt fully stopped)
+     *   jammed|jam_scrapping → running :  INFO      jam_cleared (jam resolved, belt restarting)
+     *
+     * New jams also increment faultCount and stamp jamStartedAt.
+     * Clearing a jam resets jamLocation and jamScrapsRemaining.
+     * All transitions emit on the eventBus for Supabase sync via simulationDataStore.
      */
     setConveyorStatus: (status) =>
       set((s) => {
-        /**
-         * Determine transition type. "jam active" includes both
-         * jam_scrapping (Phase 1) and jammed (Phase 2).
-         */
+        /** Whether the conveyor was already in any jam phase before this call. */
         const wasInJam = s.conveyorStatus === 'jammed' || s.conveyorStatus === 'jam_scrapping';
-        const isEnteringJam = status === 'jam_scrapping';
-        const isFullyClearing = (status === 'running') && wasInJam;
-        const now = Date.now();
 
-        let nextFaultCount = s.faultCount;
+        /** Name four distinct transitions for readable branch conditions below. */
+        const isAutoJam   = status === 'jam_scrapping' && !wasInJam;                    // auto Phase 1
+        const isDirectJam = status === 'jammed'        && !wasInJam;                    // manual jam
+        const isPhase2    = status === 'jammed'        && s.conveyorStatus === 'jam_scrapping'; // Phase 1→2
+        const isClearing  = status === 'running'       && wasInJam;                     // jam resolved
+
+        const now            = Date.now();
+        let nextFaultCount   = s.faultCount;
         let nextJamStartedAt = s.jamStartedAt;
-        /** Station display name for alarm messages */
+
+        /** Resolved station name — 'Conveyor' fallback when no specific location is set. */
         const stationName = s.jamLocation
           ? JAM_LOCATION_DISPLAY_NAMES[s.jamLocation]
-          : 'Unknown';
+          : 'Conveyor';
 
-        // Ring buffer: cap alarm log to prevent unbounded growth
+        /** Ring-buffered copy of the alarm log (caps at MAX_ALARM_LOG entries). */
         const nextAlarmLog = s.alarmLog.length >= MAX_ALARM_LOG
           ? s.alarmLog.slice(-MAX_ALARM_LOG + 1)
           : [...s.alarmLog];
 
-        /** Partial state updates accumulated here */
-        const updates: Record<string, unknown> = {
-          conveyorStatus: status,
+        /** Partial state delta — conveyor status always changes; other fields are branch-specific. */
+        const updates: Record<string, unknown> = { conveyorStatus: status };
+
+        /**
+         * emitAlarm — Push one alarm entry to the log AND fire the event bus.
+         * Eliminates the repeated alarmLog.push + eventBus.emit pattern across branches.
+         */
+        const emitAlarm = (type: AlarmType, severity: AlarmSeverity, message: string) => {
+          nextAlarmLog.push({ sClockTick: s.sClockCount, type, severity, timestamp: now, message });
+          eventBus.emit('alarm', { type, severity, message });
         };
 
-        if (isEnteringJam && !wasInJam) {
-          /**
-           * RUNNING → JAM_SCRAPPING (Phase 1 entry)
-           * Increment fault count and log station-specific alarm.
-           */
-          nextFaultCount += 1;
+        if (isAutoJam) {
+          /** Auto-jam Phase 1: belt still moving, tiles being scrapped at jammed station. */
+          nextFaultCount  += 1;
           nextJamStartedAt = now;
-          nextAlarmLog.push({
-            sClockTick: s.sClockCount,
-            type: 'jam_start',
-            severity: 'critical',
-            timestamp: now,
-          });
-          eventBus.emit('alarm', {
-            type: 'jam_start',
-            severity: 'critical',
-            message: `JAM detected at ${stationName}`,
-          });
-        } else if (status === 'jammed' && s.conveyorStatus === 'jam_scrapping') {
-          /**
-           * JAM_SCRAPPING → JAMMED (Phase 1 → Phase 2)
-           * Scrapping complete, belt now stops for clearing.
-           */
-          nextAlarmLog.push({
-            sClockTick: s.sClockCount,
-            type: 'jam_start',
-            severity: 'warning',
-            timestamp: now,
-          });
-          eventBus.emit('alarm', {
-            type: 'jam_start',
-            severity: 'warning',
-            message: `Scrap complete at ${stationName}, belt stopped for clearing`,
-          });
-        } else if (isFullyClearing) {
-          /**
-           * JAMMED → RUNNING (Phase 2 → Phase 3, jam cleared)
-           * Reset jam location and remaining counter.
-           */
-          nextJamStartedAt = null;
-          nextAlarmLog.push({
-            sClockTick: s.sClockCount,
-            type: 'jam_cleared',
-            severity: 'info',
-            timestamp: now,
-          });
-          eventBus.emit('alarm', {
-            type: 'jam_cleared',
-            severity: 'info',
-            message: `JAM CLEARED at ${stationName}`,
-          });
-          /** Reset jam-specific state on full clear */
-          updates.jamLocation = null;
+          emitAlarm('jam_start', 'critical', `JAM detected at ${stationName}`);
+
+        } else if (isDirectJam) {
+          /** Manual jam: operator clicked Jammed button or CWF issued set_conveyor_jammed. */
+          nextFaultCount  += 1;
+          nextJamStartedAt = now;
+          emitAlarm('jam_start', 'critical', `JAM triggered manually at ${stationName}`);
+
+        } else if (isPhase2) {
+          /** Phase 1 → Phase 2: tile scrapping done, belt now fully stopped for clearing. */
+          emitAlarm('jam_start', 'warning', `Scrap complete at ${stationName}, belt stopped for clearing`);
+
+        } else if (isClearing) {
+          /** Jam resolved: belt restarting, reset jam location and scrap counter. */
+          nextJamStartedAt           = null;
+          updates.jamLocation        = null;
           updates.jamScrapsRemaining = 0;
+          emitAlarm('jam_cleared', 'info', `JAM CLEARED at ${stationName}`);
         }
 
         return {
           ...updates,
-          faultCount: nextFaultCount,
+          faultCount:   nextFaultCount,
           jamStartedAt: nextJamStartedAt,
-          alarmLog: nextAlarmLog,
+          alarmLog:     nextAlarmLog,
         };
       }),
 

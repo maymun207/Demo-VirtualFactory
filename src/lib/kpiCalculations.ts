@@ -334,8 +334,12 @@ export const calculateTrends = (
     if (current === undefined || previous === undefined) return kpi;
 
     const diff = current - previous;
-    const absDiff = Math.abs(diff).toFixed(1);
     const isIncreasing = diff >= 0;
+
+    // True percentage change: (current − previous) / |previous| × 100
+    // Guard against division-by-zero at simulation start (previous = 0)
+    const pctChange = previous !== 0 ? (diff / Math.abs(previous)) * 100 : 0;
+    const absPct = Math.abs(pctChange).toFixed(1);
 
     // For inverted KPIs: increasing value = bad (red/down arrow)
     let trendDir: 'up' | 'down';
@@ -349,7 +353,7 @@ export const calculateTrends = (
 
     return {
       ...kpi,
-      trend: { tr: `${arrow} %${absDiff}`, en: `${arrow} ${absDiff}%` },
+      trend: { tr: `${arrow} %${absPct}`, en: `${arrow} ${absPct}%` },
       trendDirection: trendDir,
     };
   });

@@ -7,7 +7,6 @@
  * recordAlarm() (Supabase sync queue).
  *
  * Alarms monitored:
- *  - OEE drop below ALARM_OEE_CRITICAL → oee_alert (critical)
  *  - FTQ drop below ALARM_FTQ_WARNING → quality_alert (warning)
  *  - Scrap rise above ALARM_SCRAP_WARNING → scrap_alert (warning)
  *  - Energy rise above ALARM_ENERGY_WARNING → energy_alert (warning)
@@ -27,13 +26,16 @@ import { useSimulationDataStore } from '../store/simulationDataStore';
 import { useKPIStore } from '../store/kpiStore';
 import type { KPI, StationData } from '../lib/params';
 import {
-  ALARM_OEE_CRITICAL,
   ALARM_FTQ_WARNING,
   ALARM_SCRAP_WARNING,
   ALARM_ENERGY_WARNING,
   ALARM_COOLDOWN_TICKS,
   INITIAL_STATIONS,
 } from '../lib/params';
+// Note: ALARM_OEE_CRITICAL intentionally removed — OEE alerts were noisy
+// (fire at simulation start before tiles warm up) and redundant with the
+// OEE Hierarchy Table which shows OEE live. Retained in params.ts in case
+// it is needed in future (e.g., Copilot evaluation).
 
 /** Tracks the last S-Clock tick at which each alarm type fired */
 type CooldownMap = Record<string, number>;
@@ -70,7 +72,6 @@ export const useAlarmMonitor = () => {
       const recordAlarm = useSimulationDataStore.getState().recordAlarm;
 
       // Parse KPI values
-      const oee = parseFloat(kpis.find((k: KPI) => k.id === 'oee')?.value ?? '100');
       const ftq = parseFloat(kpis.find((k: KPI) => k.id === 'ftq')?.value ?? '100');
       const scrap = parseFloat(kpis.find((k: KPI) => k.id === 'scrap')?.value ?? '0');
       /**
@@ -103,8 +104,8 @@ export const useAlarmMonitor = () => {
       // Skip checking until simulation has run for at least a few ticks
       if (sClock < 5) return;
 
-      maybeAlarm('oee_alert', oee < ALARM_OEE_CRITICAL, 'critical',
-        `OEE dropped to ${oee.toFixed(1)}% (threshold: ${ALARM_OEE_CRITICAL}%)`);
+      // OEE alert intentionally removed — redundant with the OEE Hierarchy Table
+      // and noisy at simulation startup (OEE starts at 0% before tiles warm up).
 
       maybeAlarm('quality_alert', ftq < ALARM_FTQ_WARNING, 'warning',
         `FTQ dropped to ${ftq.toFixed(1)}% (threshold: ${ALARM_FTQ_WARNING}%)`);

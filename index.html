@@ -3,8 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Disable browser pinch-to-zoom: maximum-scale=1 and user-scalable=no prevent
+         the viewport from scaling when the user pinches on a trackpad or touch screen.
+         This stops the vw/vh-based font-size from collapsing the UI layout. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>virtual-factory-demo</title>
+    <!-- Block Ctrl+wheel (macOS trackpad pinch) from triggering browser-level page zoom.
+         Trackpad pinch fires a wheel event with ctrlKey=true. Calling preventDefault()
+         here stops the browser zoom from changing vw/vh units and collapsing the layout.
+         gesturestart is the Safari-specific pinch event — also blocked for safety. -->
+    <script>
+      document.addEventListener('wheel', function (e) {
+        /* ctrlKey=true on a wheel event is the macOS trackpad pinch gesture */
+        if (e.ctrlKey) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      /* Safari-specific pinch gesture event — block it entirely */
+      document.addEventListener('gesturestart', function (e) {
+        e.preventDefault();
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
