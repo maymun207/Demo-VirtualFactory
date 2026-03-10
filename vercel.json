@@ -6,6 +6,18 @@
   "functions": {
     "api/cwf/chat.ts": {
       "maxDuration": 60
+    },
+    "api/cwf/copilot/evaluate.ts": {
+      "maxDuration": 30
+    },
+    "api/cwf/copilot/enable.ts": {
+      "maxDuration": 10
+    },
+    "api/cwf/copilot/disable.ts": {
+      "maxDuration": 10
+    },
+    "api/cwf/copilot/heartbeat.ts": {
+      "maxDuration": 10
     }
   }
 }

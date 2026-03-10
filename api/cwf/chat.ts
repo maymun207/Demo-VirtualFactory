@@ -2980,24 +2980,45 @@ export default async function handler(
                                     updated_at: new Date().toISOString(),
                                 }, { onConflict: 'simulation_id' });
 
-                                /** Also call the copilot engine endpoint if available */
-                                const copilotApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
-                                try {
-                                    const enableRes = await fetch(`${copilotApiBase}/api/cwf/copilot/enable`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            simulationId: copilotSimId,
-                                            activatedBy: copilotAuthCode,
-                                        }),
-                                    });
-                                    const enableData = await enableRes.json() as Record<string, unknown>;
-                                    toolResult = { ...enableData, cwfState: 'copilot_active', attemptsRemaining: COPILOT_MAX_AUTH_ATTEMPTS };
-                                } catch {
-                                    /** Engine endpoint unreachable — DB update above already set state */
+                                /**
+                                 * Call the copilot engine endpoint.
+                                 *
+                                 * LOCAL DEV: cwf-dev-server.ts runs on CWF_DEV_PORT and starts the
+                                 *   in-memory CopilotEngine polling loop.
+                                 * VERCEL: No persistent engine — the DB upsert above is sufficient.
+                                 *   The browser's useCopilotHeartbeat hook detects copilot_active state
+                                 *   and drives evaluation cycles via /api/cwf/copilot/evaluate.
+                                 */
+                                if (process.env.CWF_DEV_PORT) {
+                                    /** Local dev: call cwf-dev-server to start the engine */
+                                    try {
+                                        const enableRes = await fetch(`http://localhost:${process.env.CWF_DEV_PORT}/api/cwf/copilot/enable`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                simulationId: copilotSimId,
+                                                activatedBy: copilotAuthCode,
+                                            }),
+                                        });
+                                        const enableData = await enableRes.json() as Record<string, unknown>;
+                                        toolResult = { ...enableData, cwfState: 'copilot_active', attemptsRemaining: COPILOT_MAX_AUTH_ATTEMPTS };
+                                    } catch {
+                                        /** Engine endpoint unreachable — DB update above already set state */
+                                        toolResult = {
+                                            success: true,
+                                            message: 'Copilot enabled (engine will start on next poll).',
+                                            cwfState: 'copilot_active',
+                                            attemptsRemaining: COPILOT_MAX_AUTH_ATTEMPTS,
+                                        };
+                                    }
+                                } else {
+                                    /**
+                                     * Vercel: DB upsert is done. Browser will detect copilot_active
+                                     * via Supabase Realtime and start calling /api/cwf/copilot/evaluate.
+                                     */
                                     toolResult = {
                                         success: true,
-                                        message: 'Copilot enabled (engine will start on next poll).',
+                                        message: 'Copilot enabled — browser will drive monitoring cycles.',
                                         cwfState: 'copilot_active',
                                         attemptsRemaining: COPILOT_MAX_AUTH_ATTEMPTS,
                                     };
@@ -3027,17 +3048,27 @@ export default async function handler(
                                 })
                                 .eq('simulation_id', disableSimId);
 
-                            /** Then call the copilot engine disable endpoint if available */
-                            const disableApiBase = process.env.CWF_DEV_PORT ? `http://localhost:${process.env.CWF_DEV_PORT}` : '';
-                            try {
-                                const disableRes = await fetch(`${disableApiBase}/api/cwf/copilot/disable`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ simulationId: disableSimId }),
-                                });
-                                const disableData = await disableRes.json() as Record<string, unknown>;
-                                toolResult = { ...disableData, cwfState: 'normal' };
-                            } catch {
+                            /**
+                             * Call the copilot engine disable endpoint.
+                             *
+                             * LOCAL DEV: cwf-dev-server.ts stops the in-memory CopilotEngine.
+                             * VERCEL: DB update above is sufficient — browser stops calling evaluate.
+                             */
+                            if (process.env.CWF_DEV_PORT) {
+                                /** Local dev: call cwf-dev-server to stop the engine */
+                                try {
+                                    const disableRes = await fetch(`http://localhost:${process.env.CWF_DEV_PORT}/api/cwf/copilot/disable`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ simulationId: disableSimId }),
+                                    });
+                                    const disableData = await disableRes.json() as Record<string, unknown>;
+                                    toolResult = { ...disableData, cwfState: 'normal' };
+                                } catch {
+                                    toolResult = { success: true, message: 'Copilot disabled.', cwfState: 'normal' };
+                                }
+                            } else {
+                                /** Vercel: DB update done. Browser will detect the state change. */
                                 toolResult = { success: true, message: 'Copilot disabled.', cwfState: 'normal' };
                             }
                             /** Track successful copilot disablement for the response */

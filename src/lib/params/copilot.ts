@@ -121,6 +121,23 @@ export const COPILOT_HEARTBEAT_INTERVAL_MS = 5_000;
 export const COPILOT_HEARTBEAT_TIMEOUT_MS = 15_000;
 
 // =============================================================================
+// TIMING — VERCEL CLIENT-SIDE POLLING
+// =============================================================================
+
+/**
+ * Interval (ms) at which the browser triggers copilot evaluation cycles
+ * on the Vercel deployment by calling POST /api/cwf/copilot/evaluate.
+ *
+ * 6_000ms (6 seconds) matches the server-side COPILOT_DEFAULT_POLL_INTERVAL_SEC.
+ * This is only used on Vercel — locally, the cwf-dev-server.ts runs its own
+ * polling loop via the in-memory CopilotEngine.
+ *
+ * The evaluate endpoint also updates the heartbeat timestamp internally,
+ * so a separate heartbeat call is not needed on Vercel.
+ */
+export const COPILOT_VERCEL_POLL_INTERVAL_MS = 6_000;
+
+// =============================================================================
 // RATE LIMITING & COOLDOWN
 // =============================================================================
 
