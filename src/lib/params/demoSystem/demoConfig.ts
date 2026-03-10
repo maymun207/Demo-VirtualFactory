@@ -65,10 +65,10 @@ export const DEMO_HEIGHT_TRANSITION_MS: number = 400;
  * Adjust these values to match your viewport and font size.
  */
 export const DEMO_ACT_HEIGHTS: Record<DemoHeightKey, number> = {
-    compact: 192,   // ~8 rows
-    medium: 288,   // ~12 rows
-    tall: 384,   // ~16 rows
-    large: 480,   // ~20 rows
+    compact: 154,   // ~6 rows (−20%)
+    medium: 230,    // ~10 rows (−20%)
+    tall: 307,      // ~13 rows (−20%)
+    large: 384,     // ~16 rows (−20%)
 };
 
 /**

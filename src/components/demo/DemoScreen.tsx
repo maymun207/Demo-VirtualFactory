@@ -63,9 +63,10 @@ const computeBounds = (): PanelBounds | null => {
   return {
     top: header.getBoundingClientRect().bottom,
     left: demoBtn.getBoundingClientRect().left,
+    /** 20% narrower than the original full span — left edge stays anchored to Demo button */
     width:
-      pillar3.getBoundingClientRect().right -
-      demoBtn.getBoundingClientRect().left,
+      (pillar3.getBoundingClientRect().right -
+        demoBtn.getBoundingClientRect().left) * 0.8,
   };
 };
 
