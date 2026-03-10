@@ -138,6 +138,23 @@ export const COPILOT_HEARTBEAT_TIMEOUT_MS = 15_000;
 export const COPILOT_VERCEL_POLL_INTERVAL_MS = 6_000;
 
 // =============================================================================
+// DATA-FLOW DISENGAGE GRACE PERIOD
+// =============================================================================
+
+/**
+ * Grace period (ms) before copilot auto-disengages when isDataFlowing goes false.
+ *
+ * Brief Supabase Realtime disconnections or transient data gaps can cause
+ * isDataFlowing to flicker to false for a few seconds. Without this grace
+ * period, the copilot theme drops and monitoring stops prematurely.
+ *
+ * 30_000ms = 30 seconds. If isDataFlowing stays false for 30 consecutive
+ * seconds, copilot will disengage. If data flow resumes within this window,
+ * the timer resets and copilot continues uninterrupted.
+ */
+export const COPILOT_DISENGAGE_GRACE_PERIOD_MS = 30_000;
+
+// =============================================================================
 // RATE LIMITING & COOLDOWN
 // =============================================================================
 

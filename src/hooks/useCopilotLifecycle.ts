@@ -44,6 +44,7 @@ import {
     COPILOT_FEATURE_ENABLED,
     COPILOT_CONFIG_TABLE,
     COPILOT_ACTIONS_TABLE,
+    COPILOT_DISENGAGE_GRACE_PERIOD_MS,
 } from '../lib/params/copilot';
 import type { CwfState } from '../lib/params/copilot';
 
@@ -67,6 +68,9 @@ export function useCopilotLifecycle(): void {
         to prevent duplicate API calls */
     const hasDisabledForStopRef = useRef(false);
 
+    /** Timer ID for the grace-period debounce (Fix 1) */
+    const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     /** Read state from stores */
     const isEnabled = useCopilotStore((s) => s.isEnabled);
     const isDataFlowing = useSimulationStore((s) => s.isDataFlowing);
@@ -83,50 +87,90 @@ export function useCopilotLifecycle(): void {
     /** Get store actions (stable references from Zustand) */
     const syncStateFromCloud = useCopilotStore((s) => s.syncStateFromCloud);
     const disableCopilot = useCopilotStore((s) => s.disableCopilot);
-    const enableCopilot = useCopilotStore((s) => s.enableCopilot);
     const pushAction = useCopilotStore((s) => s.pushAction);
     const updateConfig = useCopilotStore((s) => s.updateConfig);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // EFFECT 1: Auto-disengage copilot when simulation stops
+    // EFFECT 1: Auto-disengage copilot when simulation stops (WITH GRACE PERIOD)
+    //
+    // Brief Supabase Realtime disconnections or transient data gaps can cause
+    // isDataFlowing to flicker to false for a few seconds. Without a grace
+    // period, the copilot theme drops and monitoring stops prematurely.
+    //
+    // Fix: debounce the disengage by COPILOT_DISENGAGE_GRACE_PERIOD_MS (30s).
+    // If isDataFlowing resumes within that window, the timer resets.
     // ─────────────────────────────────────────────────────────────────────────
 
     useEffect(() => {
-        /** Guard: only act if copilot is enabled and sim just stopped */
+        /** Guard: only act if copilot is enabled */
         if (!COPILOT_FEATURE_ENABLED || !isEnabled) {
             hasDisabledForStopRef.current = false;
+            /** Clear any pending grace timer on disable */
+            if (graceTimerRef.current) {
+                clearTimeout(graceTimerRef.current);
+                graceTimerRef.current = null;
+            }
             return;
         }
 
         if (!isDataFlowing && !hasDisabledForStopRef.current) {
-            /** Simulation has stopped while copilot was active — auto-disengage */
-            hasDisabledForStopRef.current = true;
-
-            /** Disable locally */
-            disableCopilot();
-
             /**
-             * Disable on server (fire-and-forget).
-             * Uses simulationId (UUID) — matches copilot_config.simulation_id.
-             * Falls back gracefully if simulationId is null (session already cleared).
+             * Data flow stopped while copilot was active.
+             * Start the grace period countdown instead of disengaging immediately.
+             * If data flow resumes within COPILOT_DISENGAGE_GRACE_PERIOD_MS,
+             * the timer is cancelled and copilot continues uninterrupted.
              */
-            if (simulationId) {
-                fetch('/api/cwf/copilot/disable', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ simulationId }),
-                }).catch(() => {
-                    /** Server may already know — ignore errors */
-                });
-            }
+            if (!graceTimerRef.current) {
+                console.log(
+                    `[Copilot UI] ⏳ Data flow stopped — grace period started ` +
+                    `(${COPILOT_DISENGAGE_GRACE_PERIOD_MS / 1000}s before disengage)`
+                );
 
-            console.log('[Copilot UI] 🔴 Auto-disengaged: simulation stopped');
+                graceTimerRef.current = setTimeout(() => {
+                    /** Grace period expired — truly disengage now */
+                    hasDisabledForStopRef.current = true;
+                    graceTimerRef.current = null;
+
+                    /** Disable locally */
+                    disableCopilot();
+
+                    /**
+                     * Disable on server (fire-and-forget).
+                     * Uses simulationId (UUID) — matches copilot_config.simulation_id.
+                     * Falls back gracefully if simulationId is null (session cleared).
+                     */
+                    if (simulationId) {
+                        fetch('/api/cwf/copilot/disable', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ simulationId }),
+                        }).catch(() => {
+                            /** Server may already know — ignore errors */
+                        });
+                    }
+
+                    console.log('[Copilot UI] 🔴 Auto-disengaged: simulation stopped (grace period expired)');
+                }, COPILOT_DISENGAGE_GRACE_PERIOD_MS);
+            }
         }
 
         if (isDataFlowing) {
-            /** Simulation restarted — reset the guard */
+            /** Data flow resumed — cancel grace timer and reset the guard */
+            if (graceTimerRef.current) {
+                console.log('[Copilot UI] ✅ Data flow resumed — grace timer cancelled');
+                clearTimeout(graceTimerRef.current);
+                graceTimerRef.current = null;
+            }
             hasDisabledForStopRef.current = false;
         }
+
+        /** Cleanup: clear grace timer on effect teardown */
+        return () => {
+            if (graceTimerRef.current) {
+                clearTimeout(graceTimerRef.current);
+                graceTimerRef.current = null;
+            }
+        };
     }, [isDataFlowing, isEnabled, simulationId, disableCopilot]);
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -182,17 +226,14 @@ export function useCopilotLifecycle(): void {
                         );
                     } else {
                         /**
-                         * Fallback for rows that don't yet have cwf_state
-                         * (rows created before the state machine migration).
-                         * Use the legacy enabled boolean to derive the state.
+                         * Rows without cwf_state should not exist in production.
+                         * The `enabled` boolean is DEPRECATED — cwf_state is the
+                         * sole source of truth. Log a warning for observability.
                          */
-                        if (newRow.enabled === true && !isEnabled) {
-                            enableCopilot();
-                            console.log('[Copilot UI] 🟢 Copilot enabled via Realtime (legacy fallback)');
-                        } else if (newRow.enabled === false && isEnabled) {
-                            disableCopilot();
-                            console.log('[Copilot UI] 🔴 Copilot disabled via Realtime (legacy fallback)');
-                        }
+                        console.warn(
+                            '[Copilot UI] ⚠️ Received copilot_config Realtime event ' +
+                            'without cwf_state — ignoring deprecated enabled boolean'
+                        );
                     }
 
                     /** Sync config thresholds (unchanged) */

@@ -2967,7 +2967,6 @@ export default async function handler(
                                  */
                                 await supabase.from('copilot_config').upsert({
                                     simulation_id: copilotSimId,
-                                    enabled: true,
                                     cwf_state: 'copilot_active',
                                     auth_attempts: 0,
                                     activated_by: copilotAuthCode,

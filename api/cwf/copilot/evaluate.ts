@@ -331,7 +331,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         /** Read copilot_config for this simulation */
         const { data: config, error: configError } = await supabase
             .from('copilot_config')
-            .select('enabled, cwf_state, last_heartbeat_at, oee_alarm_threshold, cooldown_sec, max_actions_per_minute')
+            .select('cwf_state, last_heartbeat_at, oee_alarm_threshold, cooldown_sec, max_actions_per_minute')
             .eq('simulation_id', simulationId)
             .single();
 
@@ -366,7 +366,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (heartbeatAge > HEARTBEAT_TIMEOUT_MS) {
             /** Browser heartbeat lost — auto-disengage */
             await supabase.from('copilot_config').update({
-                enabled: false,
                 cwf_state: 'normal',
                 auth_attempts: 0,
                 updated_at: new Date().toISOString(),
@@ -395,7 +394,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             await supabase.from('copilot_config').update({
                 cwf_state: 'normal',
                 auth_attempts: 0,
-                enabled: false,
                 updated_at: new Date().toISOString(),
             }).eq('simulation_id', simulationId);
 
@@ -495,6 +493,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             lowMachines.length === 0;
 
         if (factoryTrulyHealthy) {
+            /**
+             * Fix 3: Deduplicate pre-filter messages.
+             * Check if the last copilot_actions row for this simulation has the
+             * same sim_tick. If so, skip the chat message to avoid duplicates.
+             * Pre-filter cycles are fast (~50ms) and can fire multiple times
+             * before the sim_tick advances.
+             */
+            const { data: lastAction } = await supabase
+                .from('copilot_actions')
+                .select('sim_tick')
+                .eq('simulation_id', simulationId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const lastLoggedTick = lastAction?.sim_tick ?? -1;
+            if (simTick === lastLoggedTick) {
+                /** Same tick as last message — skip duplicate */
+                return res.status(200).json({
+                    decision: 'skip',
+                    foee: foee.toFixed(1),
+                    simTick,
+                    latencyMs: Date.now() - cycleStart,
+                    dedup: true,
+                });
+            }
+
             /** Build compact OEE summary with colour-coded per-machine values */
             const machineOeeSummary = Object.entries(machineOees)
                 .map(([m, v]) => {

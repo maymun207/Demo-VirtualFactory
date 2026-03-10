@@ -53,7 +53,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         /** Upsert copilot_config row — create if not exists, update if exists */
         const { error } = await supabase.from('copilot_config').upsert({
             simulation_id: simulationId,
-            enabled: true,
             cwf_state: 'copilot_active',
             auth_attempts: 0,
             activated_by: activatedBy || 'airtk',

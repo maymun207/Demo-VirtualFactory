@@ -50,7 +50,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         /** Update copilot_config to disabled — reset state machine to normal */
         const { error } = await supabase.from('copilot_config')
             .update({
-                enabled: false,
                 cwf_state: 'normal',
                 auth_attempts: 0,
                 updated_at: new Date().toISOString(),
