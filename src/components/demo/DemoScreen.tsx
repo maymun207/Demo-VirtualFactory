@@ -60,10 +60,10 @@ const computeBounds = (): PanelBounds | null => {
 
   if (!header || !demoBtn || !pillar3) return null;
 
-  /** Panel width = 80% of original span */
+  /** Panel width = 96% of original span (was 80%, +20%) */
   const computedWidth =
     (pillar3.getBoundingClientRect().right -
-      demoBtn.getBoundingClientRect().left) * 0.8;
+      demoBtn.getBoundingClientRect().left) * 0.96;
 
   return {
     top: header.getBoundingClientRect().bottom,
