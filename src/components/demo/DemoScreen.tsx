@@ -67,8 +67,8 @@ const computeBounds = (): PanelBounds | null => {
 
   return {
     top: header.getBoundingClientRect().bottom,
-    /** Shift 20% of panel width further left of the Demo button */
-    left: demoBtn.getBoundingClientRect().left - computedWidth * 0.2,
+    /** Shift 13% of panel width further left of the Demo button */
+    left: demoBtn.getBoundingClientRect().left - computedWidth * 0.13,
     width: computedWidth,
   };
 };
