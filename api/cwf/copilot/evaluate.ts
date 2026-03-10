@@ -339,7 +339,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(404).json({ error: 'No copilot_config found for this simulation' });
         }
 
-        if (!config.enabled || config.cwf_state !== 'copilot_active') {
+        /**
+         * Check copilot is active using cwf_state as the SINGLE SOURCE OF TRUTH.
+         * The legacy `enabled` boolean is no longer authoritative — it can be out
+         * of sync with cwf_state. The 3-state machine (normal, copilot_pending_auth,
+         * copilot_active) is the correct way to determine if copilot is running.
+         */
+        if (config.cwf_state !== 'copilot_active') {
             return res.status(200).json({
                 decision: 'disabled',
                 message: 'Copilot is not active for this simulation',
