@@ -111,7 +111,7 @@ export const DemoControlBar: React.FC = () => {
         border border-b-0 border-white/10
         rounded-t-2xl
         shadow-[0_-8px_32px_rgba(0,0,0,0.5)]
-        px-5 py-2.5
+        px-6 py-3
         flex items-center gap-3
       ">
 
@@ -119,14 +119,14 @@ export const DemoControlBar: React.FC = () => {
         <div className="flex items-center gap-3 shrink-0">
           {/* Demo wordmark */}
           <div className="flex items-center gap-1.5">
-            <span className="text-lg leading-none">🏭</span>
-            <span className="text-white/60 text-xs font-black uppercase tracking-widest">
+            <span className="text-xl leading-none">🏭</span>
+            <span className="text-white/60 text-[13px] font-black uppercase tracking-widest">
               Demo
             </span>
           </div>
 
           {/* Thin separator */}
-          <div className="w-px h-6 bg-white/10" />
+          <div className="w-px h-7 bg-white/10" />
 
           {/* Horizontal act progress dots — tooltip shows act name on hover */}
           <div className="flex items-center gap-1.5">
@@ -142,16 +142,13 @@ export const DemoControlBar: React.FC = () => {
                   className="flex items-center justify-center"
                 >
                   {isCompleted && (
-                    /** Completed: filled dim white dot */
-                    <div className="w-2.5 h-2.5 rounded-full bg-white/35" />
+                    <div className="w-3 h-3 rounded-full bg-white/35" />
                   )}
                   {isCurrent && (
-                    /** Current: bright blue pulsing dot */
-                    <div className="w-3 h-3 rounded-full bg-blue-400 shadow-[0_0_6px_2px_rgba(96,165,250,0.55)] animate-pulse" />
+                    <div className="w-3.5 h-3.5 rounded-full bg-blue-400 shadow-[0_0_6px_2px_rgba(96,165,250,0.55)] animate-pulse" />
                   )}
                   {!isCompleted && !isCurrent && (
-                    /** Future: empty ring */
-                    <div className="w-2.5 h-2.5 rounded-full border border-white/20" />
+                    <div className="w-3 h-3 rounded-full border border-white/20" />
                   )}
                 </div>
               );
@@ -159,14 +156,14 @@ export const DemoControlBar: React.FC = () => {
           </div>
 
           {/* Current act label — readable at a glance */}
-          <span className="text-white/50 text-xs font-medium whitespace-nowrap hidden sm:inline">
+          <span className="text-white/50 text-[13px] font-medium whitespace-nowrap hidden sm:inline">
             {DEMO_ACTS[currentActIndex]?.eraEmoji}{" "}
             {DEMO_ACTS[currentActIndex]?.eraLabel}
           </span>
         </div>
 
         {/* Thin separator */}
-        <div className="w-px h-6 bg-white/10 shrink-0" />
+        <div className="w-px h-7 bg-white/10 shrink-0" />
 
         {/* ── CONTINUE BUTTON ──────────────────────────────────── */}
         {/*
@@ -192,11 +189,11 @@ export const DemoControlBar: React.FC = () => {
           }
           className="
             shrink-0 flex items-center gap-2
-            px-4 py-2 rounded-lg
+            px-4 py-2.5 rounded-lg
             bg-blue-500/20 hover:bg-blue-500/35
             border border-blue-400/30 hover:border-blue-400/60
             text-blue-300 hover:text-blue-100
-            text-sm font-semibold tracking-wide
+            text-[15px] font-semibold tracking-wide
             transition-all duration-200
             disabled:opacity-40 disabled:cursor-not-allowed
             shadow-[0_2px_10px_rgba(96,165,250,0.12)]
@@ -204,7 +201,7 @@ export const DemoControlBar: React.FC = () => {
             whitespace-nowrap
           "
         >
-          {isLastAct ? <RefreshCw size={14} /> : <ChevronRight size={14} />}
+          {isLastAct ? <RefreshCw size={16} /> : <ChevronRight size={16} />}
           <span>
             {isLastAct
               ? "↺ Restart"
@@ -229,8 +226,8 @@ export const DemoControlBar: React.FC = () => {
             className="
               flex-1 min-w-0
               bg-white/5 border border-white/10
-              rounded-lg px-3.5 py-2
-              text-[15px] text-white placeholder-white/25
+              rounded-lg px-4 py-2.5
+              text-[17px] text-white placeholder-white/25
               focus:outline-none focus:border-white/30 focus:bg-white/8
               transition-all duration-150
               disabled:opacity-40 disabled:cursor-not-allowed
@@ -243,7 +240,7 @@ export const DemoControlBar: React.FC = () => {
             disabled={isLoading || !inputText.trim() || !simHasSession}
             title="Send"
             className="
-              shrink-0 p-2 rounded-lg
+              shrink-0 p-2.5 rounded-lg
               bg-white/5 hover:bg-white/12
               border border-white/10 hover:border-white/25
               text-white/50 hover:text-white/80
@@ -251,7 +248,7 @@ export const DemoControlBar: React.FC = () => {
               disabled:opacity-30 disabled:cursor-not-allowed
             "
           >
-            <Send size={16} />
+            <Send size={18} />
           </button>
 
           {/* Clear conversation icon button */}
@@ -259,22 +256,22 @@ export const DemoControlBar: React.FC = () => {
             onClick={clearMessages}
             title="Clear conversation"
             className="
-              shrink-0 p-2 rounded-lg
+              shrink-0 p-2.5 rounded-lg
               bg-white/5 hover:bg-white/10
               border border-white/8 hover:border-white/20
               text-white/30 hover:text-white/60
               transition-all duration-150
             "
           >
-            <Trash2 size={16} />
+            <Trash2 size={18} />
           </button>
         </div>
 
         {/* Thin separator */}
-        <div className="w-px h-6 bg-white/10 shrink-0" />
+        <div className="w-px h-7 bg-white/10 shrink-0" />
 
         {/* ── RIGHT: SCENARIO + RESTART stacked ────────────────── */}
-        <div className="flex flex-col gap-0.5 shrink-0 items-stretch min-w-[120px]">
+        <div className="flex flex-col gap-0.5 shrink-0 items-stretch min-w-[132px]">
           {/* Scenario badge */}
           <div className="
             flex items-center gap-1.5 px-3 py-1.5 rounded-md
