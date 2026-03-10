@@ -1,29 +1,19 @@
 /**
  * DemoScreen.tsx — Root Demo Panel with Dynamic Height
  *
- * The fixed-position, glass-effect panel that appears below the header
- * when the Demo button is clicked. Toggled via `showDemoScreen` in uiStore.
+ * Single-column layout:
+ *   - DemoChatView fills all available vertical space (flex-1, scrollable)
+ *   - DemoActBreadcrumb is a fixed-height horizontal control bar at the bottom
  *
- * DYNAMIC HEIGHT:
- *   The panel height is NOT fixed. Each DemoAct defines a `targetHeightKey`
- *   (compact / medium / tall / large). DemoScreen reads the current act's key
- *   from demoStore, looks up the pixel value from DEMO_ACT_HEIGHTS, and
- *   applies it as an inline style. A CSS transition animates the change
- *   smoothly — the "breathing panel" effect.
+ * The old 22% left breadcrumb column is removed — all horizontal space is
+ * now used for the narrative chat thread, making it much more readable.
  *
- * LAYOUT:
- *   LEFT  (~25% width) → DemoActBreadcrumb (progress dots + restart)
- *   RIGHT (~75% width) → DemoChatView (chat thread + Continue button)
- *
- * POSITIONING:
- *   Anchored to three DOM elements via getBoundingClientRect():
- *     LEFT  edge: left edge of #btn-demo
- *     RIGHT edge: right edge of #header-pillar3
- *     TOP   edge: bottom of #header-container
- *   Handles window resize events (debounced) to stay accurate.
+ * POSITIONING: Anchored via getBoundingClientRect() to:
+ *   LEFT  edge: left edge of #btn-demo
+ *   RIGHT edge: right edge of #header-pillar3
+ *   TOP   edge: bottom of #header-container
  *
  * All layout and height constants come from params — no hardcoded values.
- *
  * Used by: src/components/ui/Dashboard.tsx
  */
 
@@ -140,31 +130,16 @@ export const DemoScreen: React.FC = () => {
         transition: `height ${DEMO_HEIGHT_TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       }}
     >
-      {/* Glass panel body */}
-      <div
-        className="
-                    w-full h-full
-                    bg-black/35
-                    backdrop-blur-md
-                    border border-white/8
-                    border-t-0
-                    rounded-b-2xl
-                    overflow-hidden
-                    pointer-events-auto
-                    shadow-[0_8px_32px_rgba(0,0,0,0.5)]
-                "
-      >
-        {/* Two-column layout: Breadcrumb (left) + Chat (right) */}
-        <div className="grid h-full" style={{ gridTemplateColumns: "22% 78%" }}>
-          {/* Left column — act progress breadcrumb */}
-          <div className="h-full overflow-hidden border-r border-white/8">
-            <DemoActBreadcrumb />
-          </div>
+      {/* Glass panel body — single flex-col column */}
+      <div className="w-full h-full bg-black/35 backdrop-blur-md border border-white/8 border-t-0 rounded-b-2xl overflow-hidden pointer-events-auto shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex flex-col">
+        {/* Chat thread — grows to fill all available space */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <DemoChatView />
+        </div>
 
-          {/* Right column — narrative chat + Continue button */}
-          <div className="h-full overflow-hidden">
-            <DemoChatView />
-          </div>
+        {/* Horizontal control bar — act stepper + navigation + input */}
+        <div className="shrink-0 border-t border-white/8">
+          <DemoActBreadcrumb />
         </div>
       </div>
     </div>

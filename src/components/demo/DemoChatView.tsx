@@ -1,24 +1,20 @@
 /**
- * DemoChatView.tsx — Narrative Demo Chat Thread + Continue Button
+ * DemoChatView.tsx — Narrative Demo Chat Thread
  *
- * Right column of DemoScreen. Shows the conversation thread between
- * the audience and ARIA (the demo AI guide), and provides:
- *   - Message thread: user questions + ARIA narrative responses
- *   - Always-visible Continue → button (advances to next act)
- *   - Free-form text input (for audience Socratic responses)
- *   - Clear conversation button
+ * Fills the upper portion of DemoScreen (flex-1, scrollable).
+ * Shows the conversation thread between the audience and ARIA.
  *
- * The Continue button is:
- *   - Always rendered (never hidden)
- *   - Disabled while isLoading (CWF generating response)
- *   - On the final act: shows "✓ Demo Complete" and triggers restartDemo
- *   - Label includes the next act's era emoji and label for context
+ * When messages is empty AND currentActIndex === 0, shows the
+ * static welcome card (factory journey overview + Start buttons).
+ *
+ * The bottom toolbar (input, Continue, Restart, Scenario) now lives
+ * exclusively in DemoActBreadcrumb — this component only manages
+ * the scrollable message area.
  *
  * Used by: DemoScreen.tsx
  */
 
-import React, { useEffect, useRef, useState } from "react";
-import { Send, Trash2 } from "lucide-react";
+import React, { useEffect, useRef } from "react";
 import { useDemoStore } from "../../store/demoStore";
 import type { DemoState, DemoMessage } from "../../store/demoStore";
 
@@ -27,26 +23,18 @@ import { useSimulationDataStore } from "../../store/simulationDataStore";
 import { useSimulationStore } from "../../store/simulationStore";
 
 /**
- * DemoChatView — the interactive right panel of DemoScreen.
+ * DemoChatView — the scrollable narrative chat thread.
  */
 export const DemoChatView: React.FC = () => {
   /** Full conversation message list */
   const messages = useDemoStore((s: DemoState) => s.messages);
-  /** True while CWF is generating a response */
-  const isLoading = useDemoStore((s: DemoState) => s.isLoading);
-  /** Current act index for Continue button labeling */
+  /** Current act index — used to show welcome card at index 0 */
   const currentActIndex = useDemoStore((s: DemoState) => s.currentActIndex);
-  /** Store actions needed in this panel */
-  const sendMessage = useDemoStore((s: DemoState) => s.sendMessage);
-  const clearMessages = useDemoStore((s: DemoState) => s.clearMessages);
+  /** advanceAct: needed for the Start Demo button in the welcome card */
   const advanceAct = useDemoStore((s: DemoState) => s.advanceAct);
 
-  /** Free-form input text */
-  const [inputText, setInputText] = useState<string>("");
   /** Ref for auto-scroll to latest message */
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  /** Ref for the text input */
-  const inputRef = useRef<HTMLInputElement | null>(null);
   /** True if a simulation session is active (required for CWF calls) */
   const simHasSession = useSimulationDataStore((s) => !!s.session?.id);
 
@@ -55,28 +43,6 @@ export const DemoChatView: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /** continueDisabled — the welcome card Start Demo button uses this too */
-  const continueDisabled = isLoading || !simHasSession;
-  /**
-   * handleSend — sends the free-form input text to CWF.
-   */
-  const handleSend = () => {
-    const trimmed = inputText.trim();
-    if (!trimmed || isLoading) return;
-    setInputText("");
-    void sendMessage(trimmed);
-  };
-
-  /**
-   * handleKeyDown — Enter to send (Shift+Enter = new line in textarea).
-   */
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   return (
     <div className="flex flex-col h-full">
       {/* ── Message thread ────────────────────────────────────────── */}
@@ -84,7 +50,6 @@ export const DemoChatView: React.FC = () => {
         {messages.length === 0 && currentActIndex === 0 && (
           /*
            * Welcome Card — static, shown before the demo starts.
-           * Uses the full column width (no max-w-xs constraints).
            * Disappears as soon as the first message arrives.
            */
           <div className="flex flex-col h-full px-5 py-5 gap-5">
@@ -180,7 +145,7 @@ export const DemoChatView: React.FC = () => {
               {/* Step 2 — Start Demo (active only when sim is running) */}
               <button
                 onClick={() => void advanceAct()}
-                disabled={!simHasSession || continueDisabled}
+                disabled={!simHasSession}
                 className="
                   w-full flex items-center justify-center gap-2
                   px-4 py-3 rounded-xl
@@ -209,64 +174,6 @@ export const DemoChatView: React.FC = () => {
         ))}
         {/* Scroll anchor */}
         <div ref={messagesEndRef} />
-      </div>
-
-      {/* ── Bottom toolbar ────────────────────────────────────────── */}
-      <div className="shrink-0 border-t border-white/8 px-2 py-2 flex flex-col gap-1.5">
-        {/* Free-form input row */}
-        <div className="flex items-center gap-1.5">
-          {/* Text input */}
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Your response or question..."
-            disabled={isLoading}
-            className="
-                            flex-1 min-w-0
-                            bg-white/5 border border-white/10
-                            rounded-lg px-3 py-2
-                            text-2xl text-white placeholder-white/25
-                            focus:outline-none focus:border-white/25 focus:bg-white/8
-                            transition-all duration-150
-                            disabled:opacity-40 disabled:cursor-not-allowed
-                        "
-          />
-
-          {/* Send button */}
-          <button
-            onClick={handleSend}
-            disabled={isLoading || !inputText.trim()}
-            title="Send your response"
-            className="
-                            shrink-0 p-1.5 rounded-lg
-                            bg-white/8 hover:bg-white/15
-                            border border-white/10 hover:border-white/25
-                            text-white/50 hover:text-white/80
-                            transition-all duration-150
-                            disabled:opacity-30 disabled:cursor-not-allowed
-                        "
-          >
-            <Send size={16} />
-          </button>
-
-          {/* Clear button */}
-          <button
-            onClick={clearMessages}
-            title="Clear conversation"
-            className="
-                            shrink-0 p-1.5 rounded-lg
-                            bg-white/5 hover:bg-white/10
-                            border border-white/8 hover:border-white/20
-                            text-white/30 hover:text-white/60
-                            transition-all duration-150
-                        "
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
       </div>
     </div>
   );

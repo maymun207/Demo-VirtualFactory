@@ -272,7 +272,7 @@ export const Header = () => {
           {/* Work ID & Scenario */}
           <div className="hidden xl:flex items-center gap-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/5">
-              <span className="text-white/30 font-bold text-[0.6rem] uppercase tracking-tighter">
+              <span className="text-white font-bold text-[0.7rem] uppercase tracking-wider">
                 {sg.labelWorkId[currentLang]}
               </span>
               <span
@@ -282,7 +282,7 @@ export const Header = () => {
               </span>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/5">
-              <span className="text-white/30 font-bold text-[0.6rem] uppercase tracking-tighter">
+              <span className="text-white font-bold text-[0.7rem] uppercase tracking-wider">
                 {sg.labelScenario[currentLang]}
               </span>
               <span
