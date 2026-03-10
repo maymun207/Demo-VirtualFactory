@@ -18,6 +18,27 @@
 /** Total number of metallic slats rendered on the conveyor belt loop */
 export const SLAT_COUNT = 100;
 
+/**
+ * Speed multiplier applied ONLY to slat (belt) animation — NOT to tiles.
+ *
+ * WHY 0.5:
+ *   The conveyor curve is a full closed loop (top production run + bottom
+ *   return leg). Tiles travel only the TOP half of the loop (t ≈ 0 → 0.5),
+ *   while slats cycle 360° using the same visualVelocity.
+ *   From the viewer's perspective, slats on the visible top surface appear
+ *   to refresh and recycle every 0.5t — making them look ~2× faster than
+ *   tiles that physically sit on the belt surface.
+ *
+ *   Applying a 0.5× multiplier to the slat offset advance rate brings the
+ *   visual speed of the belt surface into alignment with the tiles moving
+ *   on top of it. Result: slats and tiles now appear to move in sync.
+ *
+ *   If the belt still looks slightly off after deployment, tweak this value:
+ *     • Too fast → lower (e.g. 0.45)
+ *     • Too slow → raise (e.g. 0.55)
+ */
+export const SLAT_SPEED_MULTIPLIER = 0.5;
+
 /** The CatmullRom spline control points for the conveyor belt loop */
 export const CONVEYOR_CURVE_POINTS: [number, number, number][] = [
   [-16, 0.1, 0],

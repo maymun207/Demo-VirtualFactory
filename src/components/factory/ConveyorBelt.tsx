@@ -51,6 +51,7 @@ import { createLogger } from "../../lib/logger";
 import {
   computeBaseVelocity,
   SLAT_COUNT,
+  SLAT_SPEED_MULTIPLIER,
   SPAWN_T,
   SORT_THRESHOLD,
   COLLECT_THRESHOLD,
@@ -1797,7 +1798,10 @@ export const ConveyorBelt = () => {
     if (conveyorStatusRef.current === "running") {
       for (let i = 0; i < SLAT_COUNT; i++) {
         offsets.current[i] =
-          (offsets.current[i] + delta * visualVelocityRef.current) % 1;
+          /** SLAT_SPEED_MULTIPLIER corrects the looping-curve vs tile 2× visual mismatch.
+           *  Slats cycle the full curve (top + return), tiles only travel the top half.
+           *  0.5× slows the belt surface to match tile apparent speed. */
+          (offsets.current[i] + delta * visualVelocityRef.current * SLAT_SPEED_MULTIPLIER) % 1;
       }
     }
 
