@@ -102,7 +102,7 @@ export const DemoControlBar: React.FC = () => {
     <div
       id="demo-control-bar"
       style={{ transform: "translateZ(0)" }}
-      className="fixed bottom-0 left-0 right-0 z-[9999] pointer-events-none"
+      className="fixed bottom-0 left-0 right-0 z-9999 pointer-events-none"
     >
       {/* Glass HUD strip — centred, ~48vw width, pill rising from bottom */}
       <div className="
