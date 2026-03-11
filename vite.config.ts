@@ -19,6 +19,16 @@ export default defineConfig({
    * Or use: npm run dev:full (starts both Vite and CWF server concurrently)
    */
   server: {
+    /**
+     * Bind Vite explicitly to port 5173.
+     * strictPort: true makes Vite exit with an error instead of silently
+     * moving to 5174+ when the port is already in use.
+     * Without this, zombie processes from crashed restarts block 5173
+     * and Vite starts on a different port — completely invisible to the user.
+     */
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
     proxy: {
       '/api/cwf': {
         target: 'http://localhost:3001',

@@ -212,7 +212,18 @@ export const useUIStore = create<UIState>((set) => ({
   toggleKPI: () => set((s) => ({ showKPI: !s.showKPI })),
   toggleDemoSettings: () => set((s) => ({ showDemoSettings: !s.showDemoSettings })),
   toggleCWF: () => set((s) => ({ showCWF: !s.showCWF })),
-  toggleDTXFR: () => set((s) => ({ showDTXFR: !s.showDTXFR })),
+  /** Toggle the DTXFR panel; opening also enables Production Table + OEE Hierarchy; closing disables both */
+  toggleDTXFR: () =>
+    set((s) => {
+      const opening = !s.showDTXFR;
+      return {
+        showDTXFR: opening,
+        /** Turn Production Table on when opening, off when closing */
+        showProductionTable: opening,
+        /** Turn OEE Hierarchy 3D table on when opening, off when closing */
+        showOEEHierarchy: opening,
+      };
+    }),
   /** Clamp the CWF panel width between configured min and max bounds */
   setCwfPanelWidth: (width) =>
     set({ cwfPanelWidth: Math.max(CWF_SIDE_PANEL_MIN_WIDTH, Math.min(CWF_SIDE_PANEL_MAX_WIDTH, width)) }),

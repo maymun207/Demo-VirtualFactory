@@ -132,10 +132,6 @@ export function DTXFRPanel() {
   const currentLang = useUIStore((s) => s.currentLang);
   /** Toggle function to show/hide the DTXFR panel */
   const toggleDTXFR = useUIStore((s) => s.toggleDTXFR);
-  /** Whether the Production Table is currently visible */
-  const showProductionTable = useUIStore((s) => s.showProductionTable);
-  /** Whether the OEE Hierarchy table is currently visible */
-  const showOEEHierarchy = useUIStore((s) => s.showOEEHierarchy);
   /** Setter for the DTXFR panel width (clamped in the store) */
   const setDtxfrPanelWidth = useUIStore((s) => s.setDtxfrPanelWidth);
 
@@ -356,42 +352,11 @@ export function DTXFRPanel() {
           </button>
         </div>
 
-        {/* ── Upper separator bar — Tile Journey + Production Table toggle ── */}
-        <div className="h-[28px] w-full bg-linear-to-r from-emerald-600/25 via-green-500/15 to-emerald-600/25 border-y border-emerald-400/20 flex items-center justify-between px-4">
+        {/* ── Upper separator bar — Tile Journey ── */}
+        <div className="h-[28px] w-full bg-linear-to-r from-emerald-600/25 via-green-500/15 to-emerald-600/25 border-y border-emerald-400/20 flex items-center px-4">
           <span className="text-[0.78rem] uppercase tracking-[0.25em] text-white font-semibold">
             Tile Journey
           </span>
-          {/* Toggle buttons for 3D table visibility */}
-          <div className="flex items-center gap-1.5">
-            {/* Production Table toggle */}
-            <button
-              onClick={() => {
-                const s = useUIStore.getState();
-                s.setShowProductionTable(!s.showProductionTable);
-              }}
-              className={`px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wider transition-all duration-150 ${
-                showProductionTable
-                  ? "bg-cyan-400/60 text-white border border-cyan-300/70 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_0_6px_rgba(0,200,255,0.3)] translate-y-px"
-                  : "bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-[0_2px_0_rgba(0,200,255,0.15),inset_0_1px_0_rgba(255,255,255,0.1)] hover:bg-cyan-500/30"
-              }`}
-            >
-              ProdTbl
-            </button>
-            {/* OEE Hierarchy Table toggle */}
-            <button
-              onClick={() => {
-                const s = useUIStore.getState();
-                s.toggleOEEHierarchy();
-              }}
-              className={`px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wider transition-all duration-150 ${
-                showOEEHierarchy
-                  ? "bg-cyan-400/60 text-white border border-cyan-300/70 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_0_6px_rgba(0,200,255,0.3)] translate-y-px"
-                  : "bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-[0_2px_0_rgba(0,200,255,0.15),inset_0_1px_0_rgba(255,255,255,0.1)] hover:bg-cyan-500/30"
-              }`}
-            >
-              OEE
-            </button>
-          </div>
         </div>
 
         {/* ── 10px separator bar between header and content ──────── */}

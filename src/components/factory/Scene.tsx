@@ -37,6 +37,7 @@ import { OEEHierarchyTable3D } from "./OEEHierarchyTable3D";
 import { CameraDebug } from "./CameraDebug";
 import { SceneErrorBoundary } from "./SceneErrorBoundary";
 import { useSystemTimer } from "../../system-timer/useSystemTimer";
+import { useCameraReset } from "../../hooks/useCameraReset";
 import {
   STATION_STAGES,
   STATION_COUNT,
@@ -114,6 +115,21 @@ const CameraFOVController = () => {
 };
 
 /**
+ * CameraResetHandler — Invisible canvas component that mounts useCameraReset.
+ *
+ * Accepts the OrbitControls ref from Scene so useCameraReset can access
+ * the controls instance. Must live inside <Canvas> for useThree access.
+ *
+ * @param controlsRef - Ref to the OrbitControls instance
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CameraResetHandler = ({ controlsRef }: { controlsRef: React.RefObject<any> }) => {
+  /** Mount the reset listener — zero render output */
+  useCameraReset(controlsRef);
+  return null;
+};
+
+/**
  * Scene — Main scene component.
  *
  * Manages station group refs (stationRefs) and active state tracking
@@ -123,6 +139,10 @@ const CameraFOVController = () => {
 export const Scene = () => {
   const stations = useSimulationStore((s) => s.stations);
   const resetVersion = useSimulationStore((s) => s.resetVersion);
+
+  /** Ref to the OrbitControls instance — used by CameraResetHandler to restore the view */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orbitControlsRef = useRef<any>(null);
 
   // Central Station Ref Management
   const stationRefs = useRef<(THREE.Group | null)[]>(
@@ -147,12 +167,15 @@ export const Scene = () => {
         <Suspense fallback={null}>
           <SystemTimerDriver />
           <CameraFOVController />
+          {/* Camera reset listener — handles 'camera-reset' DOM events from the Header button */}
+          <CameraResetHandler controlsRef={orbitControlsRef} />
           <SceneLogic
             stationRefs={stationRefs}
             activeStatesRef={activeStatesRef}
             stationStages={STATION_STAGES}
           />
           <OrbitControls
+            ref={orbitControlsRef}
             makeDefault
             target={ORBIT_TARGET}
             minPolarAngle={ORBIT_CONTROLS.minPolarAngle}

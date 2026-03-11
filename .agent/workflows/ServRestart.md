@@ -52,10 +52,10 @@ Wait ~5 seconds for the server to print "🏭 CWF Dev Server running" — that c
 Run from the project root:
 
 ```bash
-cd "/Users/tunckahveci/Desktop/Demo VirtualFactory/virtual-factory-demo" && npm run dev
+cd "/Users/tunckahveci/Desktop/Demo VirtualFactory/virtual-factory-demo" && npx vite &
 ```
 
-Wait ~5 seconds for Vite to print its "Local: http://localhost:5173" banner — that confirms startup.
+Wait ~5 seconds for Vite to print its "Local: [http://localhost:5173](http://localhost:5173)" banner — that confirms startup.
 
 ### Step 6 — Verify both servers are running
 
@@ -70,5 +70,5 @@ Expected: two LISTEN lines, one for port 5173 (Vite) and one for port 3001 (CWF)
 
 Report to the user:
 
-- ✅ Vite frontend → http://localhost:5173
-- ✅ CWF API server → http://localhost:3001/api/cwf/chat
+- ✅ Vite frontend → [http://localhost:5173](http://localhost:5173)
+- ✅ CWF API server → [http://localhost:3001/api/cwf/chat](http://localhost:3001/api/cwf/chat)

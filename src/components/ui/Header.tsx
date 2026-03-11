@@ -47,6 +47,7 @@ import {
   Settings2,
   Settings,
   Presentation,
+  Crosshair,
 } from "lucide-react";
 import { useUIStore } from "../../store/uiStore";
 import { useSimulationStore } from "../../store/simulationStore";
@@ -197,6 +198,14 @@ export const Header = () => {
               {t("subtitle")}
             </p>
           </div>
+          {/* Camera view reset button — restores the 3D camera to the initial overview position */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('camera-reset'))}
+            className="ml-1 p-1.5 rounded-lg border border-white/10 text-white/30 hover:text-white/70 hover:border-white/30 hover:bg-white/5 transition-all duration-200 active:scale-90"
+            title="Reset camera view"
+          >
+            <Crosshair size={13} />
+          </button>
         </div>
 
         {/* ── Pillar 2: Modes (Responsive Menu) ────────────────────── */}

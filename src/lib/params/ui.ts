@@ -202,11 +202,12 @@ export const UI_DEFAULTS = {
   /** Default interface language ('tr' = Turkish, 'en' = English) */
   language: 'en' as const,
 
-  /** Panel visibility defaults: only the Production Table is visible at start */
+  /** Panel visibility defaults: all panels hidden at start for a clean initial view */
   showPassport: false,
   showHeatmap: false,
   showControlPanel: false,
-  showProductionTable: true,
+  /** Production Table hidden on initial load — opens via DTXFR toggle */
+  showProductionTable: false,
   showKPI: false,
   showDemoSettings: false,
   showAlarmLog: false,
@@ -216,8 +217,8 @@ export const UI_DEFAULTS = {
   showDTXFR: false,
   /** Basic panel (KPI + Heatmap) hidden by default for a clean initial view */
   showBasicPanel: false,
-  /** OEE Hierarchy drill-down panel visible by default */
-  showOEEHierarchy: true,
+  /** OEE Hierarchy 3D table hidden on initial load — opens via DTXFR toggle */
+  showOEEHierarchy: false,
 
   /**
    * isSimConfigured — Demo Settings Gate
