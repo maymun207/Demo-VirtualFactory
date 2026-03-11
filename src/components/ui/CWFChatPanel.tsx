@@ -712,7 +712,16 @@ export function CWFChatPanel() {
   const simulationId = useSimulationDataStore((s) => s.session?.id ?? null);
 
   /** ── Copilot State ───────────────────────────────────────────────────── */
-  const isCopilotEnabled = useCopilotStore((s) => s.isEnabled); // Whether copilot is active
+  /**
+   * Derive copilot active state from BOTH isEnabled AND cwfState.
+   * When Supabase Realtime fails (CHANNEL_ERROR), isEnabled can stay false
+   * while cwfState is already 'copilot_active'. Using OR ensures the toggle
+   * button always shows the "disable" badge when copilot is running,
+   * preventing the user from being stuck with an unusable enable icon.
+   */
+  const isCopilotEnabled = useCopilotStore(
+    (s) => s.isEnabled || s.cwfState === 'copilot_active'
+  );
   const copilotTotalActions = useCopilotStore((s) => s.totalActions); // Corrective action count
 
   /**

@@ -109,26 +109,35 @@ export function CopilotToggleButton({
       setIsDisabling(true);
       try {
         /**
-         * When simulationId is null (factory reset cleared the session),
-         * we can't call the server endpoint. Instead, perform a LOCAL-ONLY
-         * disable so the pink theme clears and the UI returns to normal.
+         * ALWAYS disable locally FIRST — gives the user instant feedback
+         * (pink theme drops, button reverts to shield icon).
+         *
+         * Previously this relied on Supabase Realtime to propagate the
+         * cwf_state change from the server. But when Realtime fails
+         * (CHANNEL_ERROR, WebSocket drops), the state never syncs and
+         * the button becomes useless. Calling disableCopilot() locally
+         * guarantees immediate UI response regardless of connectivity.
          */
-        if (!simulationId) {
-          onLocalDisable?.();
-          onDisabled?.();
-          return;
+        onLocalDisable?.();
+
+        /**
+         * Then disable on the server (if we have a session).
+         * Fire-and-forget — if the server call fails, the local state
+         * is already correct. If Realtime later fires, the double-set
+         * is harmless (idempotent state transition).
+         */
+        if (simulationId) {
+          await fetch("/api/cwf/copilot/disable", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ simulationId }),
+          });
         }
 
-        /** Call the disable endpoint — CWF dev server or Vercel function */
-        await fetch("/api/cwf/copilot/disable", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ simulationId }),
-        });
         /** Notify parent so it can add a system message to chat */
         onDisabled?.();
       } catch {
-        /** Engine may already be stopped — the Supabase state reset is what matters */
+        /** Engine may already be stopped — local state is already correct */
       } finally {
         setIsDisabling(false);
       }
