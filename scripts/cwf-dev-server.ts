@@ -328,9 +328,9 @@ const server = http.createServer(async (req, res) => {
             const { createClient } = await import('@supabase/supabase-js');
             const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-            /** Update copilot_config to disabled */
+            /** Update copilot_config: reset state machine to 'normal' and clear auth attempts */
             await sb.from('copilot_config')
-                .update({ enabled: false, updated_at: new Date().toISOString() })
+                .update({ cwf_state: 'normal', auth_attempts: 0, updated_at: new Date().toISOString() })
                 .eq('simulation_id', simulationId);
 
             /** Stop the engine polling loop */

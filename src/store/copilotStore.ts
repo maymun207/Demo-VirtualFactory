@@ -220,39 +220,30 @@ export const useCopilotStore = create<CopilotState>((set) => ({
 
     // ─── State Machine Sync (primary update path from Supabase Realtime) ─────
 
-    syncStateFromCloud: (cwfState, authAttempts) => {
-        console.log(`[CopilotStore] 🔄 syncStateFromCloud: cwfState=${cwfState}, authAttempts=${authAttempts}`);
-        set({
-            /** Mirror the authoritative Supabase state into Zustand */
-            cwfState,
-            authAttempts,
-            /** Derive convenience flags from the received state */
-            isEnabled: cwfState === 'copilot_active',
-            isAuthPending: cwfState === 'copilot_pending_auth',
-        });
-    },
+    syncStateFromCloud: (cwfState, authAttempts) => set({
+        /** Mirror the authoritative Supabase state into Zustand */
+        cwfState,
+        authAttempts,
+        /** Derive convenience flags from the received state */
+        isEnabled: cwfState === 'copilot_active',
+        isAuthPending: cwfState === 'copilot_pending_auth',
+    }),
 
     // ─── Legacy Action Helpers (kept for backward-compat) ────────────────────
 
-    enableCopilot: () => {
-        console.log('[CopilotStore] 🟢 enableCopilot() called');
-        set({
-            cwfState: 'copilot_active',
-            authAttempts: 0,
-            isEnabled: true,
-            isAuthPending: false,
-        });
-    },
+    enableCopilot: () => set({
+        cwfState: 'copilot_active',
+        authAttempts: 0,
+        isEnabled: true,
+        isAuthPending: false,
+    }),
 
-    disableCopilot: () => {
-        console.log('[CopilotStore] 🔴 disableCopilot() called');
-        set({
-            cwfState: 'normal',
-            authAttempts: 0,
-            isEnabled: false,
-            isAuthPending: false,
-        });
-    },
+    disableCopilot: () => set({
+        cwfState: 'normal',
+        authAttempts: 0,
+        isEnabled: false,
+        isAuthPending: false,
+    }),
 
     setAuthPending: (pending) => set((state) => ({
         cwfState: pending ? 'copilot_pending_auth' : state.cwfState,

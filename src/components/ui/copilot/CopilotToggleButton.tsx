@@ -52,11 +52,6 @@ interface CopilotToggleButtonProps {
   onSendMessage: (message: string, language: "en" | "tr") => void;
   /** Optional callback fired after direct disable succeeds (e.g., add a chat message) */
   onDisabled?: () => void;
-  /**
-   * Fallback local disable — called when simulationId is null (e.g., after
-   * factory reset) so the pink theme can still be cleared without a server call.
-   */
-  onLocalDisable?: () => void;
 }
 
 // =============================================================================
@@ -77,7 +72,6 @@ export function CopilotToggleButton({
   simulationId,
   onSendMessage,
   onDisabled,
-  onLocalDisable,
 }: CopilotToggleButtonProps) {
   /** Resolve bilingual labels from the centralised params module */
   const labels = COPILOT_UI_LABELS;
@@ -108,36 +102,36 @@ export function CopilotToggleButton({
 
       setIsDisabling(true);
       try {
-        /**
-         * ALWAYS disable locally FIRST — gives the user instant feedback
-         * (pink theme drops, button reverts to shield icon).
-         *
-         * Previously this relied on Supabase Realtime to propagate the
-         * cwf_state change from the server. But when Realtime fails
-         * (CHANNEL_ERROR, WebSocket drops), the state never syncs and
-         * the button becomes useless. Calling disableCopilot() locally
-         * guarantees immediate UI response regardless of connectivity.
-         */
-        onLocalDisable?.();
-
-        /**
-         * Then disable on the server (if we have a session).
-         * Fire-and-forget — if the server call fails, the local state
-         * is already correct. If Realtime later fires, the double-set
-         * is harmless (idempotent state transition).
-         */
-        if (simulationId) {
-          await fetch("/api/cwf/copilot/disable", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ simulationId }),
-          });
+        if (!simulationId) {
+          /**
+           * No active session (factory reset cleared it). The copilot_config
+           * row can't be updated without a simulation_id, but Supabase already
+           * holds the correct state (or the row doesn't exist). Call onDisabled
+           * so the parent can add a system message.
+           */
+          onDisabled?.();
+          return;
         }
 
-        /** Notify parent so it can add a system message to chat */
-        onDisabled?.();
+        /**
+         * Call the disable endpoint — CWF dev server (local) or Vercel (prod).
+         * This writes cwf_state='normal' to Supabase → Realtime fires →
+         * useCopilotLifecycle → syncStateFromCloud → UI reverts.
+         *
+         * The source of truth is Supabase. We do NOT update Zustand directly.
+         */
+        const resp = await fetch("/api/cwf/copilot/disable", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ simulationId }),
+        });
+
+        if (resp.ok) {
+          /** Notify parent so it can add a system message to chat */
+          onDisabled?.();
+        }
       } catch {
-        /** Engine may already be stopped — local state is already correct */
+        /** Engine may already be stopped — Supabase state is source of truth */
       } finally {
         setIsDisabling(false);
       }

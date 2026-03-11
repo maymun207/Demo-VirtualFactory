@@ -713,15 +713,13 @@ export function CWFChatPanel() {
 
   /** ── Copilot State ───────────────────────────────────────────────────── */
   /**
-   * Derive copilot active state from BOTH isEnabled AND cwfState.
-   * When Supabase Realtime fails (CHANNEL_ERROR), isEnabled can stay false
-   * while cwfState is already 'copilot_active'. Using OR ensures the toggle
-   * button always shows the "disable" badge when copilot is running,
-   * preventing the user from being stuck with an unusable enable icon.
+   * Read copilot enabled state from the store.
+   * The isEnabled flag is derived from cwfState inside syncStateFromCloud():
+   *   isEnabled = (cwfState === 'copilot_active')
+   * It is the ONLY reactive indicator that Supabase copilot_config has been
+   * synced — NO local overrides, NO OR-fallbacks, NO parallel states.
    */
-  const isCopilotEnabled = useCopilotStore(
-    (s) => s.isEnabled || s.cwfState === 'copilot_active'
-  );
+  const isCopilotEnabled = useCopilotStore((s) => s.isEnabled);
   const copilotTotalActions = useCopilotStore((s) => s.totalActions); // Corrective action count
 
   /**
@@ -927,7 +925,6 @@ export function CWFChatPanel() {
               isLoading={isLoading}
               simulationId={simulationId}
               onSendMessage={sendMessage}
-              onLocalDisable={() => useCopilotStore.getState().disableCopilot()}
             />
             {/* Quick Actions dropdown — always accessible for predefined queries */}
             <QuickActionsDropdown
