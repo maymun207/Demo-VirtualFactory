@@ -337,7 +337,7 @@ const server = http.createServer(async (req, res) => {
             copilotEngine.stop();
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, message: 'Copilot disabled' }));
+            res.end(JSON.stringify({ success: true, message: 'Copilot disabled', cwfState: 'normal' }));
         } catch (error) {
             console.error('[Copilot API] Disable error:', error);
             res.writeHead(500, { 'Content-Type': 'application/json' });

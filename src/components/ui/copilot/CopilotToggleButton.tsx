@@ -27,6 +27,7 @@
 import { useState } from "react";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { COPILOT_THEME, COPILOT_UI_LABELS } from "../../../lib/params/copilot";
+import { useCopilotStore } from "../../../store/copilotStore";
 
 // =============================================================================
 // PROPS INTERFACE
@@ -115,10 +116,12 @@ export function CopilotToggleButton({
 
         /**
          * Call the disable endpoint — CWF dev server (local) or Vercel (prod).
-         * This writes cwf_state='normal' to Supabase → Realtime fires →
-         * useCopilotLifecycle → syncStateFromCloud → UI reverts.
+         * This writes cwf_state='normal' to Supabase. The response body
+         * confirms the new state, which we use to sync the store directly.
          *
-         * The source of truth is Supabase. We do NOT update Zustand directly.
+         * Source of truth: Supabase. We sync from the server's confirmation
+         * response — same pattern as cwfStore.ts copilotStateChange handler.
+         * We do NOT rely on Realtime (which suffers CHANNEL_ERROR on Vercel).
          */
         const resp = await fetch("/api/cwf/copilot/disable", {
           method: "POST",
@@ -127,6 +130,17 @@ export function CopilotToggleButton({
         });
 
         if (resp.ok) {
+          /**
+           * Server confirmed: Supabase cwf_state is now 'normal'.
+           * Sync the copilot store directly from the server response.
+           * This mirrors the cwfStore.ts copilotStateChange handler pattern —
+           * reading the server's authoritative answer, NOT a local override.
+           */
+          const data = await resp.json();
+          if (data.cwfState === 'normal') {
+            useCopilotStore.getState().disableCopilot();
+          }
+
           /** Notify parent so it can add a system message to chat */
           onDisabled?.();
         }
