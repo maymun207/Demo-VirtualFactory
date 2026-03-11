@@ -2332,8 +2332,24 @@ export default async function handler(
             'activate copilot', 'go copilot', 'kopilot', 'kopilot aç',
         ];
         const messageLower = message.toLowerCase();
+
+        /**
+         * Detect copilot-enable requests.
+         *
+         * Matches when:
+         *  - cwfState === 'normal' → standard first-time enable
+         *  - cwfState === 'copilot_active' → STALE state from previous session
+         *    (e.g., user disabled copilot locally but the server-side disable
+         *    never landed due to WebSocket failure, or the session ended but
+         *    copilot_config wasn't cleaned up). The user explicitly requesting
+         *    copilot mode means they want to restart the auth flow, so we reset
+         *    the state machine to copilot_pending_auth.
+         *
+         * Does NOT match copilot_pending_auth — that means auth is already
+         * in progress and the user's message is likely the auth code.
+         */
         const isCopilotEnableRequest =
-            cwfState === 'normal' &&
+            (cwfState === 'normal' || cwfState === 'copilot_active') &&
             COPILOT_ENABLE_KEYWORDS.some((kw) => messageLower.includes(kw));
 
         if (isCopilotEnableRequest) {
