@@ -286,10 +286,16 @@ const server = http.createServer(async (req, res) => {
             const { createClient } = await import('@supabase/supabase-js');
             const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-            /** Upsert copilot_config row (create if not exists, update if exists) */
+            /** Upsert copilot_config row (create if not exists, update if exists)
+             *  CRITICAL: must set cwf_state='copilot_active' here so checkHeartbeat()
+             *  doesn't immediately disengage on the first poll after the engine starts. */
             await sb.from('copilot_config').upsert({
                 simulation_id: simulationId,
                 enabled: true,
+                cwf_state: 'copilot_active',
+                poll_interval_sec: 6,
+                max_actions_per_minute: 20,
+                cooldown_sec: 30,
                 activated_by: body?.activatedBy || 'airtk',
                 last_heartbeat_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),

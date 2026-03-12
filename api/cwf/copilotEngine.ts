@@ -66,7 +66,13 @@ const DEFAULT_POLL_INTERVAL_SEC = 6;
  * rapidly older than 45s once the tab closes).
  * Previously 15s which equaled the poll interval, causing a race.
  */
-const HEARTBEAT_TIMEOUT_MS = 45_000;
+/**
+ * How long (ms) without a browser heartbeat before the engine auto-disengages.
+ * Must be > (HEARTBEAT_GRACE_MS + 2 × COPILOT_HEARTBEAT_INTERVAL_MS) to avoid
+ * false-positive disconnects if the first heartbeat arrives during the grace window.
+ * Matches the Vercel evaluate.ts value of 90s for consistency across environments.
+ */
+const HEARTBEAT_TIMEOUT_MS = 90_000;
 
 /** Gemini model for routine copilot evaluations — gemini-2.5-flash (2.0-flash deprecated 404) */
 const COPILOT_MODEL = 'gemini-2.5-flash';
