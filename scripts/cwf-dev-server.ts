@@ -417,10 +417,10 @@ const server = http.createServer(async (req, res) => {
 // 5. Start the server
 // ─────────────────────────────────────────────────────────────────────────────
 
-server.listen(PORT, () => {
-    console.log('');
+server.listen(PORT, '127.0.0.1', () => {
+    console.log('')
     console.log('  🏭 CWF Dev Server running');
-    console.log(`  ➜  Local: http://localhost:${PORT}/api/cwf/chat`);
+    console.log(`  ➜  Local: http://127.0.0.1:${PORT}/api/cwf/chat`);
     console.log(`  ➜  Supabase: ${process.env.SUPABASE_URL}`);
     console.log(`  ➜  Gemini Model: gemini-2.5-flash`);
     console.log('');

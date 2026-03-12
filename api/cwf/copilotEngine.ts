@@ -464,10 +464,11 @@ export class CopilotEngine {
                     })
                     .eq('simulation_id', this.simulationId);
 
-                /** Inject a chat message explaining the auto-disengage */
+                /** Inject a user-facing chat message explaining the auto-disengage.
+                 *  Uses 'AutoPilot' to match branding (not Microsoft Copilot). */
                 await this.injectChatMessage(
-                    '⏹️ The simulation has ended. Copilot mode has been automatically disengaged. ' +
-                    'You can reset the simulation and re-enable Copilot for a new run.',
+                    '⏹️ The simulation has ended. AutoPilot mode has been automatically disengaged. ' +
+                    'You can reset the simulation and re-enable AutoPilot for a new run.',
                     0,
                 );
 
@@ -963,9 +964,10 @@ export class CopilotEngine {
                 })
                 .eq('simulation_id', this.simulationId);
 
-            /** Log the auto-disengage event */
+            /** Inject a user-facing chat message explaining the heartbeat-loss disengage.
+             *  Uses 'AutoPilot' to match branding (not Microsoft Copilot). */
             await this.injectChatMessage(
-                '⛔ Copilot auto-disengaged: browser connection lost. Please re-enable to resume monitoring.',
+                '⛔ AutoPilot auto-disengaged: browser connection lost. Please re-enable to resume monitoring.',
                 0,
             );
 

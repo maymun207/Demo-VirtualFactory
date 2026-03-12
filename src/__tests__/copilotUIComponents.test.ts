@@ -139,13 +139,13 @@ describe('COPILOT_UI_LABELS — Text Labels', () => {
 describe('COPILOT_UI_LABELS — Dynamic Status Functions', () => {
     test('statusActive.en generates correct text with interval', () => {
         const text = COPILOT_UI_LABELS.statusActive.en(15);
-        expect(text).toContain('Copilot Active');
+        expect(text).toContain('AutoPilot Active');
         expect(text).toContain('15s');
     });
 
     test('statusActive.tr generates Turkish text with interval', () => {
         const text = COPILOT_UI_LABELS.statusActive.tr(15);
-        expect(text).toContain('Copilot Aktif');
+        expect(text).toContain('AutoPilot Aktif');
         expect(text).toContain('15s');
     });
 

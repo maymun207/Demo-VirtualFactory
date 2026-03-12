@@ -92,7 +92,8 @@ export const DemoChatView: React.FC = () => {
                 },
                 {
                   emoji: "🤖",
-                  label: "Autonomous AI Copilot",
+                  /** User-facing stage label — shows 'AutoPilot' to avoid confusion with Microsoft Copilot */
+                  label: "Autonomous AI AutoPilot",
                   desc: "Self-optimising plant — no human input",
                 },
               ].map((stage, i) => (

@@ -184,7 +184,7 @@ export function CopilotToggleButton({
           <div
             className="w-2 h-2 rounded-full animate-pulse"
             style={{ backgroundColor: "#4ade80" }} /** green-400 */
-            title="Copilot engine active"
+            title="AutoPilot engine active"
           />
         )}
         {/* Badge label + action counter in pink */}

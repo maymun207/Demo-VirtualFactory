@@ -711,12 +711,13 @@ const tools: FunctionDeclaration[] = [
          */
         name: 'enable_copilot',
         description:
-            'Enable CWF Copilot autonomous monitoring mode. ' +
+            /** User-facing: tells Gemini to use 'AutoPilot' branding (not Microsoft Copilot). */
+            'Enable CWF AutoPilot autonomous monitoring mode. ' +
             'REQUIRES the 3-step human-in-the-loop authorization protocol: ' +
-            'Step 1: Explain what Copilot mode does and ask for confirmation. ' +
+            'Step 1: Explain what AutoPilot mode does and ask for confirmation. ' +
             'Step 2: After user confirms, ask for their authorization ID. ' +
             'Step 3: Call this tool with the auth code. ' +
-            'Copilot mode allows the AI to autonomously monitor the simulation, detect issues, ' +
+            'AutoPilot mode allows the AI to autonomously monitor the simulation, detect issues, ' +
             'and take corrective parameter actions with full audit logging.',
         parameters: {
             type: SchemaType.OBJECT,
@@ -740,8 +741,9 @@ const tools: FunctionDeclaration[] = [
          */
         name: 'disable_copilot',
         description:
-            'Disable CWF Copilot autonomous monitoring mode. ' +
-            'NO AUTHORIZATION REQUIRED — call immediately when the user wants to stop Copilot. ' +
+            /** User-facing: tells Gemini to use 'AutoPilot' branding (not Microsoft Copilot). */
+            'Disable CWF AutoPilot autonomous monitoring mode. ' +
+            'NO AUTHORIZATION REQUIRED — call immediately when the user wants to stop AutoPilot. ' +
             'This stops the autonomous monitoring loop and returns to normal CWF operation.',
         parameters: {
             type: SchemaType.OBJECT,
@@ -1465,7 +1467,7 @@ YOUR ROLE IN THE CHAT is STATUS REPORTING and MANUAL OVERRIDE — NOT autonomous
 MANDATORY FIRST STEP — BEFORE DOING ANYTHING ELSE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-For EVERY user message in Copilot mode, you MUST call get_simulation_summary FIRST.
+For EVERY user message in AutoPilot mode, you MUST call get_simulation_summary FIRST.
 DO NOT answer from memory. DO NOT say "I have not collected any data". You have a live DB to query.
 If the tool call fails, cite the most recent COPILOT🤖 message above as your data source.
 
@@ -1520,7 +1522,7 @@ OTHER RULES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 - SIMULATION ENDED: If status = completed/aborted → call disable_copilot.
-- To EXIT copilot mode: user says "stop copilot" / "exit copilot", or clicks header toggle.`;
+- To EXIT AutoPilot mode: user says "stop autopilot" / "exit autopilot", or clicks header toggle.`;
     } else if (copilotCwfState === 'copilot_pending_auth') {
         cwfStateMachineBlock = `**CURRENT CWF STATE: COPILOT PENDING AUTHORIZATION (Attempt ${copilotAuthAttempts + 1} of ${copilotMaxAttempts}, ${copilotAttemptsLeft} remaining)**
 
@@ -1531,14 +1533,14 @@ MANDATORY RULES IN COPILOT PENDING AUTH STATE:
 4. If the user says "cancel", "forget it", "stop" — call disable_copilot to return to normal mode.
 5. If the code is wrong, report: "Incorrect code. ${copilotAttemptsLeft - 1} attempt(s) remaining."
 6. If attempts are exhausted (0 remaining), report failure and return to normal mode.
-Do NOT explain Copilot again. Just wait for the auth code.`;
+Do NOT explain AutoPilot again. Just wait for the auth code.`;
     } else {
         // normal state
         cwfStateMachineBlock = `**CURRENT CWF STATE: NORMAL**
 
 Standard CWF operation. HITL protocol applies for all parameter changes.
-If the user requests Copilot mode:
-    1. Explain what Copilot mode does.
+If the user requests AutoPilot mode:
+    1. Explain what AutoPilot mode does.
 2. Ask for the authorization code.
 3. When received — call enable_copilot.
 SIMULATION ENDED GUARD: If the simulation is no longer running(status = completed or aborted), DO NOT propose or execute parameter changes.Offer analysis or a reset instead.`;
@@ -1569,11 +1571,11 @@ The CWF system is always in one of 3 states.Your behaviour MUST match the curren
 
         ${cwfStateMachineBlock}
 
-### PRIORITY 0B — COPILOT ENABLE COMMANDS(when in NORMAL state)
+### PRIORITY 0B — AUTOPILOT ENABLE COMMANDS(when in NORMAL state)
 
-If the user asks to enter Copilot mode in NORMAL state("go into copilot mode", "enable copilot", "start copilot", "kopilot ac"):
-    1. Explain: "Copilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed."
-    2. Ask: "Please provide your authorization code to enable Copilot mode."
+If the user asks to enter AutoPilot mode in NORMAL state("go into autopilot mode", "enable autopilot", "start autopilot", "otopilot ac"):
+    1. Explain: "AutoPilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed."
+    2. Ask: "Please provide your authorization code to enable AutoPilot mode."
     3. On auth code receipt — call enable_copilot.
 
 AUTH CODE RECOGNITION RULES:
@@ -2327,7 +2329,24 @@ export default async function handler(
         // This is fully deterministic and removes all LLM-timing race conditions.
         // =====================================================================
 
+        /**
+         * Keywords that trigger the AutoPilot enable flow (DB upsert to copilot_pending_auth).
+         * IMPORTANT: These MUST match what the UI sends (params/copilot.ts COPILOT_UI_LABELS.enableChatMessage).
+         * The UI button sends 'go into autopilot mode' — this MUST be in this list.
+         * Also keep legacy 'copilot' variants for typed commands.
+         */
         const COPILOT_ENABLE_KEYWORDS = [
+            /* ── AutoPilot keyword variants (UI canonical + typed shortcuts) ── */
+            'go into autopilot mode',
+            'enable autopilot',
+            'start autopilot',
+            'activate autopilot',
+            'autopilot on',
+            'turn on autopilot',
+            /* ── Turkish AutoPilot variants ── */
+            'otopilot aç',
+            'otopilot başlat',
+            /* ── Legacy copilot typed commands (backwards-compatible) ── */
             'copilot mode', 'into copilot', 'enable copilot', 'start copilot',
             'activate copilot', 'go copilot', 'kopilot', 'kopilot aç',
         ];
@@ -2672,8 +2691,8 @@ export default async function handler(
         if (isCopilotEnableRequest) {
             console.log('[CWF] ⚡ Short-circuit: copilot enable request → pending_auth (no Gemini call)');
             const promptMsg = lang === 'tr'
-                ? '🤖 Kopilot Modu, simülasyonunuzu gerçek zamanlı olarak izlememi, parametre sapmalarını ve kalite sorunlarını tespit etmemi ve düzeltici işlemleri otomatik olarak gerçekleştirmemi sağlayacak. Tüm işlemler tam gerekçesiyle kaydedilecek. Devam etmek için yetkinize ihtiyacım var.\n\nLütfen yetki kodunuzu girerek Kopilot modunu etkinleştirin.'
-                : '🤖 Copilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed.\n\nPlease provide your authorization code to enable Copilot mode.';
+                ? '🤖 AutoPilot Modu, simülasyonunuzu gerçek zamanlı olarak izlememi, parametre sapmalarını ve kalite sorunlarını tespit etmemi ve düzeltici işlemleri otomatik olarak gerçekleştirmemi sağlayacak. Tüm işlemler tam gerekçesiyle kaydedilecek. Devam etmek için yetkinize ihtiyacım var.\n\nLütfen yetki kodunuzu girerek AutoPilot modunu etkinleştirin.'
+                : '🤖 AutoPilot Mode will enable me to autonomously monitor your simulation in real-time, detect parameter deviations and quality issues, and take corrective actions automatically. All actions are logged with full reasoning. I need your authorization to proceed.\n\nPlease provide your authorization code to enable AutoPilot mode.';
             return res.status(200).json({
                 response: promptMsg,
                 toolCallCount: 0,
@@ -2688,8 +2707,8 @@ export default async function handler(
         if (isReRequestInPendingAuth) {
             console.log('[CWF] ⚡ Short-circuit: re-request in pending_auth → re-prompting (no Gemini call)');
             const promptMsg = lang === 'tr'
-                ? '🤖 Kopilot Modu zaten yetki bekleme durumunda. Lütfen yetki kodunuzu girin.'
-                : '🤖 Copilot Mode is already waiting for authorization. Please provide your authorization code.';
+                ? '🤖 AutoPilot Modu zaten yetki bekleme durumunda. Lütfen yetki kodunuzu girin.'
+                : '🤖 AutoPilot Mode is already waiting for authorization. Please provide your authorization code.';
             return res.status(200).json({
                 response: promptMsg,
                 toolCallCount: 0,
@@ -2704,8 +2723,8 @@ export default async function handler(
         if (maxAttemptsReached) {
             console.log('[CWF] ⚡ Short-circuit: max auth attempts reached → returning to normal (no Gemini call)');
             const failMsg = lang === 'tr'
-                ? `❌ ${COPILOT_MAX_AUTH_ATTEMPTS} denemeden sonra yetkilendirme başarısız oldu. Kopilot modu etkinleştirilemedi. Tekrar denemek için "kopilot moduna geç" diyebilirsiniz.`
-                : `❌ Authorization failed after ${COPILOT_MAX_AUTH_ATTEMPTS} attempts. Copilot mode could not be activated. You can try again by saying 'go into copilot mode'.`;
+                ? `❌ ${COPILOT_MAX_AUTH_ATTEMPTS} denemeden sonra yetkilendirme başarısız oldu. AutoPilot modu etkinleştirilemedi. Tekrar denemek için "otopilot moduna geç" diyebilirsiniz.`
+                : `❌ Authorization failed after ${COPILOT_MAX_AUTH_ATTEMPTS} attempts. AutoPilot mode could not be activated. You can try again by saying 'go into autopilot mode'.`;
             return res.status(200).json({
                 response: failMsg,
                 toolCallCount: 0,
@@ -2746,8 +2765,8 @@ export default async function handler(
                 }
 
                 const successMsg = lang === 'tr'
-                    ? `✅ Kopilot Modu etkinleştirildi. Simülasyonu gerçek zamanlı olarak izliyorum ve gerektiğinde düzeltici işlemler uygulayacağım. Tüm işlemler kaydedilecek.`
-                    : `✅ Copilot Mode has been enabled for simulation ID ${simulationId}. I will now autonomously monitor your simulation in real-time, detect deviations, and apply corrective actions as needed. All actions will be logged with full reasoning.`;
+                    ? `✅ AutoPilot Modu etkinleştirildi. Simülasyonu gerçek zamanlı olarak izliyorum ve gerektiğinde düzeltici işlemler uygulayacağım. Tüm işlemler kaydedilecek.`
+                    : `✅ AutoPilot Mode has been enabled for simulation ID ${simulationId}. I will now autonomously monitor your simulation in real-time, detect deviations, and apply corrective actions as needed. All actions will be logged with full reasoning.`;
 
                 return res.status(200).json({
                     response: successMsg,
@@ -2970,7 +2989,7 @@ export default async function handler(
                                 .update({ cwf_state: 'copilot_pending_auth' })
                                 .eq('simulation_id', copilotSimId);
                             toolResult = {
-                                error: 'Incorrect authorization code. Copilot mode was NOT enabled.',
+                                error: 'Incorrect authorization code. AutoPilot mode was NOT enabled.',
                                 attemptsRemaining: Math.max(0, COPILOT_MAX_AUTH_ATTEMPTS - (authAttempts + 1)),
                             };
                         } else {

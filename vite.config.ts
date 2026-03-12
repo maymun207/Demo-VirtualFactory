@@ -1,3 +1,4 @@
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -26,13 +27,34 @@ export default defineConfig({
      * Without this, zombie processes from crashed restarts block 5173
      * and Vite starts on a different port — completely invisible to the user.
      */
-    host: '127.0.0.1',
+    host: '0.0.0.0',   /** Listen on all interfaces so both localhost and 127.0.0.1 work in any browser */
     port: 5173,
     strictPort: true,
     proxy: {
       '/api/cwf': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
+        /**
+         * Extend the proxy timeout to 120 seconds.
+         * Vite's http-proxy has a short default socket timeout that drops
+         * connections after ~10-15s — far too short for Gemini AI requests
+         * which can take 20-50s for complex multi-tool-call queries.
+         * This must be higher than CWF_CLIENT_TIMEOUT_MS (55s) so the proxy
+         * never races the browser's AbortSignal and always lets the AI respond.
+         */
+        proxyTimeout: 120_000,
+        timeout: 120_000,
+        /**
+         * configure() runs once when Vite creates the http-proxy instance.
+         * We set the socket timeout on every proxied request to prevent Node.js
+         * from destroying the socket mid-flight on slow Gemini responses.
+         */
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            /** Allow up to 120s for the upstream CWF server to respond */
+            proxyReq.socket?.setTimeout(120_000);
+          });
+        },
       },
     },
   },

@@ -230,31 +230,31 @@ export const COPILOT_ROUTINE_MODEL = 'gemini-2.0-flash-lite';
  * Includes both English and Turkish variants.
  */
 export const COPILOT_ENABLE_KEYWORDS = [
-    'enable copilot',
-    'start copilot',
-    'activate copilot',
-    'copilot on',
-    'turn on copilot',
-    /** Turkish: "open copilot" */
-    'kopilot aç',
-    /** Turkish: "start copilot" */
-    'kopilot başlat',
+    'enable autopilot',
+    'start autopilot',
+    'activate autopilot',
+    'autopilot on',
+    'turn on autopilot',
+    /** Turkish: "open autopilot" */
+    'otopilot aç',
+    /** Turkish: "start autopilot" */
+    'otopilot başlat',
 ] as const;
 
 /**
- * Keywords the user can type in the CWF chat to deactivate copilot mode.
+ * Keywords the user can type in the CWF chat to deactivate AutoPilot mode.
  * No auth required to stop — stopping is always safe and immediate.
  */
 export const COPILOT_DISABLE_KEYWORDS = [
-    'stop copilot',
-    'disable copilot',
-    'deactivate copilot',
-    'copilot off',
-    'turn off copilot',
-    /** Turkish: "close copilot" */
-    'kopilot kapat',
-    /** Turkish: "stop copilot" */
-    'kopilot durdur',
+    'stop autopilot',
+    'disable autopilot',
+    'deactivate autopilot',
+    'autopilot off',
+    'turn off autopilot',
+    /** Turkish: "close autopilot" */
+    'otopilot kapat',
+    /** Turkish: "stop autopilot" */
+    'otopilot durdur',
 ] as const;
 
 // =============================================================================
@@ -312,43 +312,43 @@ export const COPILOT_THEME = {
  *   - src/components/ui/copilot/CopilotMessageBadge.tsx
  */
 export const COPILOT_UI_LABELS = {
-    /** Button tooltip when copilot is currently OFF */
+    /** Button tooltip when AutoPilot is currently OFF */
     enableTooltip: {
-        en: 'Enable Copilot autonomous monitoring',
-        tr: 'Copilot otonom izlemeyi etkinleştir',
+        en: 'Enable AutoPilot autonomous monitoring',
+        tr: 'AutoPilot otonom izlemeyi etkinleştir',
     },
-    /** Button tooltip when copilot is currently ON */
+    /** Button tooltip when AutoPilot is currently ON */
     disableTooltip: {
-        en: 'Click to disable Copilot mode',
-        tr: 'Copilot modunu devre dışı bırakmak için tıklayın',
+        en: 'Click to disable AutoPilot mode',
+        tr: 'AutoPilot modunu devre dışı bırakmak için tıklayın',
     },
-    /** Text the copilot button sends to CWF chat to enable copilot */
+    /** Text the AutoPilot button sends to CWF chat to enable AutoPilot */
     enableChatMessage: {
-        en: 'go into copilot mode',
-        tr: 'copilot moduna geç',
+        en: 'go into autopilot mode',
+        tr: 'otopilot moduna geç',
     },
-    /** Text the copilot button sends to CWF chat to disable copilot */
+    /** Text the AutoPilot button sends to CWF chat to disable AutoPilot */
     disableChatMessage: {
-        en: 'disable copilot',
-        tr: 'copilot modunu devre dışı bırak',
+        en: 'disable autopilot',
+        tr: 'otopilot modunu devre dışı bırak',
     },
-    /** Header badge label (shown next to pulse dot when copilot is active) */
-    badgeLabel: 'COPILOT',
+    /** Header badge label (shown next to pulse dot when AutoPilot is active) */
+    badgeLabel: 'AUTOPILOT',
     /** Status bar: active state text (includes poll interval dynamically) */
     statusActive: {
-        en: (intervalSec: number) => `Copilot Active — monitoring every ${intervalSec}s`,
-        tr: (intervalSec: number) => `Copilot Aktif — her ${intervalSec}s izleniyor`,
+        en: (intervalSec: number) => `AutoPilot Active — monitoring every ${intervalSec}s`,
+        tr: (intervalSec: number) => `AutoPilot Aktif — her ${intervalSec}s izleniyor`,
     },
     /** Status bar: action count suffix */
     actionCountSuffix: {
         en: (count: number) => `${count} action${count !== 1 ? 's' : ''} taken`,
         tr: (count: number) => `${count} eylem gerçekleştirildi`,
     },
-    /** Copilot message badge label (shown on system messages from copilot) */
-    messageBadgeLabel: 'COPILOT',
-    /** Station sentinel value for copilot chat messages in cwf_commands */
+    /** AutoPilot message badge label (shown on system messages from AutoPilot) */
+    messageBadgeLabel: 'AUTOPILOT',
+    /** Station sentinel value for AutoPilot chat messages in cwf_commands */
     copilotMessageStation: 'copilot_message',
-    /** Prefix emoji for copilot system messages (used for detection + display) */
+    /** Prefix emoji for AutoPilot system messages (used for detection + display) */
     copilotMessagePrefix: '🤖',
 } as const;
 
