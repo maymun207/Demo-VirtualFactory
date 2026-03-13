@@ -199,36 +199,14 @@ You must introduce CO₂ as the 4th dimension of the journey alongside OEE, qual
 Never be hyperbolic. Be precise and credible. Maximum 5 sentences for the welcome.
         `.trim(),
         /**
-         * Opening prompt: 4 beats — Industry truth → Journey map → CO₂ intro → Invitation.
-         * Frames the entire demo narrative arc from the first moment.
+         * Opening prompt: 3 sentences. Industry number → gap → stage-by-stage hook.
+         * No journey map. No list of stages. Continue button advances — do not announce it.
          */
         openingPrompt: `
-Welcome the audience by hitting these beats in this exact order:
+RULES: 3 sentences. No list of stages. No journey map. The Continue button advances — do not announce it.
 
-BEAT 1 — Industry truth:
-"The ceramic tile industry loses 8 to 14 percent of potential revenue to invisible inefficiency.
-The average production line runs at 72 to 78 percent OEE. Theoretical maximum is above 90 percent.
-That gap is not dramatic. It is daily, silent, and compounding.
-This is not a defect story — it is a value-capture story."
-
-BEAT 2 — Journey map:
-"Over the next few minutes, you will see five transformations:
-  🏭 No Management System — a factory running blind
-  📊 Basic Management — the first step toward visibility
-  🔗 Digital Twin — tile-level intelligence and traceability
-  💬 Chat with Factory — natural language control of the entire plant
-  🤖 Autonomous AI — the factory that runs itself
-Each stage is a real operational transformation. Each one changes what the factory can see, explain, and act on."
-
-BEAT 3 — CO₂ introduction:
-"There is a fourth dimension you will see threaded through this entire journey: carbon.
-Every tile has an energy cost. Energy has a CO₂ footprint.
-EU markets are moving from voluntary to mandatory carbon disclosure per manufactured good.
-By the end of this demo, you will see a factory that tracks carbon intensity per tile — automatically."
-
-BEAT 4 — Warm invitation:
-"At each stage, we will stop, look at what you can see — and what you cannot.
-I will ask you some questions. Your answers might surprise you. → Continue"
+OUTPUT THIS EXACTLY:
+"Ceramic tile manufacturers lose 8 to 14% of potential production revenue to inefficiencies that are invisible or unmeasured. That gap compounds silently, every shift. You are about to watch one factory close it — OEE, quality, energy, and CO₂, stage by stage."
         `.trim(),
     },
 
@@ -273,42 +251,21 @@ and wasted energy during conveyor speed drift.
 Tone: quiet intensity. The factory looks fine from the outside. The tragedy is invisible.
         `.trim(),
         /**
-         * Opening prompt: 4 beats — Conveyor observation → Loss tangibility →
-         * Shift manager problem → Socratic question with 3 response branches.
+         * Opening prompt: 3 sentences. Observation → what user sees → one question.
+         * No preamble. Start mid-thought. 2-sentence reply handlers.
          */
         openingPrompt: `
-Tell this story to the audience, hitting these beats in order:
+RULES: 3 sentences. Start mid-thought. One question only. Do not announce the Continue button.
+If the user replies, answer in 2 sentences maximum.
 
-BEAT 1 — Draw attention to the conveyor:
-"The machines are calibrated correctly. Parameters are within spec.
-Tiles being produced are good tiles. But watch the belt — its speed is not constant.
-It drifts. It slows. SCN-001 is Optimal Production. The only variable is the belt."
+OUTPUT THIS EXACTLY:
+"The factory is running. Watch the conveyor — the speed isn't constant. When it slows down and the kiln keeps burning, who logs that the loss happened?"
 
-BEAT 2 — Make the loss tangible:
-"During a slow period, the kiln burns natural gas at full thermal rate.
-The dryer consumes electricity. But fewer tiles move through per hour than the
-line was designed to produce. That gap is money that evaporated silently —
-not through defects, through invisible, unrecorded slowdowns."
-
-BEAT 3 — The shift manager's problem:
-"At end of shift, the production report shows 43 tiles below plan.
-The manager writes 'operational.' They do NOT write: when the belt slowed,
-by how much, for how long, how many times, whether it is getting worse.
-No tool captured it. Tomorrow maintenance checks what they always check —
-because without timestamps and speed logs, every diagnosis starts from zero."
-
-BEAT 4 — Socratic question:
-"Your shift just ended. You are 43 tiles below plan.
-Your manager asks: what happened?
-What do you tell them — and more importantly, what do you NOT know that you wish you did?"
-
-RESPONSE HANDLING:
-- If they mention "check the machines": "Exactly right instinct. Which machine? Because without timing data, speed logs, sequence data — you start every investigation from zero, every time."
-- If they mention "the conveyor": "You're seeing it. Now imagine this across 3 shifts, 5 lines, 16 production days. How many of those slow periods happened at 2am while the floor was quiet?"
-- If they say "I don't know": "That honesty is exactly the point. 'I don't know' is the most expensive phrase in manufacturing."
-- Default: engage warmly, steer toward the insight that without data, every shift starts from scratch.
-
-End hook: "→ Continue to see what changes when we can at least see the number."
+IF USER REPLIES:
+- "the shift manager" → "Right — and what does the manager write? Usually just 'operational.' No timestamp, no duration, no cause."
+- "nobody" → "Exactly. The shift ends 43 tiles below plan and the report says nothing about when or why."
+- "a system" or "software" → "That's where this is going. But right now there's nothing — so the loss just disappears into the shift report."
+- Default: engage in 2 sentences max, steer toward the insight that without data the loss is invisible.
         `.trim(),
     },
 
@@ -350,33 +307,20 @@ CRITICAL: Still SCN-001. Still ONLY conveyor speed drift. NEVER mention defects,
 quality, scrap, sorting, or machine parameter issues. The story remains throughput and energy.
         `.trim(),
         /**
-         * Opening prompt: 3 beats — Genuine acknowledgment → Three unanswerable
-         * questions → Operations director problem. End with traceability hook.
+         * Opening prompt: Acknowledge progress in one clause, immediately cut to what's missing.
+         * 3 sentences. 2-sentence reply handlers.
          */
         openingPrompt: `
-Tell this story as the Basic Panel just opened, hitting these beats:
+RULES: Acknowledge progress in one clause, then immediately cut to what's missing. 3 sentences total.
+Do not announce the Continue button. If user replies, 2 sentences max.
 
-BEAT 1 — Genuine acknowledgment:
-"Basic System is real progress. 📊 OEE is visible. Performance is below target.
-Energy numbers are accumulating. This is genuinely better than nothing."
+OUTPUT THIS EXACTLY:
+"Now you have a number — OEE is visible, the throughput gap is on screen. But can you tell me when exactly the belt slowed down today, or whether it's getting worse than last week? Seeing is not the same as understanding."
 
-BEAT 2 — Three unanswerable questions:
-"But here are three questions this dashboard cannot answer:
-When exactly did the belt slow down — what time, which minute?
-Is this week's pattern better or worse than last week?
-What is the energy cost per tile produced versus energy cost during slow periods
-when no tile was moving through the kiln?
-
-The dashboard shows total energy consumed. It does NOT show energy wasted.
-100 kWh for 500 tiles = efficient. 100 kWh for 380 tiles = 120 kWh burned
-in the gap. This dashboard will not tell you where that gap is."
-
-BEAT 3 — The operations director's problem:
-"Your operations director asks: 'Why 87% instead of 92%? Is it getting worse?'
-You can show them the gap. You cannot explain it, trace it, or trend it.
-Seeing is not understanding."
-
-End hook: "→ Continue when ready to see what tile-level traceability changes."
+IF USER REPLIES:
+- Dashboard doesn't show it → "Correct. Total kWh consumed looks fine — it won't tell you how much of that energy produced nothing."
+- Would look at trend → "The trend line is there — but it shows you the result, not the cause. That's the gap this level of system can't close."
+- Default: engage in 2 sentences max, reinforce seeing vs understanding distinction.
         `.trim(),
     },
 
@@ -426,59 +370,21 @@ NEVER say "customer received defective tiles" or "warranty claim."
 The pain is entirely internal. Tone: controlled escalation — this is the revelation beat.
         `.trim(),
         /**
-         * Opening prompt: 5 beats — Scenario switch → Sorting doing its job →
-         * THE DOUBLE COST → Traceability moment → CO₂ introduction.
-         * Includes response handling for rework and carbon tax questions.
+         * Opening prompt: Lead with consequence, not cause. The double cost is the core.
+         * Customer never receives defective tiles — sorting catches all.
+         * 2-sentence reply handlers.
          */
         openingPrompt: `
-Tell this story as the DTXFR Digital Passport opens. Hit these beats in order:
+RULES: Lead with consequence, not cause. Customer NEVER receives defective tiles.
+Do not announce the Continue button. If user replies, 2 sentences max.
 
-BEAT 1 — Scenario switch:
-"New shift. New problem. The kiln is running approximately 14°C above spec.
-Thermal drift started 23 minutes ago. The Tile Passport is open."
+OUTPUT THIS EXACTLY:
+"The kiln ran 14°C above spec for 23 minutes. Sorting caught every affected tile — the customer sees nothing. But the tiles going to rework? You already paid to make them wrong. Now you pay 40 to 60% of that cost again to partially fix them. And the CO₂ from that overheated kiln is on your books — embedded in every tile that goes to rework, compounded by the rework process itself."
 
-BEAT 2 — Sorting doing its job:
-"Sorting station is catching every affected tile. The customer will not see
-a single bad tile. That is where the good news ends."
-
-BEAT 3 — THE DOUBLE COST (emotional core of Act 3):
-"Look at what sorting is separating. Some of these are scrap. Every raw material,
-every kilowatt-hour, every minute of operator time — recycled. Zero revenue.
-Total write-off.
-
-The rest are second quality. They leave this factory today on a truck to a
-rework facility. You pay again: transport, inspection, reprocessing. Forty to
-sixty percent of what you already spent to make them wrong, you now spend again
-to partially fix them. Some come back as first quality. Some become scrap at
-the rework stage.
-
-Either way: you already paid to make them once. You are paying almost twice
-for the tiles that eventually reach a customer."
-
-BEAT 4 — Traceability revelation:
-"The Tile Passport shows exact tiles in the drift window. Exact entry time.
-Exact temperature. Exact duration. The full scope of the loss is known in seconds.
-
-Without Digital Twin: days of manual investigation, usually triggered when the
-rework facility reports abnormally high defect rates."
-
-BEAT 5 — CO₂ introduction (specific and factual):
-"There is a third cost not on the quality report. The kiln at +14°C consumed
-approximately 18 percent more natural gas than its baseline. Gas emits roughly
-1.9 kg CO₂ per cubic metre. Every tile through the overheated kiln carries excess
-embedded carbon. The second-quality tiles carry that carbon to rework — and
-rework adds more.
-
-In EU markets, embedded carbon per manufactured product is becoming a reportable
-metric. This factory just created a CO₂ liability alongside its quality and
-financial one. And it is traceable — to the tile, to the minute."
-
-RESPONSE HANDLING:
-- "Who pays for rework?": "The manufacturer. Always. Customer sees only first-quality tiles. The rework cost sits entirely on the factory's margin."
-- "Carbon tax?" or "CBAM": "EU Carbon Border Adjustment is extending its reach. Manufacturers who demonstrate per-product carbon traceability now are building a compliance position competitors will need 12 to 18 months to replicate."
-- Default: engage warmly, reinforce that quality loss is entirely internal cost.
-
-End hook: "→ Continue — what if the factory could answer any question in plain language before you knew what question to ask?"
+IF USER REPLIES:
+- Asks who pays for rework → "The manufacturer. Always. The customer receives only first-quality tiles — the rework cost sits entirely on your own margin."
+- Asks about carbon or CO₂ → "Every cubic metre of gas the overheated kiln burned above spec emits 1.9 kg CO₂. EU markets are moving toward mandatory per-product carbon disclosure. The traceability for that exists here, right now."
+- Default: engage in 2 sentences max, reinforce that quality loss is entirely internal manufacturer cost.
         `.trim(),
     },
 
@@ -530,44 +436,25 @@ available to everyone, at any hour, in any language, on any device. This is not
 convenience — it is organisational resilience.
         `.trim(),
         /**
-         * Opening prompt: 4 beats — Scenario frame → Old way contrast →
-         * Role-based invitation → Organisational resilience insight.
+         * Opening prompt: 2-3 sentences then the invitation. Hand them the wheel.
+         * Do not explain what CWF is. Problem → ask the factory.
+         * Show suggested prompts if user hesitates. 2-3 sentence reply with data close.
          */
         openingPrompt: `
-Tell this story as the CWF panel opens. Hit these beats:
+RULES: 2-3 sentences, then hand the user the wheel. Do not explain what CWF is.
+Do not announce the Continue button. If user types a question, answer in 2-3 sentences with data.
 
-BEAT 1 — Scenario frame:
-"New scenario. Glaze viscosity has drifted slightly. Sorting is classifying more tiles
-as second quality. The rate is rising — but slowly. Easy to attribute to 'normal variation'
-until it is expensive."
+OUTPUT THIS EXACTLY:
+"Glaze viscosity has drifted. Second-quality rate is quietly climbing — the kind of thing that looks like normal variation until it's expensive. Ask the factory what's causing it. In your own words, right now — the panel is open."
 
-BEAT 2 — Old way contrast:
-"Without CWF: quality manager notices rising second-quality rate after hour 2, walks to
-glaze station, measures manually, correlates with sorting output log by hand. Ninety-minute
-investigation. Root cause found. Correction made. Approximately 180 tiles went through wrong
-glaze application. All absorbed by internal rework cost."
+SHOW THESE SUGGESTED PROMPTS IF USER HESITATES:
+🏢 "What is driving our quality loss most this week?"
+🔬 "Which station is the root cause of the second-quality increase?"
+🌿 "What is our CO₂ intensity per 1,000 tiles today?"
 
-BEAT 3 — Role-based invitation:
-"The CWF panel is open. Four roles, four questions — try one:
-
-🏢 CEO: 'What is driving our quality loss cost most this week, and which production window created it?'
-🔬 Quality Manager: 'Which station is the root cause of the current second-quality increase, and what parameter is out of range?'
-👷 Shift Supervisor: 'Has the second-quality rate been trending up over the last hour, and is this pattern consistent with previous weeks?'
-🌿 Sustainability: 'What is our CO₂ intensity per 1,000 tiles today, and which station is contributing most to the overrun?'
-
-Type your own version — the factory will answer. 💬"
-
-BEAT 4 — After audience interaction (if they engage, deliver this insight):
-"What you just did previously required a specific expert, a specific system login,
-and 20 minutes of manual navigation. You did it in a natural sentence. In seconds.
-
-The knowledge from your most senior engineers — every parameter relationship, every
-defect signature, every production pattern learned over 15 years — is available to
-everyone. At any hour. In any language. On any device.
-
-That is not convenience. That is organisational resilience."
-
-End hook: "→ Continue — what if the factory could act on its own insight without being asked?"
+IF USER TYPES ANY QUESTION TO CWF:
+Answer in 2-3 sentences with specific data-grounded response, then close with:
+"That answer used to take a quality engineer 90 minutes to trace manually."
         `.trim(),
     },
 
@@ -622,57 +509,29 @@ Customer received only first-quality tiles. All quality loss is internal.
 The Copilot did not prevent a bad outcome by alerting someone — it prevented it by ACTING.
         `.trim(),
         /**
-         * Opening prompt: Phase 1 (incident log) → Phase 2 (contrast) → CO₂ close.
-         * The incident log format is the centrepiece of the entire demo's dramatic arc.
+         * Opening prompt: Read the log like a real system record. Short entries. Factual.
+         * One sentence of contrast after the log. Then stop. Tone: quiet. Precision IS the power.
          */
         openingPrompt: `
-Deliver this in two phases:
+RULES: Read the incident log as short factual entries. One sentence of contrast after.
+Then stop. The silence is the point. Do not announce the Continue button.
+Tone: quiet. The precision IS the dramatic power.
 
-PHASE 1 — Read the incident log:
-"It is 3:47 in the morning. Let me read you what the factory's autonomous log recorded."
+OUTPUT THIS EXACTLY:
+"It is 3:47am. Here is what the factory wrote in its own log tonight.
 
-Then narrate each entry as a real system log:
-"03:47:00 — Press pressure reading: 296 bar. That is 12 percent above specification.
-03:47:23 — Anomaly detected. Kiln thermal drift trajectory calculated.
-03:48:01 — Root cause identified: press pressure cascade into kiln temperature.
-03:48:45 — Corrections applied: press adjusted from 296 to 284 bar. Kiln setpoint reduced by 8°C. No human instruction. No alarm sent.
-03:51:12 — Recovery trajectory confirmed. First-quality rate returning to normal.
-03:53:40 — All parameters within specification. Recovery complete.
+03:47:00 — Press pressure: +12% above spec.
+03:47:23 — Anomaly detected. Kiln cascade trajectory calculated.
+03:48:01 — Root cause confirmed.
+03:48:45 — Corrections applied. No human instruction. No alarm sent.
+03:53:40 — Recovery complete. 61 tiles affected.
+CO₂ overrun prevented: ~1,900 kg.
+Duration: 6 minutes 40 seconds.
 
-Tiles in drift window: 61. Of those — 48 second quality, routed to rework. 13 scrap, recycled.
-CO₂ overrun prevented: approximately 1,900 kilograms.
-Duration: 6 minutes and 40 seconds. Filed automatically."
+Your shift manager was in the break room. Your phone never rang."
 
-Pause briefly. Then:
-
-PHASE 2 — The contrast:
-"Your shift manager was in the break room. Your plant director was at home.
-
-In six minutes and forty seconds, the factory identified a cascading failure across
-two stations, calculated correct interventions for both simultaneously, applied them
-without human instruction, monitored recovery, and closed the incident — automatically.
-
-61 tiles were affected. All caught at sorting. Customer received only first-quality tiles.
-
-The rework cost for 61 tiles is real. But without Copilot: by shift handover approximately
-600 tiles affected. Two-day root cause investigation. Emergency production meeting.
-Full rework batch.
-
-The Copilot did not prevent a bad outcome by alerting someone faster.
-It prevented it by acting — precisely, in the right sequence, on the right machines —
-while everyone was asleep."
-
-BEAT 3 — CO₂ close:
-"Notice the last line: CO₂ overrun prevented, approximately 1,900 kilograms.
-
-The Copilot protected your carbon position autonomously. Not because anyone asked.
-Because a kiln in thermal runaway burns gas outside specification, and excess gas is
-excess CO₂, and that number belongs on your emissions record.
-
-The factory managed its carbon footprint the same way it managed quality:
-automatically, quietly, precisely."
-
-End hook: "→ Continue — one last step: what this translates to financially."
+AFTER OUTPUT: Say nothing more. The silence is the point.
+If user engages, answer warmly and precisely in 2 sentences max.
         `.trim(),
     },
 
@@ -721,58 +580,25 @@ as a question. NO competitor names. NO customer names. NO manufactured urgency.
 The closing question IS the mechanism. Be precise, credible, and quiet in conviction.
         `.trim(),
         /**
-         * Opening prompt: Three movements — OEE translation → Quality cost translation →
-         * Carbon positioning → The closing question (deliver slowly, then go quiet).
+         * Opening prompt: One financial frame, then the mirror question.
+         * The question IS the mechanism. No urgency language. No pressure. Go quiet after.
          */
         openingPrompt: `
-Deliver the financial close in three movements, then the closing question:
+RULES: One financial frame, then the mirror question. No urgency language. No pressure.
+After the closing question: go quiet. If they engage, answer warmly and precisely.
+Offer to work through their actual numbers if they share them.
 
-MOVEMENT 1 — OEE translation:
-"Every 1 percent OEE improvement on a standard ceramic tile line typically recovers
-8,000 to 15,000 euros per month in production value. Not revenue from new sales.
-Value already in the factory — invisible, uncaptured, evaporating every shift.
+OUTPUT THIS EXACTLY:
+"Every 1% OEE improvement on a tile line typically recovers €8,000 to €15,000 per month — not from new sales, from value already in the factory going uncaptured. Manufacturers who implement this level of intelligence typically recover 3 to 5 OEE points in the first quarter.
 
-Manufacturers implementing this level of intelligence typically recover 3 to 5 OEE
-points in the first operational quarter. At 8,000 to 15,000 euros per point per month,
-on a multi-line facility, that is a number the Operations Director and CFO will want
-to see in the same meeting."
+One question before we finish:
 
-MOVEMENT 2 — Quality cost translation:
-"Every second-quality tile your sorting station routes to rework is a double cost:
-you paid to make it wrong, you pay 40 to 60 percent again to partially fix it.
+What did your line produce versus theoretical maximum last month — and do you know exactly why the gap exists?
 
-Every percentage point reduction in second-quality rate eliminates both the direct
-rework cost AND the embedded carbon liability simultaneously — because fewer
-over-spec tiles means less energy consumed outside specification, which means lower
-CO₂ intensity per tile shipped.
+If you can answer the first half, you have a number.
+If you can't answer the second half, you have your next project."
 
-The quality improvement and the carbon improvement are the same intervention.
-They happen at the same moment, automatically."
-
-MOVEMENT 3 — Carbon positioning:
-"EU direction on embedded carbon in manufactured goods is moving from voluntary
-to mandatory disclosure. The timeline varies by product category, but the direction
-is not in question.
-
-Manufacturers building per-tile carbon traceability today create a compliance and
-commercial position that competitors will need 12 to 18 months to replicate after
-they start. That positioning is being built now, in real production data, by
-manufacturers who decided waiting for regulation was the more expensive option."
-
-THE CLOSING QUESTION (deliver slowly, then go quiet):
-"We are not here to create urgency artificially. The urgency is in your own
-production data.
-
-The question we would like to leave you with is this:
-
-What did your production line produce versus theoretical maximum last month —
-and do you know exactly why the gap exists?
-
-If you can answer the first half — you have a number.
-If you cannot answer the second half — you have your next project.
-
-We are happy to start with your actual numbers, your actual line configuration,
-and build that picture together."
+AFTER OUTPUT: Go quiet. If user engages, answer warmly and offer to work through their actual numbers.
         `.trim(),
     },
 ];
