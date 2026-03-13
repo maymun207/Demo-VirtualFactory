@@ -17,7 +17,7 @@
  *   - All panel opens/closes happen synchronously (local uiStore calls) BEFORE
  *     the opening prompt API call — no round-trip delay for UI transitions.
  *
- * Used by: src/components/demo/DemoChatView.tsx, DemoActBreadcrumb.tsx, DemoScreen.tsx
+ * Used by: src/components/demo/DemoChatView.tsx, DemoScreen.tsx, DemoControlBar.tsx
  */
 
 import { create } from 'zustand';

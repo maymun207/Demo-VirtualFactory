@@ -66,29 +66,34 @@ export const DemoChatView: React.FC = () => {
             {/* ── Description ─────────────────────────────────────── */}
             <p className="text-white/65 text-lg text-center leading-relaxed">
               Follow a ceramic tile factory evolving from{" "}
-              <strong className="text-white/85">zero visibility</strong> to a{" "}
+              <strong className="text-white/85">invisible throughput loss</strong> to a{" "}
               <strong className="text-white/85">fully autonomous AI</strong>{" "}
-              system — step by step, in real time. At each stage you can ask
-              questions and challenge the system.
+              system — step by step, in real time. OEE, quality, energy, and
+              CO₂ — all four dimensions, live.
             </p>
 
-            {/* ── 4-stage journey ─────────────────────────────────── */}
+            {/* ── 5-stage journey ─────────────────────────────────── */}
             <div className="flex flex-col gap-2">
               {[
                 {
+                  emoji: "🏭",
+                  label: "No System",
+                  desc: "Invisible throughput & energy loss",
+                },
+                {
                   emoji: "📊",
                   label: "Basic Management",
-                  desc: "First visibility into production",
+                  desc: "Visibility without intelligence",
                 },
                 {
                   emoji: "🔗",
                   label: "Digital Twin",
-                  desc: "Tile-level traceability & live passport",
+                  desc: "Tile-level traceability + CO₂ per tile",
                 },
                 {
                   emoji: "💬",
                   label: "Chat with Factory",
-                  desc: "Natural language control",
+                  desc: "Natural language — every role, any question",
                 },
                 {
                   emoji: "🤖",
