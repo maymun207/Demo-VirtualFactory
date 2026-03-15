@@ -83,6 +83,14 @@ export interface UIState {
   /** Whether the DemoScreen floating panel below the header is visible */
   showDemoScreen: boolean;
   /**
+   * demoPanelVisible — whether the Demo Status sidebar is fully expanded.
+   * Mirrors the internal collapsed state in DemoSidePanel so App.tsx can
+   * reserve the correct flex-column width for the sidebar space.
+   * true  = sidebar expanded (default);
+   * false = sidebar collapsed by the presenter toggle arrow.
+   */
+  demoPanelVisible: boolean;
+  /**
    * isSimConfigured — Demo Settings Gate flag.
    *
    * When false (default on page load and after every factory reset),
@@ -165,6 +173,11 @@ export interface UIState {
   /**
    * Set or clear the hovered station and screen position */
   setHoveredStation: (station: StationName | null, screenPos?: { x: number; y: number }) => void;
+  /**
+   * Update the demo sidebar visibility flag (called by DemoLayout when the
+   * presenter collapses or expands the Demo Status sidebar).
+   */
+  setDemoPanelVisible: (visible: boolean) => void;
 }
 
 // ─── Store Implementation ────────────────────────────────────────────────────
@@ -195,6 +208,8 @@ export const useUIStore = create<UIState>((set) => ({
   showOEEHierarchy: UI_DEFAULTS.showOEEHierarchy,
   /** DemoScreen hidden by default; shown when user clicks the Demo button */
   showDemoScreen: false,
+  /** Demo sidebar starts expanded (matches DEMO_SIDE_PANEL_VISIBLE_DEFAULT = true) */
+  demoPanelVisible: true,
   /** Start unconfigured — user must visit Demo Settings before first run */
   isSimConfigured: UI_DEFAULTS.isSimConfigured,
   /** Start with no ended simulation — simulation has not run yet */
@@ -262,4 +277,6 @@ export const useUIStore = create<UIState>((set) => ({
     hoveredStation: station,
     hoveredStationScreenPos: screenPos ?? null,
   }),
+  /** Mirror the demo sidebar expanded/collapsed state for App.tsx flex layout */
+  setDemoPanelVisible: (visible) => set({ demoPanelVisible: visible }),
 }));

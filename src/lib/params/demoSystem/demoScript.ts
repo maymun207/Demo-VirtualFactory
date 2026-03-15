@@ -75,6 +75,90 @@ export interface PanelAction {
     state: 'open' | 'close';
 }
 
+// ─── Media Instruction Type ────────────────────────────────────────────────
+
+/**
+ * MediaInstruction — identifies a dynamic visualisation to render in DemoMediaView
+ * instead of a static slide image for a given CtaStep.
+ *
+ * Each value maps to a dedicated React component inside
+ * `src/components/demo/media/DemoMediaInstructionRenderer.tsx`.
+ *
+ * Adding a new visualisation:
+ *   1. Add a new string literal to this union.
+ *   2. Implement the component in DemoMediaInstructionRenderer.
+ *   3. Reference it in the ctaSteps[] of the relevant act.
+ *
+ * Current values:
+ *   'chart:conveyor_speed' — SVG line chart of S-Clock vs conveyor belt speed.
+ *                            Reads directly from the local conveyorStateRecords
+ *                            ring-buffer in simulationDataStore — no API call.
+ */
+export type MediaInstruction = 'chart:conveyor_speed';
+
+// ─── CTA Step ────────────────────────────────────────────────────────────────
+
+/**
+ * CtaStep — describes every action triggered by a single CTA button click.
+ *
+ * Each DemoAct has an ordered ctaSteps[] array. Click N executes ctaSteps[N-1].
+ * Only fields relevant to the click need to be set — all are optional.
+ *
+ * Field execution order (inside handleCtaClick):
+ *   1. panelActions      — immediately toggle panels (open/close)
+ *   2. scenarioCode      — load scenario into simulationDataStore
+ *   3. simulationReset   — reset simulation to fresh state
+ *   4. slideImageUrl     — show static slide on the demo screen surface,
+ *                          OR replaced by mediaInstruction when that is set
+ *   4b. mediaInstruction — show a dynamic chart/viz (overrides slideImageUrl)
+ *   5. delayMs           — wait this many ms, then show screenText
+ *   6. screenText        — display plain text on the demo screen surface
+ *   7. ariaLocal         — inject a scripted ARIA bubble (no API call)
+ *   8. ariaApi           — send prompt to CWF, ARIA generates a dynamic reply
+ *   9. transitionTo      — navigate to next/named act ('next' | act-id | null)
+ *
+ * ctaLabel controls the button label during this step (defaults to 'Next ›').
+ */
+export interface CtaStep {
+    /** Label shown on the CTA button during this step */
+    ctaLabel?: string;
+    /** Slide image URL shown on the demo screen (root-relative, e.g. '/demo/ACT-0.png').
+     * Ignored when mediaInstruction is also set — the chart takes priority. */
+    slideImageUrl?: string;
+    /**
+     * Dynamic visualisation to render in the media area instead of a static slide.
+     * When set, DemoMediaView renders the appropriate chart/viz component using
+     * live simulation data from the local store — no API or image file needed.
+     * Overrides slideImageUrl for this step.
+     */
+    mediaInstruction?: MediaInstruction;
+    /** Scenario code to load — null or omit to keep current scenario */
+    scenarioCode?: string | null;
+    /** Milliseconds to wait before displaying screenText */
+    delayMs?: number;
+    /** Plain text rendered as an overlay on the demo screen surface (not ARIA chat) */
+    screenText?: string;
+    /** Scripted ARIA chat bubble injected locally — no CWF API call, instant */
+    ariaLocal?: string;
+    /** Prompt sent to CWF — ARIA generates a dynamic reply via the API */
+    ariaApi?: string;
+    /** Whether the ARIA chat input is enabled for this step (default: true) */
+    ariaInputEnabled?: boolean;
+    /** Panel open/close instructions applied immediately on this click */
+    panelActions?: PanelAction[];
+    /**
+     * simulationAction — controls the simulation engine on this click.
+     *   'start'       : start the sim (calls toggleDataFlow() if not already running)
+     *   'stop'        : stop the sim immediately (calls stopDataFlow())
+     *   'reset'       : reset all simulation state (clocks, counters, tiles)
+     *   'reset-start' : reset then immediately start (most common for demo opening)
+     * Omit / undefined to leave the simulation state unchanged.
+     */
+    simulationAction?: 'start' | 'stop' | 'reset' | 'reset-start';
+    /** Where to navigate after this step: 'next' = next act, an act id = jump, null/'' = stay */
+    transitionTo?: 'next' | string | null;
+}
+
 // ─── Act Definition ─────────────────────────────────────────────────────────
 
 /**
@@ -132,6 +216,40 @@ export interface DemoAct {
     enableCopilot?: boolean;
 
     /**
+     * CtaStep — describes everything that happens on a single CTA button click.
+     *
+     * Each act has an ordered ctaSteps array. Click N → executes ctaSteps[N-1].
+     * After the last step the next click has no further steps to execute
+     * (a step with transitionTo:'next' is the idiomatic final step).
+     */
+
+    /**
+     * ctaSteps — ordered list of rich step definitions for the CTA button.
+     *
+     * Replaces the old ctaSlides: string[] with a fully declarative model:
+     *   Click 1 → executes ctaSteps[0], Click 2 → ctaSteps[1], …
+     *
+     * Leave undefined (or empty) for acts that have no CTA-driven slides.
+     */
+    ctaSteps?: CtaStep[];
+
+    /**
+     * Optional label shown next to the LED indicator in DemoSidePanel.
+     * Only set for the 5 narrative acts (1–5). Acts without this field
+     * (Welcome, Close) are excluded from the sidebar LED list.
+     *
+     * Keep to 2–4 words for the sidebar width.
+     */
+    sidebarLabel?: string;
+
+    /**
+     * Optional italic sub-label shown below sidebarLabel in DemoSidePanel.
+     * Used to add a short technology tag (e.g. "Digital Twin", "CWF", "Auto Pilot").
+     * Leave as undefined if no sub-label is needed.
+     */
+    sidebarSubLabel?: string;
+
+    /**
      * Per-act AI system context injected into the conversation.
      * This is APPENDED to DEMO_SYSTEM_PROMPT — it specialises ARIA's framing
      * for this specific act without replacing the base persona.
@@ -142,14 +260,10 @@ export interface DemoAct {
      */
     systemContext: string;
 
-    /**
-     * The opening prompt auto-sent to CWF when the act begins.
-     * This triggers ARIA to deliver the act's narrative and Socratic question.
-     *
-     * Write this as a rich instruction to ARIA, telling it exactly what story to
-     * tell and what question to pose to the audience.
+    /** The opening prompt auto-sent to CWF when the act begins.
+     * Leave empty string or omit to keep ARIA silent for this act.
      */
-    openingPrompt: string;
+    openingPrompt?: string;
 }
 
 // ─── The Demo Script ─────────────────────────────────────────────────────────
@@ -198,16 +312,27 @@ You are opening the demo. Tone = calm authority, experienced manufacturing consu
 You must introduce CO₂ as the 4th dimension of the journey alongside OEE, quality, and throughput.
 Never be hyperbolic. Be precise and credible. Maximum 5 sentences for the welcome.
         `.trim(),
-        /**
-         * Opening prompt: 3 sentences. Industry number → gap → stage-by-stage hook.
-         * No journey map. No list of stages. Continue button advances — do not announce it.
-         */
-        openingPrompt: `
-RULES: 3 sentences. No list of stages. No journey map. The Continue button advances — do not announce it.
-
-OUTPUT THIS EXACTLY:
-"Ceramic tile manufacturers lose 8 to 14% of potential production revenue to inefficiencies that are invisible or unmeasured. That gap compounds silently, every shift. You are about to watch one factory close it — OEE, quality, energy, and CO₂, stage by stage."
-        `.trim(),
+                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+            { // Click #1
+                ctaLabel: 'Start',
+                slideImageUrl: '/demo/Welcome.png',
+                scenarioCode: 'SCN-001',
+                delayMs: 3000,
+                screenText: 'Let\'s start',
+                ariaInputEnabled: true,
+                panelActions: [
+                    { panel: 'basicPanel', state: 'close' },
+                    { panel: 'dtxfr', state: 'close' },
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                    { panel: 'controlPanel', state: 'close' },
+                ],
+                simulationAction: 'reset',
+                transitionTo: 'next',
+            },
+        ],
+        /** Opening prompt: cleared — to be authored per-act. */
+        openingPrompt: '',
     },
 
     // ══════════════════════════════════════════════════════════════════════
@@ -231,6 +356,60 @@ OUTPUT THIS EXACTLY:
             { panel: 'cwf', state: 'close' },
             { panel: 'oeeHierarchy', state: 'close' },
         ],
+        /** Three CTA steps:
+         *   1. Slide intro (ACT-1a) with scenario load
+         *   2. Live conveyor speed chart (mediaInstruction) — visual teaser, control panel opens
+         *   3. Static slide (ACT-1b) + ariaLocal + ariaApi query — ARIA responds with real data, auto-advance
+         */
+                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+            { // Click #1
+                ctaLabel: 'Continue',
+                scenarioCode: 'SCN-001',
+                delayMs: 1000,
+                screenText: 'Now, production started everything is looking great...',
+                ariaInputEnabled: true,
+                panelActions: [
+                    { panel: 'basicPanel', state: 'close' },
+                    { panel: 'dtxfr', state: 'close' },
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                    { panel: 'controlPanel', state: 'close' },
+                ],
+                simulationAction: 'start',
+            },
+            { // Click #2
+                ctaLabel: 'Next',
+                delayMs: 500,
+                screenText: 'Is everything really going well?',
+                ariaInputEnabled: true,
+                panelActions: [
+                    { panel: 'basicPanel', state: 'close' },
+                    { panel: 'dtxfr', state: 'close' },
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                    { panel: 'controlPanel', state: 'close' },
+                ],
+            },
+            { // Click #3
+                ctaLabel: 'Next',
+                delayMs: 500,
+                screenText: 'Let\'s go deep dive a bit...',
+                ariaInputEnabled: true,
+                panelActions: [
+                    { panel: 'basicPanel', state: 'close' },
+                    { panel: 'dtxfr', state: 'close' },
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                    { panel: 'controlPanel', state: 'close' },
+                ],
+            },
+            { // Click #4
+                ariaInputEnabled: true,
+                transitionTo: 'next',
+            },
+        ],
+        /** Sidebar LED label — displayed in DemoSidePanel stage list */
+        sidebarLabel: 'No System',
         /**
          * System context: "No Management System" era. SCN-001 running — machine params
          * all within spec. ONLY variable = conveyor speed drift. Loss = throughput gap
@@ -250,23 +429,8 @@ and wasted energy during conveyor speed drift.
 
 Tone: quiet intensity. The factory looks fine from the outside. The tragedy is invisible.
         `.trim(),
-        /**
-         * Opening prompt: 3 sentences. Observation → what user sees → one question.
-         * No preamble. Start mid-thought. 2-sentence reply handlers.
-         */
-        openingPrompt: `
-RULES: 3 sentences. Start mid-thought. One question only. Do not announce the Continue button.
-If the user replies, answer in 2 sentences maximum.
-
-OUTPUT THIS EXACTLY:
-"The factory is running. Watch the conveyor — the speed isn't constant. When it slows down and the kiln keeps burning, who logs that the loss happened?"
-
-IF USER REPLIES:
-- "the shift manager" → "Right — and what does the manager write? Usually just 'operational.' No timestamp, no duration, no cause."
-- "nobody" → "Exactly. The shift ends 43 tiles below plan and the report says nothing about when or why."
-- "a system" or "software" → "That's where this is going. But right now there's nothing — so the loss just disappears into the shift report."
-- Default: engage in 2 sentences max, steer toward the insight that without data the loss is invisible.
-        `.trim(),
+        /** Opening prompt: cleared — to be authored per-act. */
+        openingPrompt: '',
     },
 
     // ══════════════════════════════════════════════════════════════════════
@@ -281,12 +445,22 @@ IF USER REPLIES:
         eraEmoji: '📊',
         /** Panel height: medium — dashboard visible, narrative continues */
         targetHeightKey: 'medium',
-        /** SCN-001 still active — now the audience can SEE the numbers */
-        scenarioCode: null,
-        /** Open the Basic KPI panel — first dashboard visibility */
+        /** SCN-001 — conveyor speed drift visible in the KPI dashboard numbers */
+        scenarioCode: 'SCN-001',
+        /**
+         * Close all panels at act entry — the basicPanel is opened only at
+         * ctaSteps[1] (Click #2). Opening it here caused it to appear immediately
+         * when transitioning from No System, before the first CTA click.
+         */
         panelActions: [
-            { panel: 'basicPanel', state: 'open' },
+            { panel: 'basicPanel', state: 'close' },
+            { panel: 'dtxfr', state: 'close' },
+            { panel: 'cwf', state: 'close' },
+            { panel: 'oeeHierarchy', state: 'close' },
+            { panel: 'controlPanel', state: 'close' },
         ],
+        /** Sidebar LED label — displayed in DemoSidePanel stage list */
+        sidebarLabel: 'Basic Management',
         /**
          * System context: Basic Panel just opened. Audience sees OEE (85-92%,
          * Performance dragged by speed drift), throughput count, energy figures.
@@ -306,22 +480,52 @@ Make the distinction between "seeing a number" and "understanding its cause" ver
 CRITICAL: Still SCN-001. Still ONLY conveyor speed drift. NEVER mention defects, second
 quality, scrap, sorting, or machine parameter issues. The story remains throughput and energy.
         `.trim(),
-        /**
-         * Opening prompt: Acknowledge progress in one clause, immediately cut to what's missing.
-         * 3 sentences. 2-sentence reply handlers.
-         */
-        openingPrompt: `
-RULES: Acknowledge progress in one clause, then immediately cut to what's missing. 3 sentences total.
-Do not announce the Continue button. If user replies, 2 sentences max.
-
-OUTPUT THIS EXACTLY:
-"Now you have a number — OEE is visible, the throughput gap is on screen. But can you tell me when exactly the belt slowed down today, or whether it's getting worse than last week? Seeing is not the same as understanding."
-
-IF USER REPLIES:
-- Dashboard doesn't show it → "Correct. Total kWh consumed looks fine — it won't tell you how much of that energy produced nothing."
-- Would look at trend → "The trend line is there — but it shows you the result, not the cause. That's the gap this level of system can't close."
-- Default: engage in 2 sentences max, reinforce seeing vs understanding distinction.
-        `.trim(),
+        /** Two CTA steps: chart + Basic/Control panels open so the audience sees live OEE alongside the chart. */
+                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+            { // Click #1
+                ctaLabel: 'Continue',
+                slideImageUrl: '/demo/ACT-1a.png',
+                delayMs: 300,
+                screenText: 'You can see how OEE fluctuates at the Basic screen',
+                ariaInputEnabled: true,
+                panelActions: [
+                    { panel: 'basicPanel', state: 'close' },
+                    { panel: 'dtxfr', state: 'close' },
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                    { panel: 'controlPanel', state: 'open' },
+                ],
+            },
+            { // Click #2
+                ctaLabel: 'Next',
+                mediaInstruction: 'chart:conveyor_speed',
+                delayMs: 300,
+                screenText: 'Hard to understand what took place....',
+                ariaInputEnabled: true,
+                panelActions: [
+                    { panel: 'basicPanel', state: 'open' },
+                    { panel: 'dtxfr', state: 'close' },
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                ],
+            },
+            { // Click #3
+                ctaLabel: 'Next',
+                slideImageUrl: '/demo/ACT-1b.png',
+                delayMs: 300,
+                screenText: 'Let\'s see how conveyor speed varies',
+                ariaInputEnabled: true,
+                panelActions: [
+                    { panel: 'dtxfr', state: 'close' },
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                    { panel: 'controlPanel', state: 'close' },
+                ],
+                transitionTo: 'next',
+            },
+        ],
+        /** Opening prompt: cleared — to be authored per-act. */
+        openingPrompt: '',
     },
 
     // ══════════════════════════════════════════════════════════════════════
@@ -343,6 +547,10 @@ IF USER REPLIES:
             { panel: 'basicPanel', state: 'close' },
             { panel: 'dtxfr', state: 'open' },
         ],
+        /** Sidebar LED label — displayed in DemoSidePanel stage list */
+        sidebarLabel: 'Digital Transformation',
+        /** Italic sub-label shown below the main sidebar label */
+        sidebarSubLabel: 'Digital Twin',
         /**
          * System context: SCN-002 (Kiln Temperature Crisis) loaded. Kiln running ~14°C
          * above spec. Tile Passport (DTXFR) open. Every tile has station-by-station record.
@@ -369,23 +577,22 @@ Manufacturer's CO₂ liability is compounded — quality + carbon = same root ca
 NEVER say "customer received defective tiles" or "warranty claim."
 The pain is entirely internal. Tone: controlled escalation — this is the revelation beat.
         `.trim(),
-        /**
-         * Opening prompt: Lead with consequence, not cause. The double cost is the core.
-         * Customer never receives defective tiles — sorting catches all.
-         * 2-sentence reply handlers.
-         */
-        openingPrompt: `
-RULES: Lead with consequence, not cause. Customer NEVER receives defective tiles.
-Do not announce the Continue button. If user replies, 2 sentences max.
-
-OUTPUT THIS EXACTLY:
-"The kiln ran 14°C above spec for 23 minutes. Sorting caught every affected tile — the customer sees nothing. But the tiles going to rework? You already paid to make them wrong. Now you pay 40 to 60% of that cost again to partially fix them. And the CO₂ from that overheated kiln is on your books — embedded in every tile that goes to rework, compounded by the rework process itself."
-
-IF USER REPLIES:
-- Asks who pays for rework → "The manufacturer. Always. The customer receives only first-quality tiles — the rework cost sits entirely on your own margin."
-- Asks about carbon or CO₂ → "Every cubic metre of gas the overheated kiln burned above spec emits 1.9 kg CO₂. EU markets are moving toward mandatory per-product carbon disclosure. The traceability for that exists here, right now."
-- Default: engage in 2 sentences max, reinforce that quality loss is entirely internal manufacturer cost.
-        `.trim(),
+        /** Two CTA steps: ARIA narrative + audience interaction. */
+                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+            { // Click #1
+                ctaLabel: 'Continue',
+                slideImageUrl: '/demo/ACT-3.png',
+                ariaInputEnabled: true,
+            },
+            { // Click #2
+                ctaLabel: 'Next',
+                slideImageUrl: '/demo/ACT-3.png',
+                ariaInputEnabled: true,
+                transitionTo: 'next',
+            },
+        ],
+        /** Opening prompt: cleared — to be authored per-act. */
+        openingPrompt: '',
     },
 
     // ══════════════════════════════════════════════════════════════════════
@@ -407,6 +614,10 @@ IF USER REPLIES:
             { panel: 'dtxfr', state: 'close' },
             { panel: 'cwf', state: 'open' },
         ],
+        /** Sidebar LED label — displayed in DemoSidePanel stage list */
+        sidebarLabel: 'Chat with Your Factory',
+        /** Italic sub-label shown below the main sidebar label */
+        sidebarSubLabel: 'CWF',
         /**
          * System context: SCN-003 (Glaze Viscosity Drift) active. Subtle — glaze
          * viscosity slightly off, second-quality rate rising slowly. CWF panel open.
@@ -435,27 +646,26 @@ Key insight to deliver: the knowledge from 15 years of experienced engineers is 
 available to everyone, at any hour, in any language, on any device. This is not
 convenience — it is organisational resilience.
         `.trim(),
-        /**
-         * Opening prompt: 2-3 sentences then the invitation. Hand them the wheel.
-         * Do not explain what CWF is. Problem → ask the factory.
-         * Show suggested prompts if user hesitates. 2-3 sentence reply with data close.
-         */
-        openingPrompt: `
-RULES: 2-3 sentences, then hand the user the wheel. Do not explain what CWF is.
-Do not announce the Continue button. If user types a question, answer in 2-3 sentences with data.
-
-OUTPUT THIS EXACTLY:
-"Glaze viscosity has drifted. Second-quality rate is quietly climbing — the kind of thing that looks like normal variation until it's expensive. Ask the factory what's causing it. In your own words, right now — the panel is open."
-
-SHOW THESE SUGGESTED PROMPTS IF USER HESITATES:
-🏢 "What is driving our quality loss most this week?"
-🔬 "Which station is the root cause of the second-quality increase?"
-🌿 "What is our CO₂ intensity per 1,000 tiles today?"
-
-IF USER TYPES ANY QUESTION TO CWF:
-Answer in 2-3 sentences with specific data-grounded response, then close with:
-"That answer used to take a quality engineer 90 minutes to trace manually."
-        `.trim(),
+        /** Two CTA steps: ARIA narrative + audience interaction. */
+                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+            { // Click #1
+                ctaLabel: 'Continue',
+                slideImageUrl: '/demo/ACT-4.png',
+                ariaInputEnabled: true,
+            },
+            { // Click #2
+                ctaLabel: 'Next',
+                slideImageUrl: '/demo/ACT-4a.png',
+                ariaInputEnabled: true,
+            },
+            { // Click #3
+                slideImageUrl: '/demo/ACT-4b.png',
+                ariaInputEnabled: true,
+                transitionTo: 'next',
+            },
+        ],
+        /** Opening prompt: cleared — to be authored per-act. */
+        openingPrompt: '',
     },
 
     // ══════════════════════════════════════════════════════════════════════
@@ -479,6 +689,10 @@ Answer in 2-3 sentences with specific data-grounded response, then close with:
         ],
         /** Signal the engine to auto-call the Copilot enable API when this act starts */
         enableCopilot: true,
+        /** Sidebar LED label — displayed in DemoSidePanel stage list */
+        sidebarLabel: 'Autonomous AI',
+        /** Italic sub-label shown below the main sidebar label */
+        sidebarSubLabel: 'Auto Pilot',
         /**
          * System context: SCN-004 (Multi-Station Cascade) active. Press + kiln failures.
          * Copilot auto-enabled — monitoring, detecting, correcting autonomously.
@@ -508,31 +722,22 @@ Duration: 6 minutes 40 seconds. Filed automatically.
 Customer received only first-quality tiles. All quality loss is internal.
 The Copilot did not prevent a bad outcome by alerting someone — it prevented it by ACTING.
         `.trim(),
-        /**
-         * Opening prompt: Read the log like a real system record. Short entries. Factual.
-         * One sentence of contrast after the log. Then stop. Tone: quiet. Precision IS the power.
-         */
-        openingPrompt: `
-RULES: Read the incident log as short factual entries. One sentence of contrast after.
-Then stop. The silence is the point. Do not announce the Continue button.
-Tone: quiet. The precision IS the dramatic power.
-
-OUTPUT THIS EXACTLY:
-"It is 3:47am. Here is what the factory wrote in its own log tonight.
-
-03:47:00 — Press pressure: +12% above spec.
-03:47:23 — Anomaly detected. Kiln cascade trajectory calculated.
-03:48:01 — Root cause confirmed.
-03:48:45 — Corrections applied. No human instruction. No alarm sent.
-03:53:40 — Recovery complete. 61 tiles affected.
-CO₂ overrun prevented: ~1,900 kg.
-Duration: 6 minutes 40 seconds.
-
-Your shift manager was in the break room. Your phone never rang."
-
-AFTER OUTPUT: Say nothing more. The silence is the point.
-If user engages, answer warmly and precisely in 2 sentences max.
-        `.trim(),
+        /** Two CTA steps: ARIA narrative + audience interaction. */
+                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+            { // Click #1
+                ctaLabel: 'Continue',
+                slideImageUrl: '/demo/ACT-4c.png',
+                ariaInputEnabled: true,
+            },
+            { // Click #2
+                ctaLabel: 'Next',
+                slideImageUrl: '/demo/ACT-4d.png',
+                ariaInputEnabled: true,
+                transitionTo: 'close',
+            },
+        ],
+        /** Opening prompt: cleared — to be authored per-act. */
+        openingPrompt: '',
     },
 
     // ══════════════════════════════════════════════════════════════════════
@@ -579,26 +784,22 @@ CLOSE STYLE: soft mirror — reflect the audience's own production gap back to t
 as a question. NO competitor names. NO customer names. NO manufactured urgency.
 The closing question IS the mechanism. Be precise, credible, and quiet in conviction.
         `.trim(),
+        /** Opening prompt: cleared — to be authored per-act. */
+        openingPrompt: '',
         /**
-         * Opening prompt: One financial frame, then the mirror question.
-         * The question IS the mechanism. No urgency language. No pressure. Go quiet after.
+         * Two CTA steps: ARIA closing narrative + audience Q&A.
+         * No further stage transition — this is the final act.
          */
-        openingPrompt: `
-RULES: One financial frame, then the mirror question. No urgency language. No pressure.
-After the closing question: go quiet. If they engage, answer warmly and precisely.
-Offer to work through their actual numbers if they share them.
-
-OUTPUT THIS EXACTLY:
-"Every 1% OEE improvement on a tile line typically recovers €8,000 to €15,000 per month — not from new sales, from value already in the factory going uncaptured. Manufacturers who implement this level of intelligence typically recover 3 to 5 OEE points in the first quarter.
-
-One question before we finish:
-
-What did your line produce versus theoretical maximum last month — and do you know exactly why the gap exists?
-
-If you can answer the first half, you have a number.
-If you can't answer the second half, you have your next project."
-
-AFTER OUTPUT: Go quiet. If user engages, answer warmly and offer to work through their actual numbers.
-        `.trim(),
+                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+            { // Click #1
+                ctaLabel: 'Continue',
+                ariaInputEnabled: true,
+            },
+            { // Click #2
+                ctaLabel: 'Next',
+                ariaInputEnabled: true,
+                transitionTo: 'close',
+            },
+        ],
     },
 ];

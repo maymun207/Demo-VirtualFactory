@@ -6,9 +6,10 @@
  * using absolute/fixed positioning to float above the WebGL content.
  *
  * Components rendered:
- *  - Header — top bar with title, controls, language toggle, session info
+ *  - Header     — top bar with title, controls, language toggle, session info
+ *  - DemoLayout — new demo UI: collapsible sidebar + central media/ARIA view
  *  - ControlPanel — drop-down panel with simulation sliders (toggled from Header)
- *  - Playbook — modal overlay with factory process guide
+ *  - Playbook   — modal overlay with factory process guide
  *  - MachineTooltip — hover tooltip with live station parameters
  *  - DemoSettingsPanel — simulation configuration popup
  *
@@ -22,10 +23,12 @@ import { ControlPanel } from "./ControlPanel";
 import { Playbook } from "./Playbook";
 import { MachineTooltip } from "./MachineTooltip";
 import { DemoSettingsPanel } from "./DemoSettingsPanel";
-/** DemoScreen — transparent glass chat panel toggled by the Demo button in the header */
-import { DemoScreen } from "../demo/DemoScreen";
-/** DemoControlBar — fixed bottom-of-viewport control strip (act progress + navigation) */
-import { DemoControlBar } from "../demo/DemoControlBar";
+/**
+ * DemoLayout — the new unified Demo UI entry point.
+ * Replaced the old DemoScreen + DemoControlBar pair.
+ * Mounts DemoSidePanel (left sidebar) and DemoMediaView (central area).
+ */
+import { DemoLayout } from "../demo/DemoLayout";
 import { useAlarmMonitor } from "../../hooks/useAlarmMonitor";
 /** Auto-detects sim state transitions (jams, starts, speed changes) and emits telemetry events */
 import { useTelemetry } from "../../hooks/useTelemetry";
@@ -40,10 +43,8 @@ export const Dashboard = () => {
 
   return (
     <>
-      {/* DemoScreen — chat window anchored below header */}
-      <DemoScreen />
-      {/* DemoControlBar — act progress + navigation, fixed at viewport bottom */}
-      <DemoControlBar />
+      {/* DemoLayout — new Demo UI: sidebar + central media view */}
+      <DemoLayout />
       <ControlPanel />
       <Playbook />
       <MachineTooltip />

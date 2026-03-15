@@ -37,6 +37,9 @@ import { useCWFCommandListener } from "./hooks/useCWFCommandListener";
 import { useUIStore } from "./store/uiStore";
 import { CWF_SIDE_PANEL_ANIMATION_MS } from "./lib/params";
 import { Header } from "./components/ui/Header";
+import {
+  DEMO_SIDE_PANEL_WIDTH_PX,
+} from "./lib/params/demoSystem/demoConfig";
 
 function App() {
   /** Activate KPI synchronization (reacts to simulation clock changes) */
@@ -78,11 +81,35 @@ function App() {
   const showBasicPanel = useUIStore((s) => s.showBasicPanel);
   /** Current width of the Basic side panel (user-resizable) */
   const basicPanelWidth = useUIStore((s) => s.basicPanelWidth);
+  /** Whether the demo tab is currently open */
+  const showDemoScreen = useUIStore((s) => s.showDemoScreen);
+  /**
+   * demoPanelVisible — whether the Demo Status sidebar is expanded.
+   * Flipped by DemoLayout via uiStore when the presenter uses the toggle arrow.
+   * Used to size the flex-column spacer that pushes Basic/DTXFR rightward.
+   */
+  const demoPanelVisible = useUIStore((s) => s.demoPanelVisible);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black flex flex-col">
       <Header />
       <div className="flex-1 flex flex-row overflow-hidden">
+        {/*
+          * ── Demo Status sidebar spacer ─────────────────────────────
+          * A zero-content transparent column that reserves the exact
+          * same width as the fixed DemoSidePanel. When demo mode is
+          * active and the sidebar is expanded, this spacer pushes
+          * BasicPanel and DTXFRPanel to the right of the demo bar —
+          * identically to how BasicPanel pushes DTXFRPanel.
+          * Width animates to 0 when demo is closed or sidebar collapses.
+          */}
+        <div
+          className="h-full shrink-0 overflow-hidden"
+          style={{
+            width: showDemoScreen && demoPanelVisible ? DEMO_SIDE_PANEL_WIDTH_PX : 0,
+            transition: `width ${CWF_SIDE_PANEL_ANIMATION_MS}ms ease-in-out`,
+          }}
+        />
         {/* ── Basic side panel: left-docked ─────────────────────────────── */}
         <div
           className="h-full overflow-hidden shrink-0"

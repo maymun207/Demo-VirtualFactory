@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!--
+    VF Demo Script Editor — index.html
+    =====================================
+    Standalone browser tool for building the ctaSteps[] arrays used in
+    demoScript.ts. Open this file directly in any modern browser (no server
+    required — just double-click the file).
+
+    Script load order is important:
+      1. schema.js  — static data constants
+      2. editor.js  — state management + DOM rendering
+      3. exporter.js — TypeScript generation + modal logic
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VF Demo Script Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ── Application Shell ─────────────────────────────────────────── -->
+<div id="app">
+
+    <!-- Header -->
+    <header id="app-header">
+        <div class="header-brand">
+            <span class="brand-icon">🏭</span>
+            <span class="brand-name">VF Demo Script Editor</span>
+        </div>
+        <div class="header-actions">
+            <button id="btn-reset-all" class="btn-secondary" title="Clear ALL data and start fresh">
+                ↺ Reset All
+            </button>
+            <button id="btn-export" class="btn-primary" title="Generate TypeScript code">
+                ⬇ Export TypeScript
+            </button>
+            <!-- Save to File — writes ctaSteps directly into demoScript.ts via File System Access API -->
+            <!-- Requires Chrome or Edge; Firefox does not support this API for file:// origins -->
+            <div class="save-btn-group">
+                <button id="btn-save" class="btn-save" title="Write ctaSteps blocks directly to demoScript.ts (Chrome/Edge only)">
+                    💾 Save to File
+                </button>
+                <!-- Shown only after a file has been picked; lets the user relink to a different file -->
+                <span id="btn-change-file-wrap" style="display:none;">
+                    <span id="save-filename" class="save-filename"></span>
+                    <button id="btn-change-file" class="btn-change-file" title="Pick a different file">Change File…</button>
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stage Tab Navigation — rendered by editor.js -->
+    <nav id="stage-tabs"></nav>
+
+    <!-- Active Stage Table — rendered by editor.js -->
+    <main id="stage-content"></main>
+
+    <!-- Status toast: shown briefly after each save attempt -->
+    <div id="save-status" class="save-status" style="display:none;"></div>
+
+</div>
+
+<!-- ── Export Modal ──────────────────────────────────────────────── -->
+<div id="export-modal" role="dialog" aria-modal="true" aria-label="Generated TypeScript">
+    <div class="modal-panel">
+
+        <div class="modal-header">
+            <h2>Generated TypeScript</h2>
+            <button id="btn-close-modal" class="btn-close" title="Close">×</button>
+        </div>
+
+        <p class="modal-hint">
+            Copy each <code>ctaSteps: [...]</code> block and replace the matching block
+            inside <code>DEMO_ACTS</code> in <code>demoScript.ts</code>.
+        </p>
+
+        <!-- The generated code is placed here by exporter.js -->
+        <pre id="export-code"></pre>
+
+        <div class="modal-footer">
+            <button id="btn-copy" class="btn-primary">⎘ Copy All to Clipboard</button>
+            <button class="btn-secondary" onclick="hideExportModal()">Close</button>
+        </div>
+
+    </div>
+</div>
+
+<!-- Scripts — order matters -->
+<script src="js/schema.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/exporter.js"></script>
+<!-- fileSaver.js must load last: depends on schema.js (STAGES) and exporter.js (buildStepFields, q) -->
+<script src="js/fileSaver.js"></script>
+
+</body>
+</html>

@@ -5,11 +5,15 @@
  * All values used by demoStore.ts and demo UI components come from here.
  * No hardcoded values anywhere else in the demo module.
  *
- * HEIGHT SYSTEM:
- *   Each act defines a targetHeightKey. The demo screen animates smoothly
- *   between these heights as the user progresses through the story.
- *   This creates the "breathing panel" effect — the screen grows as the
- *   narrative complexity increases.
+ * HEIGHT SYSTEM (legacy — retained for reference):
+ *   The old floating DemoScreen used per-act height keys. The new layout
+ *   uses a fixed sidebar + full-height media area, so DEMO_ACT_HEIGHTS
+ *   remains only to avoid breaking existing demoScript.ts field declarations.
+ *
+ * SIDEBAR:
+ *   The new Demo UI places a collapsible left sidebar (DemoSidePanel) next
+ *   to a central media+ARIA area (DemoMediaView). Width and default
+ *   visibility are configured here.
  *
  * Isolated from main params/index.ts — only imported by demo system files.
  */
@@ -32,6 +36,24 @@ export const DEMO_MAX_HISTORY_MESSAGES: number = 6;
  * Aborts the fetch if the CWF API doesn't respond in time.
  */
 export const DEMO_CLIENT_TIMEOUT_MS: number = 60_000;
+
+/**
+ * DEMO_ARIA_LOADING_TIMEOUT_MS — Safety unlock timeout for the CTA button.
+ *
+ * If the ARIA API call does not complete within this duration, the CTA button
+ * is re-enabled so the presenter is never permanently stuck during a live demo.
+ * The underlying fetch continues in the background and will still update the
+ * message thread when (if) it eventually resolves.
+ *
+ * Set to 15 s — generous enough for slow networks, tight enough not to stall a demo.
+ */
+export const DEMO_ARIA_LOADING_TIMEOUT_MS: number = 15_000;
+
+/**
+ * DEMO_ARIA_LOADING_LABEL — Text shown on the CTA button while ARIA is responding.
+ * Tells the presenter exactly why the button is momentarily disabled.
+ */
+export const DEMO_ARIA_LOADING_LABEL: string = 'ARIA responding…';
 
 /**
  * DEMO_MESSAGE_ID_PREFIX — Prefix for generated demo message IDs.
@@ -89,3 +111,93 @@ export const DEMO_RESTART_SCENARIO: string = 'SCN-001';
  * Act 0 is always welcome; Act 1 is the first narrative act.
  */
 export const DEMO_FIRST_ACT_INDEX: number = 0;
+
+/**
+ * DEMO_SIDE_PANEL_WIDTH_PX — Pixel width of the collapsible left sidebar
+ * (DemoSidePanel) in the new Demo UI layout.
+ * Adjust to fit the sidebar content comfortably at any screen resolution.
+ */
+export const DEMO_SIDE_PANEL_WIDTH_PX: number = 210;
+
+/**
+ * DEMO_SIDE_PANEL_VISIBLE_DEFAULT — Whether the left sidebar is shown by
+ * default when the user opens the Demo tab.
+ * Set to true so presenters always see the control panel on entry.
+ */
+export const DEMO_SIDE_PANEL_VISIBLE_DEFAULT: boolean = true;
+
+/**
+ * DEMO_MOVIE_PATH — Root-relative URL of the short demo video file.
+ * Served from /public/demo/ as a static Vite asset.
+ * Used by DemoSidePanel's "Watch movie" button and DemoMediaView's player.
+ */
+export const DEMO_MOVIE_PATH: string = '/demo/ShortVideo.mp4';
+
+/**
+ * DEMO_MEDIA_LEFT_OFFSET_PCT — additional leftward shift applied to the
+ * DemoMediaView panel after its anchor position (midpoint between the Demo
+ * and Basic header buttons) has been calculated.
+ * Expressed as a fraction of window.innerWidth (0.10 = 10%).
+ * Increase to shift the panel further left, decrease to move it right.
+ * Used exclusively by DemoMediaView.tsx.
+ */
+export const DEMO_MEDIA_LEFT_OFFSET_PCT: number = 0.005;
+
+// =============================================================================
+// MEDIA INSTRUCTION CHART CONFIG
+// =============================================================================
+
+/**
+ * DEMO_CHART_HEIGHT_PX — Pixel height of the SVG canvas for media instruction charts.
+ * Tuned to fit comfortably within the 55vh DemoMediaView without overflow.
+ */
+export const DEMO_CHART_HEIGHT_PX: number = 220;
+
+/**
+ * DEMO_CHART_PADDING — Inner padding for SVG chart axes, in pixels.
+ * top/right leave room for axis labels; bottom accommodates X-axis labels;
+ * left accommodates Y-axis labels and tick values.
+ */
+export const DEMO_CHART_PADDING: { top: number; right: number; bottom: number; left: number } = {
+    top: 28,
+    right: 20,
+    bottom: 40,
+    left: 52,
+};
+
+/**
+ * DEMO_CHART_REF_SPEED — Nominal conveyor speed used as the reference (green) line.
+ * The belt runs at 1.0 m/s under normal conditions; drifts are visible as deviations.
+ */
+export const DEMO_CHART_REF_SPEED: number = 1.0;
+
+/**
+ * DEMO_CHART_MAX_SPEED — Y-axis ceiling for the conveyor speed chart.
+ * Matches the CONVEYOR_SPEED_RANGE upper bound (2.0) plus a small margin.
+ */
+export const DEMO_CHART_MAX_SPEED: number = 2.1;
+
+/**
+ * DEMO_CHART_MIN_SPEED — Y-axis floor for the conveyor speed chart.
+ * Belt can reach 0 during a jam. Small negative margin keeps the zero line visible.
+ */
+export const DEMO_CHART_MIN_SPEED: number = -0.05;
+
+/**
+ * DEMO_SCREEN_TEXT_FONT_SIZE_PX — Font size in pixels for the on-screen text caption
+ * (CtaStep.screenText). Rendered at the TOP of the DemoMediaView content area, centred,
+ * so it reads like a section headline before the slide or chart appears in the same panel.
+ *
+ * 17 px — halved from 34 px to match the 50% panel size reduction.
+ */
+export const DEMO_SCREEN_TEXT_FONT_SIZE_PX: number = 17;
+
+/**
+ * DEMO_SCREEN_MAX_HEIGHT_VH — Maximum height of the DemoMediaView panel as a percentage
+ * of the viewport height. The panel grows freely with its content up to this ceiling,
+ * then clips with an internal scrollbar. Prevents the panel from covering the entire
+ * factory 3D view on tall displays.
+ *
+ * 40vh — halved from 80vh to match the 50% panel size reduction.
+ */
+export const DEMO_SCREEN_MAX_HEIGHT_VH: number = 40;
