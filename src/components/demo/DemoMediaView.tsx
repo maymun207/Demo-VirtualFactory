@@ -32,9 +32,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDemoStore } from '../../store/demoStore';
 import type { DemoState, DemoMessage } from '../../store/demoStore';
 import {
-    DEMO_SIDE_PANEL_WIDTH_PX,
     DEMO_MOVIE_PATH,
-    DEMO_MEDIA_LEFT_OFFSET_PCT,
     DEMO_SCREEN_TEXT_FONT_SIZE_PX,
     DEMO_SCREEN_MAX_HEIGHT_VH,
 } from '../../lib/params/demoSystem/demoConfig';
@@ -111,51 +109,17 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
     /** Observed header height for dynamic top positioning */
     const [headerHeight, setHeaderHeight] = useState<number>(40);
 
-    /**
-     * mediaLeft — the left edge of the DemoMediaView, measured in pixels.
-     * Always equals the right edge of the #btn-demo element in the header
-     * so the panel"drop-aligns" under the Demo button exactly.
-     * Falls back to DEMO_SIDE_PANEL_WIDTH_PX on small screens where btn-demo
-     * is hidden (lg:flex).
-     */
-    const [mediaLeft, setMediaLeft] = useState<number>(DEMO_SIDE_PANEL_WIDTH_PX);
 
-    /** Observes header height AND measures the Demo button right edge on mount and resize */
+    /**
+     * Tracks header bottom for dynamic top positioning.
+     * Measured on mount and every resize so the panel always
+     * sits exactly below the header regardless of browser height.
+     */
     useEffect(() => {
         const measure = () => {
             /** Header bottom → used as the top anchor for the media panel */
             const h = document.getElementById('header-container');
             if (h) setHeaderHeight(h.getBoundingClientRect().bottom);
-
-            /**
-             * Anchor: midpoint between the right edge of the DTXFR button and the
-             * left edge of the OEE button. This aligns the panel's left edge
-             * exactly between those two header buttons.
-             *
-             * Falls back to:
-             *   1. btn-demo right edge (when DTXFR/OEE IDs are not found)
-             *   2. DEMO_SIDE_PANEL_WIDTH_PX (when no button is found at all)
-             */
-            const dtxfrBtn = document.getElementById('btn-dtxfr');
-            const oeeBtn   = document.getElementById('btn-oee');
-
-            if (dtxfrBtn && oeeBtn) {
-                /** Midpoint of the gap between DTXFR right edge and OEE left edge */
-                const dtxfrRight = dtxfrBtn.getBoundingClientRect().right;
-                const oeeLeft    = oeeBtn.getBoundingClientRect().left;
-                const midpoint   = (dtxfrRight + oeeLeft) / 2;
-                const shift      = window.innerWidth * DEMO_MEDIA_LEFT_OFFSET_PCT;
-                setMediaLeft(Math.max(0, Math.round(midpoint - shift)));
-            } else {
-                /** Fallback: use the Demo button right edge */
-                const btn = document.getElementById('btn-demo');
-                if (btn) {
-                    const shift = window.innerWidth * DEMO_MEDIA_LEFT_OFFSET_PCT;
-                    setMediaLeft(Math.max(0, Math.round(btn.getBoundingClientRect().right - shift)));
-                } else {
-                    setMediaLeft(DEMO_SIDE_PANEL_WIDTH_PX);
-                }
-            }
         };
         measure();
         window.addEventListener('resize', measure);
@@ -188,15 +152,20 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
             className="fixed pointer-events-none z-9997"
             style={{
                 top: headerHeight,
-                /** Aligns with the right edge of the #btn-demo header button */
-                left: mediaLeft,
                 /**
-                 * Width: capped at 390px (halved from 780px for 50% size reduction).
-                 * Leaves more of the factory 3D visible on the right side of the screen.
-                 * No explicit height — the inner glass panel grows with its content.
+                 * Horizontally centered in the full viewport.
+                 * left: 50% + translateX(-50%) gives equal distance
+                 * from the left and right browser edges at all times,
+                 * regardless of window size.
                  */
-                width: `min(421px, calc(100vw - ${mediaLeft}px - 12px))`,
-                transition: 'left 250ms cubic-bezier(0.4, 0, 0.2, 1), width 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                /**
+                 * Width: capped at 421px (50% size reduction base, +8%).
+                 * Falls back to 90vw on narrow viewports so it never clips.
+                 */
+                width: `min(421px, 90vw)`,
+                transition: 'top 250ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}
         >
             {/* Glass panel body — grows with content, scrolls if taller than max-height */}

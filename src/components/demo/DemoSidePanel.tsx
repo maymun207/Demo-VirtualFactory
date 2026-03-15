@@ -40,8 +40,12 @@ import { deriveCtaButtonLabel } from '../../lib/utils/demoCtaLabel';
 
 /** Props passed from DemoLayout */
 interface DemoSidePanelProps {
-    /** Called when the presenter clicks "Watch movie" */
+    /** Called when the presenter clicks "Watch movie" to start playback */
     onMovieRequest: () => void;
+    /** Called when the presenter clicks the button again to dismiss the movie */
+    onMovieDismiss: () => void;
+    /** Whether the movie is currently playing — drives toggle button state */
+    isMoviePlaying: boolean;
     /** Called whenever the sidebar collapses or expands, with the new visible state */
     onVisibilityChange: (visible: boolean) => void;
     /** Initial visibility — driven by DEMO_SIDE_PANEL_VISIBLE_DEFAULT */
@@ -54,6 +58,8 @@ interface DemoSidePanelProps {
  */
 export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
     onMovieRequest,
+    onMovieDismiss,
+    isMoviePlaying,
     onVisibilityChange,
     initialVisible,
 }) => {
@@ -273,7 +279,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                     </div>
 
                     {/* ── 3. STAGE LED LIST ──────────────────────────────────── */}
-                    <div className="px-3 py-2 flex flex-col gap-1 flex-1 overflow-y-auto border-b border-white/8">
+                    <div className="px-3 py-2 flex flex-col gap-1 overflow-y-auto border-b border-white/8">
                         {sidebarActs.map(({ act, idx }) => {
                             /** LED is green for the currently active act, grey otherwise */
                             const isActive = idx === currentActIndex;
@@ -316,31 +322,15 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                         })}
                     </div>
 
-                    {/* ── 4. WATCH MOVIE ─────────────────────────────────────── */}
-                    <div className="px-3 py-2 border-b border-white/8">
-                        <div className="text-white/40 text-[10px] font-medium mb-1.5 leading-tight">
-                            Why Digital Transformation?
+                    {/* ── 4. CHAT INPUT ─────────────────────────────────────── */}
+                    <div className="mt-[30px]">
+                        {/* Divider label */}
+                        <div className="px-3 pt-3 pb-1 border-t border-white/8">
+                            <span className="text-white/30 text-[9px] font-medium uppercase tracking-widest">
+                                Ask ARIA
+                            </span>
                         </div>
-                        <button
-                            id="demo-sidebar-movie"
-                            onClick={onMovieRequest}
-                            className="
-                                w-full flex items-center justify-center gap-1.5
-                                py-1.5 rounded-md
-                                bg-violet-500/20 hover:bg-violet-500/35
-                                border border-violet-400/30 hover:border-violet-400/60
-                                text-violet-200 hover:text-white
-                                text-[11px] font-semibold
-                                transition-all duration-150
-                            "
-                        >
-                            <Film size={12} />
-                            Watch movie
-                        </button>
-                    </div>
-
-                    {/* ── 5. CHAT INPUT (bottom) ─────────────────────────────── */}
-                    <div className="px-3 py-2 flex flex-col gap-2 mt-auto">
+                        <div className="px-3 pb-3 flex flex-col gap-2">
                         {/* Ask ARIA text input */}
                         <input
                             ref={inputRef}
@@ -398,6 +388,53 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                                 Send
                             </button>
                         </div>
+                        </div>
+                    </div>
+
+                    {/* ── 5. WATCH MOVIE (below ARIA, pushed to bottom) ──────── */}
+                    <div className="px-3 py-2 border-t border-white/8 mt-auto mb-[110px]">
+                        <div className="text-white/75 text-[12px] font-medium mb-[20px] leading-tight truncate">
+                            Why Digital Transformation?
+                        </div>
+                        <button
+                            id="demo-sidebar-movie"
+                            onClick={isMoviePlaying ? onMovieDismiss : onMovieRequest}
+                            className={
+                                isMoviePlaying
+                                    ? `
+                                        w-full flex items-center justify-center gap-1.5
+                                        py-1.5 rounded-md
+                                        bg-red-500/20 hover:bg-red-500/35
+                                        border border-red-400/40 hover:border-red-400/60
+                                        text-red-300 hover:text-white
+                                        text-[11px] font-semibold
+                                        transition-all duration-150
+                                    `
+                                    : `
+                                        w-full flex items-center justify-center gap-1.5
+                                        py-1.5 rounded-md
+                                        bg-violet-500/20 hover:bg-violet-500/35
+                                        border border-violet-400/30 hover:border-violet-400/60
+                                        text-violet-200 hover:text-white
+                                        text-[11px] font-semibold
+                                        transition-all duration-150
+                                    `
+                            }
+                        >
+                            {isMoviePlaying ? (
+                                /** Stop / dismiss icon — shown while movie is playing */
+                                <>
+                                    <span className="text-[10px]">✕</span>
+                                    Dismiss movie
+                                </>
+                            ) : (
+                                /** Play icon — shown when no movie is playing */
+                                <>
+                                    <Film size={12} />
+                                    Watch movie
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
             )}

@@ -65,6 +65,8 @@ export const DemoLayout: React.FC = () => {
             {/* Left sidebar — demo status, LED stage list, chat input */}
             <DemoSidePanel
                 onMovieRequest={() => setShowMovie(true)}
+                onMovieDismiss={() => setShowMovie(false)}
+                isMoviePlaying={showMovie}
                 onVisibilityChange={handleVisibilityChange}
                 initialVisible={DEMO_SIDE_PANEL_VISIBLE_DEFAULT}
             />
