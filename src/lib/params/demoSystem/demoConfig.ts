@@ -190,7 +190,7 @@ export const DEMO_CHART_MIN_SPEED: number = -0.05;
  *
  * 17 px — halved from 34 px to match the 50% panel size reduction.
  */
-export const DEMO_SCREEN_TEXT_FONT_SIZE_PX: number = 17;
+export const DEMO_SCREEN_TEXT_FONT_SIZE_PX: number = 18;
 
 /**
  * DEMO_SCREEN_MAX_HEIGHT_VH — Maximum height of the DemoMediaView panel as a percentage
@@ -200,4 +200,4 @@ export const DEMO_SCREEN_TEXT_FONT_SIZE_PX: number = 17;
  *
  * 40vh — halved from 80vh to match the 50% panel size reduction.
  */
-export const DEMO_SCREEN_MAX_HEIGHT_VH: number = 40;
+export const DEMO_SCREEN_MAX_HEIGHT_VH: number = 43;

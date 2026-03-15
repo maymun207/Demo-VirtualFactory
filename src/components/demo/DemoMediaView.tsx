@@ -128,31 +128,33 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
             if (h) setHeaderHeight(h.getBoundingClientRect().bottom);
 
             /**
-             * Demo button right edge → used as the left anchor for the media panel.
-             * Uses the element ID set in Header.tsx (id="btn-demo") and the
-             * modes menu pill (id="header-modes-pill" which starts at "Basic").
-             * The left edge of the panel sits at the midpoint between those two
-             * elements so it aligns "between the Demo and Basic buttons."
-             * Falls back to DEMO_SIDE_PANEL_WIDTH_PX when either element is
-             * not found (small screens where btn-demo is hidden).
+             * Anchor: midpoint between the right edge of the DTXFR button and the
+             * left edge of the OEE button. This aligns the panel's left edge
+             * exactly between those two header buttons.
+             *
+             * Falls back to:
+             *   1. btn-demo right edge (when DTXFR/OEE IDs are not found)
+             *   2. DEMO_SIDE_PANEL_WIDTH_PX (when no button is found at all)
              */
-            const btn = document.getElementById('btn-demo');
-            const modesPill = document.getElementById('header-modes-pill');
-            if (btn && modesPill) {
-                const demoRight = btn.getBoundingClientRect().right;
-                const basicLeft = modesPill.getBoundingClientRect().left;
-                /**
-                 * Midpoint of the gap, then shifted left by DEMO_MEDIA_LEFT_OFFSET_PCT
-                 * (default 10% of viewport width) so the panel doesn't start too far right.
-                 */
-                const midpoint = (demoRight + basicLeft) / 2;
-                const shift = window.innerWidth * DEMO_MEDIA_LEFT_OFFSET_PCT;
+            const dtxfrBtn = document.getElementById('btn-dtxfr');
+            const oeeBtn   = document.getElementById('btn-oee');
+
+            if (dtxfrBtn && oeeBtn) {
+                /** Midpoint of the gap between DTXFR right edge and OEE left edge */
+                const dtxfrRight = dtxfrBtn.getBoundingClientRect().right;
+                const oeeLeft    = oeeBtn.getBoundingClientRect().left;
+                const midpoint   = (dtxfrRight + oeeLeft) / 2;
+                const shift      = window.innerWidth * DEMO_MEDIA_LEFT_OFFSET_PCT;
                 setMediaLeft(Math.max(0, Math.round(midpoint - shift)));
-            } else if (btn) {
-                const shift = window.innerWidth * DEMO_MEDIA_LEFT_OFFSET_PCT;
-                setMediaLeft(Math.max(0, Math.round(btn.getBoundingClientRect().right - shift)));
             } else {
-                setMediaLeft(DEMO_SIDE_PANEL_WIDTH_PX);
+                /** Fallback: use the Demo button right edge */
+                const btn = document.getElementById('btn-demo');
+                if (btn) {
+                    const shift = window.innerWidth * DEMO_MEDIA_LEFT_OFFSET_PCT;
+                    setMediaLeft(Math.max(0, Math.round(btn.getBoundingClientRect().right - shift)));
+                } else {
+                    setMediaLeft(DEMO_SIDE_PANEL_WIDTH_PX);
+                }
             }
         };
         measure();
@@ -193,7 +195,7 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                  * Leaves more of the factory 3D visible on the right side of the screen.
                  * No explicit height — the inner glass panel grows with its content.
                  */
-                width: `min(390px, calc(100vw - ${mediaLeft}px - 12px))`,
+                width: `min(421px, calc(100vw - ${mediaLeft}px - 12px))`,
                 transition: 'left 250ms cubic-bezier(0.4, 0, 0.2, 1), width 250ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}
         >
@@ -236,7 +238,7 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                             style={{ animation: 'fadeIn 0.6s ease-in' }}
                         >
                             <p
-                                className="font-semibold text-white/95 tracking-wide leading-tight"
+                                className="font-semibold text-white/95 tracking-wide leading-tight whitespace-pre-wrap"
                                 style={{ fontSize: DEMO_SCREEN_TEXT_FONT_SIZE_PX }}
                             >
                                 {currentScreenText}

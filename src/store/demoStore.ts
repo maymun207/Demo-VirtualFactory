@@ -569,9 +569,20 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                 executeSimulationAction(step.simulationAction, useSimulationStore.getState());
             }
 
-            /** ── 4. Slide image ──────────────────────────────────── */
+            /**
+             * ── 4. Slide image ──────────────────────────────────────
+             * If the step defines a slide URL, show it.
+             * If the step has NO slideImageUrl AND NO mediaInstruction
+             * (i.e. the editor's "— no slide" option was selected),
+             * explicitly clear the current slide so the demo screen goes blank.
+             * This prevents a stale slide from a previous step persisting
+             * into this step against the author's intent.
+             */
             if (step.slideImageUrl && !step.mediaInstruction) {
                 set({ currentSlide: step.slideImageUrl });
+            } else if (!step.slideImageUrl && !step.mediaInstruction) {
+                /** "No slide" selected — clear the screen */
+                set({ currentSlide: null });
             }
 
             /** ── 4b. Media instruction (dynamic chart/viz) ──────── */

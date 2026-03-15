@@ -127,6 +127,7 @@ export const ModesMenu: React.FC = () => {
 
         {/* DTXFR Mode Button */}
         <button
+          id="btn-dtxfr"
           onClick={() =>
             toggleMode(
               () => useUIStore.getState().toggleDTXFR(),
@@ -150,6 +151,7 @@ export const ModesMenu: React.FC = () => {
 
         {/* OEE Hierarchy Mode Button */}
         <button
+          id="btn-oee"
           onClick={() =>
             toggleMode(
               () => useUIStore.getState().toggleOEEHierarchy(),
@@ -173,6 +175,7 @@ export const ModesMenu: React.FC = () => {
 
         {/* ProdTbl (Production Table) Mode Button */}
         <button
+          id="btn-prodtbl"
           onClick={() => {
             const s = useUIStore.getState();
             /** Record whether production table was open before toggling */

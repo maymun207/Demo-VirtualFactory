@@ -312,12 +312,12 @@ You are opening the demo. Tone = calm authority, experienced manufacturing consu
 You must introduce CO₂ as the 4th dimension of the journey alongside OEE, quality, and throughput.
 Never be hyperbolic. Be precise and credible. Maximum 5 sentences for the welcome.
         `.trim(),
-                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start',
                 slideImageUrl: '/demo/Welcome.png',
                 scenarioCode: 'SCN-001',
-                delayMs: 3000,
+                delayMs: 1000,
                 screenText: 'Let\'s start',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -361,7 +361,7 @@ Never be hyperbolic. Be precise and credible. Maximum 5 sentences for the welcom
          *   2. Live conveyor speed chart (mediaInstruction) — visual teaser, control panel opens
          *   3. Static slide (ACT-1b) + ariaLocal + ariaApi query — ARIA responds with real data, auto-advance
          */
-                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Continue',
                 scenarioCode: 'SCN-001',
@@ -391,21 +391,17 @@ Never be hyperbolic. Be precise and credible. Maximum 5 sentences for the welcom
                 ],
             },
             { // Click #3
-                ctaLabel: 'Next',
+                ctaLabel: 'Bext',
                 delayMs: 500,
-                screenText: 'Let\'s go deep dive a bit...',
+                screenText: 'Lets imagine factory installed a simple management and tracking system in place.',
                 ariaInputEnabled: true,
-                panelActions: [
-                    { panel: 'basicPanel', state: 'close' },
-                    { panel: 'dtxfr', state: 'close' },
-                    { panel: 'cwf', state: 'close' },
-                    { panel: 'oeeHierarchy', state: 'close' },
-                    { panel: 'controlPanel', state: 'close' },
-                ],
             },
             { // Click #4
+                ctaLabel: 'Next',
+                delayMs: 1,
+                screenText: 'Lets imagine factory installed a simple management and tracking system in place.',
                 ariaInputEnabled: true,
-                transitionTo: 'next',
+                transitionTo: 'basic-system',
             },
         ],
         /** Sidebar LED label — displayed in DemoSidePanel stage list */
@@ -481,11 +477,11 @@ CRITICAL: Still SCN-001. Still ONLY conveyor speed drift. NEVER mention defects,
 quality, scrap, sorting, or machine parameter issues. The story remains throughput and energy.
         `.trim(),
         /** Two CTA steps: chart + Basic/Control panels open so the audience sees live OEE alongside the chart. */
-                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Continue',
                 slideImageUrl: '/demo/ACT-1a.png',
-                delayMs: 300,
+                delayMs: 3000,
                 screenText: 'You can see how OEE fluctuates at the Basic screen',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -500,7 +496,7 @@ quality, scrap, sorting, or machine parameter issues. The story remains throughp
                 ctaLabel: 'Next',
                 mediaInstruction: 'chart:conveyor_speed',
                 delayMs: 300,
-                screenText: 'Hard to understand what took place....',
+                screenText: 'Let\'s see how conveyor speed varies.',
                 ariaInputEnabled: true,
                 panelActions: [
                     { panel: 'basicPanel', state: 'open' },
@@ -513,7 +509,7 @@ quality, scrap, sorting, or machine parameter issues. The story remains throughp
                 ctaLabel: 'Next',
                 slideImageUrl: '/demo/ACT-1b.png',
                 delayMs: 300,
-                screenText: 'Let\'s see how conveyor speed varies',
+                screenText: 'Hard to understand what took place....',
                 ariaInputEnabled: true,
                 panelActions: [
                     { panel: 'dtxfr', state: 'close' },
@@ -521,6 +517,9 @@ quality, scrap, sorting, or machine parameter issues. The story remains throughp
                     { panel: 'oeeHierarchy', state: 'close' },
                     { panel: 'controlPanel', state: 'close' },
                 ],
+            },
+            { // Click #4
+                ariaInputEnabled: true,
                 transitionTo: 'next',
             },
         ],
@@ -578,15 +577,17 @@ NEVER say "customer received defective tiles" or "warranty claim."
 The pain is entirely internal. Tone: controlled escalation — this is the revelation beat.
         `.trim(),
         /** Two CTA steps: ARIA narrative + audience interaction. */
-                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Continue',
                 slideImageUrl: '/demo/ACT-3.png',
+                delayMs: 1000,
+                screenText: '`Digital Passport captures:\\n• Machine station that touched each tile\\n• Parameter values at time of processing\\n• Defect attribution — which machine caused it`,',
                 ariaInputEnabled: true,
             },
             { // Click #2
                 ctaLabel: 'Next',
-                slideImageUrl: '/demo/ACT-3.png',
+                screenText: 'Digital passport has amazing power, while each tile is born it will be assigned a uniqueu ID, at each mjine impact on the tile is captured at digital passport of the tile. As you would siee in teh RTXFR screen, when a defect occurs now, it is possible to tell which mahine has introduced this defect.',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
             },
@@ -647,7 +648,7 @@ available to everyone, at any hour, in any language, on any device. This is not
 convenience — it is organisational resilience.
         `.trim(),
         /** Two CTA steps: ARIA narrative + audience interaction. */
-                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Continue',
                 slideImageUrl: '/demo/ACT-4.png',
@@ -723,7 +724,7 @@ Customer received only first-quality tiles. All quality loss is internal.
 The Copilot did not prevent a bad outcome by alerting someone — it prevented it by ACTING.
         `.trim(),
         /** Two CTA steps: ARIA narrative + audience interaction. */
-                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Continue',
                 slideImageUrl: '/demo/ACT-4c.png',
@@ -790,7 +791,7 @@ The closing question IS the mechanism. Be precise, credible, and quiet in convic
          * Two CTA steps: ARIA closing narrative + audience Q&A.
          * No further stage transition — this is the final act.
          */
-                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Continue',
                 ariaInputEnabled: true,
