@@ -27,7 +27,7 @@
  */
 
 import http from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -254,7 +254,7 @@ function createVercelResponseShim(res: http.ServerResponse) {
 const server = http.createServer(async (req, res) => {
     /** CORS headers — allow the Vite dev server to call this endpoint */
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     /** Handle CORS preflight requests */
@@ -389,6 +389,45 @@ const server = http.createServer(async (req, res) => {
             console.error('[Copilot API] Heartbeat error:', error);
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: (error as Error).message }));
+        }
+        return;
+    }
+
+    // ─── Demo Slides Listing Endpoint ───────────────────────────────────────
+
+    /**
+     * GET /api/demo-slides — Return a list of all files in public/demo/.
+     * Used by the Demo Script Editor to dynamically populate the slide
+     * dropdown without hard-coding filenames in schema.js.
+     * Response: { slides: Array<{ id: string, label: string }> }
+     * where id = '/demo/<filename>' and label = '<filename>'.
+     */
+    if (req.method === 'GET' && req.url === '/api/demo-slides') {
+        try {
+            /** Absolute path to the public/demo folder in the project root */
+            const demoDir = resolve(projectRoot, 'public', 'demo');
+
+            /** Read the directory contents — filter out hidden files (e.g. .DS_Store) */
+            const files = readdirSync(demoDir).filter((f) => !f.startsWith('.'));
+
+            /** Sort alphabetically so the dropdown order is predictable */
+            files.sort((a, b) => a.localeCompare(b));
+
+            /** Build the slide descriptors matching the window.SLIDES format in schema.js */
+            const slides = files.map((filename) => ({
+                id: `/demo/${filename}`,  /** Absolute path Vite serves at runtime */
+                label: filename,          /** Human-readable name for the dropdown */
+            }));
+
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache', /** Always return fresh file list */
+            });
+            res.end(JSON.stringify({ slides }));
+        } catch (error) {
+            console.error('[Demo Slides API] Error reading public/demo/:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to read demo slides directory' }));
         }
         return;
     }

@@ -102,20 +102,29 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(welcome.id).toBe('welcome');
         });
 
-        it('has exactly 2 ctaSteps', () => {
-            expect(welcome.ctaSteps).toHaveLength(2);
+        it('has exactly 1 ctaStep', () => {
+            /**
+             * Welcome has a single CTA step: the presenter clicks once, the
+             * simulation resets to a clean baseline, and the factory begins.
+             * The ACT-0 overview slide is no longer a separate step.
+             */
+            expect(welcome.ctaSteps).toHaveLength(1);
+        });
+
+        it('act has scenarioCode: SCN-001 (loaded at act entry)', () => {
+            /**
+             * SCN-001 (Optimal Production baseline) is set at the ACT level
+             * so it loads immediately when the welcome act begins.
+             */
+            expect(welcome.scenarioCode).toBe('SCN-001');
         });
 
         it('Click #1 — simulationAction is reset (resets sim to clean state)', () => {
             /**
              * Welcome Click #1 resets the simulation so the factory starts
-             * from a clean baseline. The simulation starts on Click #2.
+             * from a clean baseline.
              */
             expect(welcome.ctaSteps![0].simulationAction).toBe('reset');
-        });
-
-        it('Click #1 — loads scenario SCN-001', () => {
-            expect(welcome.ctaSteps![0].scenarioCode).toBe('SCN-001');
         });
 
         it('Click #1 — shows Welcome.png slide', () => {
@@ -133,19 +142,9 @@ describe('DEMO_ACTS — data integrity', () => {
             panels.forEach(p => expect(p.state).toBe('close'));
         });
 
-        it('Click #2 — shows ACT-0 overview slide', () => {
-            /** Welcome summary/overview slide shown before transitioning to the factory demo. */
-            expect(welcome.ctaSteps![1].ctaLabel).toBe('Continue');
-            expect(welcome.ctaSteps![1].slideImageUrl).toBe('/demo/ACT-0.png');
-        });
-
-        it('Click #2 — transitions to next stage with simulationAction: start', () => {
-            /**
-             * simulationAction: 'start' is restored — factory data begins flowing
-             * as the presenter moves from the ACT-0 overview slide into the demo.
-             */
-            expect(welcome.ctaSteps![1].transitionTo).toBe('next');
-            expect(welcome.ctaSteps![1].simulationAction).toBe('start');
+        it('Click #1 — auto-transitions to the next act (transitionTo: next)', () => {
+            /** Single step now owns the transition — no separate Click #2 needed. */
+            expect(welcome.ctaSteps![0].transitionTo).toBe('next');
         });
     });
 
@@ -158,61 +157,43 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(noManagement.id).toBe('no-management');
         });
 
-        it('has exactly 3 ctaSteps', () => {
-            expect(noManagement.ctaSteps).toHaveLength(3);
+        it('has exactly 2 ctaSteps', () => {
+            /**
+             * No System act has 2 steps:
+             *   1. Starts the simulation (SCN-001 still active from welcome)
+             *   2. Auto-transitions to the next act — the factory looks fine from outside
+             */
+            expect(noManagement.ctaSteps).toHaveLength(2);
         });
 
-        it('Click #1 — shows ACT-1a slide with 2s delay', () => {
+        it('act-level scenarioCode is null (SCN-001 still active from welcome)', () => {
+            /**
+             * No new scenario is loaded — the No System era inherits the baseline
+             * SCN-001 scenario that was set by the Welcome act.
+             */
+            expect(noManagement.scenarioCode).toBeNull();
+        });
+
+        it('Click #1 — starts the simulation', () => {
+            /**
+             * Click #1 fires simulationAction: start, beginning the live data flow.
+             */
             const step = noManagement.ctaSteps![0];
-            expect(step.slideImageUrl).toBe('/demo/ACT-1a.png');
-            expect(step.delayMs).toBe(2000);
-            expect(step.ariaInputEnabled).toBe(true);
-            expect(step.simulationAction).toBeUndefined();
+            expect(step.simulationAction).toBe('start');
+            expect(step.ariaInputEnabled).toBe(false);
+            expect(step.delayMs).toBeGreaterThan(0);
+            expect(step.screenText).toBeTruthy();
         });
 
-        it('Click #1 — loads SCN-001 and closes all 5 panels', () => {
-            const step = noManagement.ctaSteps![0];
-            expect(step.scenarioCode).toBe('SCN-001');
-            const panels = step.panelActions!;
-            expect(panels).toHaveLength(5);
-            panels.forEach(p => expect(p.state).toBe('close'));
-        });
-
-        it('Click #2 — shows live conveyor speed chart (mediaInstruction) + opens controlPanel', () => {
+        it('Click #2 — auto-transitions to next act to reveal the hidden tragedy', () => {
+            /**
+             * Click #2 is the punchline: everything looks fine, but the factory's
+             * invisible losses are about to be revealed. transitionTo: next fires.
+             */
             const step = noManagement.ctaSteps![1];
-            /**
-             * Chart is now the visual for Click #2 — a live data teaser before the query.
-             * No slideImageUrl: the chart component replaces the static image.
-             */
-            expect(step.mediaInstruction).toBe('chart:conveyor_speed');
-            expect(step.slideImageUrl).toBeUndefined();
-            /** delayMs ensures the screenText fades in after the chart renders. */
-            expect(step.delayMs).toBe(2000);
-            expect(step.screenText).toBe("Let's see how conveyor speed varies");
-            /** controlPanel opens so the presenter can gesture at the live belt speed slider. */
-            const cpAction = step.panelActions?.find(p => p.panel === 'controlPanel');
-            expect(cpAction?.state).toBe('open');
-        });
-
-        it('Click #3 — chart shows + panelActions close all, no ARIA query, auto-transitions', () => {
-            const step = noManagement.ctaSteps![2];
-            /**
-             * Click #3 is now a pure chart-transition step — no live query.
-             * The chart stays visible, controlPanel closes, and the act advances.
-             * ARIA will respond via the openingPrompt of the next act instead.
-             */
-            expect(step.ctaLabel).toBe('Continue');
-            expect(step.mediaInstruction).toBe('chart:conveyor_speed');
-            expect(step.slideImageUrl).toBeUndefined();
-            expect(step.screenText).toBe('We will look into Conveyor speed change closer...');
-            /** No live query on this step — ariaLocal and ariaApi are both absent. */
-            expect(step.ariaLocal).toBeUndefined();
-            expect(step.ariaApi).toBeUndefined();
-            /** All 5 panels close (including controlPanel that opened on Click #2). */
-            const panels = step.panelActions!;
-            expect(panels).toHaveLength(5);
-            panels.forEach(p => expect(p.state).toBe('close'));
             expect(step.transitionTo).toBe('next');
+            expect(step.ariaInputEnabled).toBe(false);
+            expect(step.screenText).toBeTruthy();
         });
     });
 
@@ -225,42 +206,54 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(basicSystem.id).toBe('basic-system');
         });
 
-        it('has exactly 2 ctaSteps', () => {
-            expect(basicSystem.ctaSteps).toHaveLength(2);
+        it('has exactly 3 ctaSteps', () => {
+            /**
+             * Basic System act has 3 steps:
+             *   1. Static slide (ACT-1a) + basicPanel opens — audience sees OEE numbers
+             *   2. Live conveyor speed chart (mediaInstruction) — visual teaser
+             *   3. Static slide (ACT-1b) + ariaApi sets work order — reveals root cause
+             */
+            expect(basicSystem.ctaSteps).toHaveLength(3);
         });
 
-        it('Click #1 — shows chart + opens basicPanel and controlPanel', () => {
+        it('Click #1 — shows ACT-1a slide and opens basicPanel', () => {
             const step = basicSystem.ctaSteps![0];
             /**
-             * Click #1 shows the live conveyor speed chart alongside the Basic Panel
-             * so the audience can see OEE fluctuating in real time while watching
-             * the belt speed trend. controlPanel opens so the presenter can gesture
-             * at the speed slider.
+             * First click: show the baseline OEE slide and open the Basic Panel
+             * so the audience can see the live KPI numbers alongside the narrative.
+             */
+            expect(step.slideImageUrl).toBe('/demo/ACT-1a.png');
+            expect(step.delayMs).toBeGreaterThan(0);
+            expect(step.screenText).toBeTruthy();
+            const basicPanelAction = step.panelActions?.find(p => p.panel === 'basicPanel');
+            expect(basicPanelAction?.state).toBe('open');
+        });
+
+        it('Click #2 — shows live conveyor speed chart (mediaInstruction)', () => {
+            const step = basicSystem.ctaSteps![1];
+            /**
+             * Second click: switch to the live conveyor speed chart so the audience
+             * can see the belt speed trend while OEE fluctuates on the Basic Panel.
              */
             expect(step.mediaInstruction).toBe('chart:conveyor_speed');
             expect(step.slideImageUrl).toBeUndefined();
-            expect(step.screenText).toBe('You can see how OEE fluctuates at the Basic screen');
-            expect(step.delayMs).toBe(2000);
-            const basicPanelAction = step.panelActions?.find(p => p.panel === 'basicPanel');
-            const controlPanelAction = step.panelActions?.find(p => p.panel === 'controlPanel');
-            expect(basicPanelAction?.state).toBe('open');
-            expect(controlPanelAction?.state).toBe('open');
+            expect(step.delayMs).toBeGreaterThan(0);
         });
 
-        it('Click #2 — chart remains, controlPanel closes, basicPanel stays open, auto-advances', () => {
-            const step = basicSystem.ctaSteps![1];
+        it('Click #3 — shows ACT-1b slide, triggers ariaApi to set work order, auto-advances', () => {
+            const step = basicSystem.ctaSteps![2];
             /**
-             * Click #2 delivers the punchline: the numbers exist but are hard to
-             * interpret without digital traceability. controlPanel closes to refocus
-             * the audience on the OEE dashboard. basicPanel stays open.
+             * Third click: reveal slide (ACT-1b), fire the CWF ariaApi command to
+             * set Work Order (demo production batch), enable ARIA input for Q&A,
+             * then auto-transition to the Digital Twin act.
              */
-            expect(step.mediaInstruction).toBe('chart:conveyor_speed');
-            expect(step.screenText).toBe('Hard to understand what took place....');
-            const basicPanelAction = step.panelActions?.find(p => p.panel === 'basicPanel');
-            const controlPanelAction = step.panelActions?.find(p => p.panel === 'controlPanel');
-            expect(basicPanelAction?.state).toBe('open');
-            expect(controlPanelAction?.state).toBe('close');
+            expect(step.slideImageUrl).toBe('/demo/ACT-1b.png');
+            expect(step.ariaApi).toBeTruthy();
+            expect(step.ariaInputEnabled).toBe(true);
             expect(step.transitionTo).toBe('next');
+            /** basicPanel closes so the audience focuses on the DTXFR passport view */
+            const basicPanelAction = step.panelActions?.find(p => p.panel === 'basicPanel');
+            expect(basicPanelAction?.state).toBe('close');
         });
     });
 

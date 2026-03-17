@@ -5,10 +5,26 @@
  *   1. CONVERSATION THREAD  — DemoMessage[] isolated from cwfStore
  *   2. ACT STATE MACHINE    — currentActIndex, advanceAct, restartDemo, jumpToAct
  *   3. SLIDE / MEDIA STATE  — currentSlide, currentMediaInstruction, currentScreenText
- *   4. CTA STEP SEQUENCER  — ctaStepIndex, handleCtaClick
+ *   4. CTA STEP SEQUENCER  — currentStepIndex, enterStep, userAdvance
  *   5. PANEL CONTROL        — applies per-act and per-step panelActions via uiStore
  *   6. SCENARIO SWITCHING   — loads per-act scenarioCode via simulationDataStore
  *   7. API CALLS            — sends openingPrompt to /api/cwf/chat with ARIA persona
+ *
+ * PHASE-BASED EXECUTION MODEL:
+ *   Each CtaStep now executes across multiple phases instead of a single click:
+ *
+ *   Phase 1 (auto on step load): ctaLabel → slide → scenario → delayMs
+ *   Phase 2 (auto after 1):      screenText tokens processed (<cls>,<clmi>,<w:N>,<MI>,<clck>)
+ *                                 → if no <clck> and has screenText: WAITS for user click
+ *                                 → if <clck> found: auto-advances to Phase 3
+ *                                 → if no screenText: immediately proceeds to Phase 3
+ *   Phase 3 (user click or <clck>): ARIA Local tokens → ARIA API call
+ *   Phase 4 (auto after API response): ariaInputEnabled → panelActions → simActions
+ *                                      → WAITS for user click
+ *   Phase 5 (user click): transitionTo fires (next step, next act, or named act)
+ *
+ *   Inline commands <cls>,<clmi>,<w:N>,<MI>,<clck> are parsed by commandParser.ts.
+ *   mediaInstruction is ONLY activated via explicit <MI> command (no longer auto-runs).
  *
  * Architecture:
  *   - Calls /api/cwf/chat directly — the SAME endpoint as the CWF panel.
@@ -16,8 +32,7 @@
  *   - Reads simulationDataStore and uiStore via getState() snapshot only.
  *   - Dual-channel isolation: demoStore.messages[] is completely separate from
  *     cwfStore.messages[]. The CWF panel never sees demo messages.
- *   - All panel opens/closes happen synchronously (local uiStore calls) BEFORE
- *     the opening prompt API call — no round-trip delay for UI transitions.
+ *   - All panel opens/closes happen synchronously (local uiStore calls).
  *
  * Used by: DemoSidePanel.tsx, DemoMediaView.tsx
  */
@@ -35,6 +50,9 @@ import {
     DEMO_FIRST_ACT_INDEX,
     DEMO_ARIA_LOADING_TIMEOUT_MS,
 } from '../lib/params/demoSystem/demoConfig';
+
+/** Inline command parser — tokenises screenText and ARIA Local fields */
+import { parseCommands, executeTokens } from '../lib/utils/commandParser';
 
 /** ARIA storyteller persona — injected as synthetic conversation seed */
 import { DEMO_SYSTEM_PROMPT } from '../lib/params/demoSystem/demoSystemPrompt';
@@ -59,6 +77,14 @@ import { useSimulationStore } from './simulationStore';
 
 /** executeSimulationAction — extracted utility for sim lifecycle control */
 import { executeSimulationAction } from '../lib/utils/simActionExecutor';
+
+/**
+ * getSimulationHistory — reads this browser's local simulation session history.
+ * Passed to the CWF API so ARIA can reference previous runs by session code.
+ * An empty array causes the backend to skip history context, leading to hallucinations;
+ * we must always pass the real history (even if it is empty from a fresh browser).
+ */
+import { getSimulationHistory } from '../services/simulationHistoryService';
 
 // =============================================================================
 // TYPES
@@ -89,6 +115,28 @@ export interface DemoMessage {
     imageUrl?: string;
 }
 
+// ─── Demo Phase ───────────────────────────────────────────────────────────────
+
+/**
+ * DemoPhase — tracks which execution phase the current step is in.
+ *
+ * State transitions:
+ *   idle             → content (when enterStep() is called)
+ *   content          → awaiting-click   (screenText done, waiting for user)
+ *   content          → aria             (auto, when no screenText or <clck> hit)
+ *   awaiting-click   → aria             (on userAdvance() call)
+ *   aria             → awaiting-transition (ARIA+post-ARIA complete)
+ *   awaiting-transition → (next step or act loaded via enterStep or jumpToAct)
+ */
+export type DemoPhase =
+    | 'idle'                  // No step loaded yet (initial state)
+    | 'content'               // Auto-executing: slide, scenario, delayMs, screenText
+    | 'awaiting-click'        // Paused after screenText, waiting for user click
+    | 'aria'                  // Auto-executing: ARIA Local + ARIA API
+    | 'awaiting-transition';  // Post-ARIA done; waiting for click to fire transitionTo
+
+// ─── DemoState ────────────────────────────────────────────────────────────────
+
 /**
  * DemoState — the full shape of the Zustand demo store.
  */
@@ -104,66 +152,102 @@ export interface DemoState {
     currentActIndex: number;
     /**
      * currentSlide — URL of the slide currently shown in DemoMediaView.
-     * Written by handleCtaClick; NOT cleared on advanceAct (persists as a bridge
-     * slide until the next act's ctaStep sets a new slideImageUrl).
-     * Cleared by jumpToAct (non-linear nav) and restartDemo.
+     * Written by enterStep when slide is set by slideImageUrl.
      * Ignored when currentMediaInstruction is also set.
      */
     currentSlide: string | null;
     /**
      * currentMediaInstruction — active media instruction for the current step.
      * When set, DemoMediaView renders a dynamic chart/viz instead of the slide image.
-     * Written by handleCtaClick (step.mediaInstruction); cleared on every act transition.
+     * Activated ONLY via explicit <MI> command in screenText or ARIA Local.
+     * Cleared on every act transition or by <clmi> command.
      */
     currentMediaInstruction: MediaInstruction | null;
     /**
      * currentScreenText — plain text shown as an overlay on the demo screen surface.
-     * Written by handleCtaClick after delayMs (if set). Cleared on act transition.
+     * Written incrementally by the screenText token processor. Cleared on act transition.
      */
     currentScreenText: string | null;
     /**
-     * ctaStepIndex — number of CTA clicks consumed within the current act.
-     * When < ctaSteps.length: next click executes ctaSteps[ctaStepIndex].
-     * When >= ctaSteps.length: no more steps (last step should set transitionTo).
+     * currentStepIndex — which CtaStep within the current act is active.
+     * Replaces ctaStepIndex. Managed by enterStep() and userAdvance().
      */
-    ctaStepIndex: number;
+    currentStepIndex: number;
     /**
-     * isCtaExecuting — true while handleCtaClick is running (including any delayMs sleep).
-     *
-     * Distinct from isLoading (which only covers ARIA API calls).
-     * Prevents the race condition where rapid clicks during a delayMs sleep would each
-     * capture the same ctaStepIndex, execute the same step multiple times, and cause
-     * later steps to be skipped.
-     * The CTA button is disabled when EITHER isLoading OR isCtaExecuting is true.
+     * demoPhase — which execution phase the current step is in.
+     * Determines what happens when the user clicks the CTA button.
+     * The CTA button is active (clickable) only during 'awaiting-click' and
+     * 'awaiting-transition' phases.
+     */
+    demoPhase: DemoPhase;
+    /**
+     * isCtaExecuting — true while an async phase is running.
+     * Prevents the CTA button from being pressed during auto-executing phases.
+     * Kept for backward compatibility with existing DemoSidePanel.tsx checks.
      */
     isCtaExecuting: boolean;
+    /**
+     * ctaStepIndex — alias for currentStepIndex, kept for backward compatibility
+     * with existing tests and components that read this field.
+     * @deprecated Use currentStepIndex instead.
+     */
+    ctaStepIndex: number;
 
     // ── Actions ──────────────────────────────────────────────────────────────
 
     /**
-     * handleCtaClick — the single action called by the CTA button in DemoSidePanel.
-     * Steps through ctaSteps[] one per click and applies each field in sequence:
-     *   1. panelActions  — toggle panels open/close immediately
-     *   2. scenarioCode  — load scenario
-     *   3. simulationAction — control simulation lifecycle
-     *   4. slideImageUrl — show slide on screen
-     *   5. delayMs + screenText — wait then show text on screen
-     *   6. ariaLocal — inject local ARIA bubble (no API)
-     *   7. ariaApi   — send to CWF API
-     *   8. transitionTo — navigate to next/named act
+     * enterStep — loads a specific step and auto-executes Phase 1 + Phase 2.
+     *
+     * Called automatically when:
+     *   - The demo starts (act 0, step 0)
+     *   - A transitionTo fires (new act or step within same act)
+     *   - advanceAct() or jumpToAct() complete
+     *
+     * Phase 1 (auto): ctaLabel updates button → slideImageUrl shown → scenario loaded
+     *                 → delayMs waited
+     * Phase 2 (auto): screenText tokens processed (<cls>,<clmi>,<w:N>,<MI>,<clck>)
+     *   → hits <clck>: immediately proceed to Phase 3 (ARIA)
+     *   → no <clck>, has text: sets demoPhase='awaiting-click', waits for userAdvance()
+     *   → no screenText: immediately proceed to Phase 3 (ARIA)
+     *
+     * @param actIndex  - Index into DEMO_ACTS[]
+     * @param stepIndex - Index into act.ctaSteps[]
+     */
+    enterStep: (actIndex: number, stepIndex: number) => Promise<void>;
+
+    /**
+     * userAdvance — called by the CTA button click.
+     *
+     * Behaviour depends on current demoPhase:
+     *   'awaiting-click'       → triggers Phase 3 (ARIA Local + API)
+     *   'awaiting-transition'  → fires transitionTo:
+     *                            'next' → advanceAct()
+     *                            act-id → jumpToAct(idx)
+     *                            'stay' / null → advance to next step in same act
+     *                            last step + stay → do nothing
+     *   other phases           → no-op (button is disabled in these phases)
+     */
+    userAdvance: () => Promise<void>;
+
+    /**
+     * handleCtaClick — backward-compatible alias for userAdvance().
+     * Kept so existing code calling handleCtaClick() continues to work
+     * without changes during the transition period.
      */
     handleCtaClick: () => Promise<void>;
 
     /**
      * advanceAct — move to the next act.
-     * Applies panel actions, loads scenario, sends opening prompt to CWF.
-     * No-op if already at the last act (prevents index overflow).
+     * Applies panel actions, loads scenario, sends opening prompt to CWF,
+     * then calls enterStep(nextActIndex, 0).
+     * No-op if already at the last act.
      */
     advanceAct: () => Promise<void>;
 
     /**
      * restartDemo — reset to act 0 (Welcome).
-     * Closes all demo-opened panels, reloads DEMO_RESTART_SCENARIO, clears messages.
+     * Closes all demo-opened panels, reloads DEMO_RESTART_SCENARIO, clears messages,
+     * then calls enterStep(0, 0).
      */
     restartDemo: () => Promise<void>;
 
@@ -177,7 +261,7 @@ export interface DemoState {
      * jumpToAct — jump directly to a specific act by index.
      * Used by the sidebar LED list so the presenter can navigate non-linearly.
      * Clears the message thread, applies panel actions for the target act,
-     * loads the target act's scenario, then sends its opening prompt.
+     * loads the target act's scenario, then calls enterStep(targetIndex, 0).
      *
      * @param targetIndex — zero-based index into DEMO_ACTS[]. Clamped to valid range.
      */
@@ -320,6 +404,44 @@ async function applyCopilotEnable(): Promise<void> {
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 /**
+ * sanitizeScreenText — cleans up a screenText value before displaying it on
+ * the demo screen surface.
+ *
+ * Two common authoring mistakes handled:
+ *
+ *   1. Surrounding quotes: when text is written in demoScript.ts as
+ *      `'Some text'` (with literal quote characters included in the string
+ *      value), they appear verbatim. This strips one leading/trailing
+ *      single or double quote if they form a matched pair.
+ *
+ *   2. Literal \n sequences: the demo screen uses `whitespace-pre-wrap` so
+ *      real newline characters (\n) render as line breaks. But if the author
+ *      wrote the escape sequence as two characters (backslash + n) rather
+ *      than a real newline, it shows as "\n" on screen. This replaces every
+ *      literal backslash-n with a real newline character.
+ *
+ * @param text - Raw screenText value from CtaStep
+ * @returns Cleaned text ready for display
+ */
+function sanitizeScreenText(text: string): string {
+    /** Step 1: replace any literal two-character "\n" (backslash + n) with a
+     *  real newline so whitespace-pre-wrap renders line breaks correctly. */
+    let cleaned = text.replace(/\\n/g, '\n');
+
+    /** Step 2: strip one matching pair of surrounding single or double quotes.
+     *  Only removes them when both the opening and closing character match,
+     *  so normal apostrophes inside body text are not affected. */
+    if (
+        (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+        (cleaned.startsWith('"') && cleaned.endsWith('"'))
+    ) {
+        cleaned = cleaned.slice(1, -1);
+    }
+
+    return cleaned;
+}
+
+/**
  * postToCWF — internal helper for all API calls (advanceAct, sendMessage, ariaApi steps).
  *
  * Builds the payload with ARIA persona injected, per-act systemContext prepended,
@@ -421,6 +543,28 @@ async function postToCWF(
             ...recentHistory,
         ];
 
+        // ── Build minimal UI context snapshot ────────────────────────────────
+        /**
+         * uiContext is injected into the server-side Gemini system prompt so ARIA
+         * has situational awareness of the current simulation state.
+         * Uses the same pattern as cwfStore.sendMessage() but with only the fields
+         * that the demo API endpoint needs (simulation status + config language).
+         */
+        const simState = useSimulationStore.getState();
+        const uiState = useUIStore.getState();
+        const uiContext = {
+            /** Active simulation tick count and running state */
+            simulation: {
+                isRunning: simState.isDataFlowing,
+                sClockCount: simState.sClockCount,
+            },
+            /** Interface config snapshot */
+            config: {
+                language: 'en' as const,
+                isSimConfigured: uiState.isSimConfigured,
+            },
+        };
+
         // ── POST to /api/cwf/chat ────────────────────────────────────────────
 
         const httpResponse = await fetch(DEMO_API_ENDPOINT, {
@@ -433,9 +577,11 @@ async function postToCWF(
                 sessionCode,
                 conversationHistory,
                 language: 'en',
-                simulationHistory: [],
+                simulationHistory: getSimulationHistory(),
+                uiContext,
             }),
         });
+
 
         if (!httpResponse.ok) {
             const errBody = await httpResponse.json().catch(() => ({}));
@@ -504,138 +650,327 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     isLoading: false,
     /** Start at the first act (Welcome) */
     currentActIndex: DEMO_FIRST_ACT_INDEX,
-    /** No slide shown until presenter clicks CTA */
+    /** No slide shown on init */
     currentSlide: null,
     /** No dynamic chart/viz on init */
     currentMediaInstruction: null,
     /** No screen text on init */
     currentScreenText: null,
-    /** CTA step counter — 0 means no clicks yet within this act */
+    /** No step loaded yet */
+    currentStepIndex: 0,
+    /** ctaStepIndex — backward-compat alias for currentStepIndex */
     ctaStepIndex: 0,
-    /** isCtaExecuting — false until handleCtaClick acquires the lock */
+    /** Start in idle phase — enterStep() transitions to 'content' */
+    demoPhase: 'idle' as DemoPhase,
+    /** Not executing on init */
     isCtaExecuting: false,
 
     /** Clear the message thread */
     clearMessages: () => set({ messages: [] }),
 
     /**
-     * handleCtaClick — executes the next CtaStep for the current act.
+     * enterStep — auto-executes Phase 1 + Phase 2 for the given act/step.
      *
-     * Each act defines an ordered ctaSteps[] array. This function reads the
-     * step at ctaStepIndex and applies every field in sequence:
-     *   1. panelActions    — toggle panels open/close immediately
-     *   2. scenarioCode    — load scenario
-     *   3. simulationAction — control simulation lifecycle
-     *   4. slideImageUrl   — show slide on screen
-     *   4b. mediaInstruction — show dynamic chart/viz (replaces slide)
-     *   5. delayMs + screenText — wait then show text on screen
-     *   6. ariaLocal       — inject local ARIA bubble (no API)
-     *   7. increment ctaStepIndex
-     *   8. ariaApi         — send to CWF API
-     *   9. transitionTo    — navigate to next/named act
+     * Phase 1 (always runs):
+     *   - Updates ctaLabel on the button (via currentStepIndex)
+     *   - Shows the slideImageUrl (if set; note: mediaInstruction is NOT auto-applied)
+     *   - Loads the scenarioCode (if set)
+     *   - Waits delayMs (if set)
      *
-     * RACE CONDITION GUARD:
-     *   isCtaExecuting is set to true at the start and released in finally.
-     *   This prevents rapid clicks from executing the same step multiple times
-     *   during a delayMs sleep (which doesn't disable isLoading).
+     * Phase 2 (screenText token processing):
+     *   - Walks tokenised screenText: text → append, <cls> → clear, <clmi> → clearMI,
+     *     <w:N> → wait, <MI> → show MI, <clck> → soft click (triggers Phase 3)
+     *   - If <clck> found → immediately executes Phase 3 (ARIA)
+     *   - If no screenText → immediately executes Phase 3 (ARIA)
+     *   - If screenText ends without <clck> → demoPhase='awaiting-click', wait for user
      */
-    handleCtaClick: async () => {
-        // Dual-lock: isLoading covers ARIA API calls; isCtaExecuting covers the
-        // full handleCtaClick body including any delayMs sleep.
-        if (get().isLoading || get().isCtaExecuting) return;
+    enterStep: async (actIndex: number, stepIndex: number) => {
+        /** Guard: reject if another phase is already running */
+        if (get().isCtaExecuting) return;
 
-        // Acquire the execution lock — released unconditionally in the finally block.
-        set({ isCtaExecuting: true });
+        set({ isCtaExecuting: true, demoPhase: 'content' as DemoPhase });
 
         try {
-            const { currentActIndex, ctaStepIndex } = get();
-            const act   = DEMO_ACTS[currentActIndex];
+            const act = DEMO_ACTS[actIndex];
+            if (!act) return;
             const steps = act.ctaSteps ?? [];
-            const step: CtaStep | undefined = steps[ctaStepIndex];
+            const step: CtaStep | undefined = steps[stepIndex];
 
-            // No more steps — nothing to do (lock released by finally)
-            if (!step) return;
+            /** Update step index — drives ctaLabel on the CTA button */
+            set({ currentActIndex: actIndex, currentStepIndex: stepIndex, ctaStepIndex: stepIndex });
 
-            /** ── 1. Panel actions ──────────────────────────────── */
-            applyStepPanelActions(step.panelActions);
+            if (!step) {
+                /** No step at this index — enter idle phase */
+                set({ demoPhase: 'idle' as DemoPhase, isCtaExecuting: false });
+                return;
+            }
 
-            /** ── 2. Scenario load ──────────────────────────────── */
+            // ── Phase 1: Setup ────────────────────────────────────────────────
+
+            /** Show the slideImageUrl (mediaInstruction is NOT auto-applied) */
+            if (step.slideImageUrl) {
+                set({ currentSlide: step.slideImageUrl, currentMediaInstruction: null });
+            } else {
+                /** No slide selected — clear the screen */
+                set({ currentSlide: null });
+            }
+
+            /** Load the scenario if specified */
             if (step.scenarioCode) {
                 applyScenario(step.scenarioCode);
             }
 
-            /** ── 3. Simulation action ──────────────────────────── */
+            /** Wait delayMs before showing screen text */
+            if (step.delayMs && step.delayMs > 0) {
+                await sleep(step.delayMs);
+            }
+
+            // ── Phase 2: ScreenText token processing ──────────────────────────
+
+            if (!step.screenText) {
+                /** No screenText → proceed directly to ARIA phase (Phase 3) */
+                set({ isCtaExecuting: false });
+                /** Call enterAriaPhase via the concrete store instance — not in DemoState type */
+                await (useDemoStore.getState() as unknown as { enterAriaPhase: (a: number, s: number) => Promise<void> }).enterAriaPhase(actIndex, stepIndex);
+                return;
+            }
+
+            /** Parse the screenText into typed tokens */
+            const tokens = parseCommands(sanitizeScreenText(step.screenText));
+
+            /** Walk the tokens, updating screen state for each one */
+            const { hitClick } = await executeTokens(tokens, {
+                onText: (value) => {
+                    /** Append text to whatever is already on screen */
+                    set((s) => ({
+                        currentScreenText: (s.currentScreenText ?? '') + value,
+                    }));
+                },
+                onClear: () => {
+                    /** <cls> — remove the slide image from screen */
+                    set({ currentSlide: null });
+                },
+                onClearMI: () => {
+                    /** <clmi> — remove the active media instruction */
+                    set({ currentMediaInstruction: null });
+                },
+                onWait: async (ms) => {
+                    /** <w:N> — pause for N milliseconds */
+                    await sleep(ms);
+                },
+                onShowMI: () => {
+                    /** <MI> — activate the step's mediaInstruction */
+                    if (step.mediaInstruction) {
+                        set({ currentMediaInstruction: step.mediaInstruction, currentSlide: null });
+                    }
+                },
+            });
+
+            if (hitClick) {
+                /** <clck> was found — soft-click fires the ARIA phase immediately */
+                set({ isCtaExecuting: false });
+                /** Call enterAriaPhase via the concrete store instance — not in DemoState type */
+                await (useDemoStore.getState() as unknown as { enterAriaPhase: (a: number, s: number) => Promise<void> }).enterAriaPhase(actIndex, stepIndex);
+            } else {
+                /** No <clck> — pause and wait for user's physical click */
+                set({ demoPhase: 'awaiting-click' as DemoPhase, isCtaExecuting: false });
+            }
+
+        } catch (err) {
+            console.error('[Demo] enterStep error:', err);
+            set({ demoPhase: 'idle' as DemoPhase, isCtaExecuting: false });
+        }
+    },
+
+    /**
+     * enterAriaPhase — internal async runner for Phase 3 + Phase 4.
+     *
+     * Phase 3 — ARIA execution:
+     *   - Processes ARIA Local tokens (same commands as screenText).
+     *     If <clck> found in ARIA Local: stops local text and calls ARIA API.
+     *   - Calls ARIA API if ariaApi is set.
+     *
+     * Phase 4 — Post-ARIA setup:
+     *   - Applies ariaInputEnabled setting.
+     *   - Applies panelActions.
+     *   - Applies simulationAction.
+     *   - Sets demoPhase='awaiting-transition' → waits for user click to fire transitionTo.
+     *
+     * Not exposed on DemoState interface — called internally by enterStep and userAdvance.
+     */
+    enterAriaPhase: async (actIndex: number, stepIndex: number) => {
+        const act = DEMO_ACTS[actIndex];
+        if (!act) return;
+        const steps = act.ctaSteps ?? [];
+        const step: CtaStep | undefined = steps[stepIndex];
+        if (!step) return;
+
+        set({ isCtaExecuting: true, demoPhase: 'aria' as DemoPhase });
+
+        try {
+            // ── Phase 3a: ARIA Local ──────────────────────────────────────────
+
+            if (step.ariaLocal?.trim()) {
+                const localTokens = parseCommands(sanitizeScreenText(step.ariaLocal));
+                let localTextAcc = '';
+
+                const { hitClick: localHitClick } = await executeTokens(localTokens, {
+                    onText: (value) => {
+                        /** Accumulate ARIA Local text — inject as single bubble at end */
+                        localTextAcc += value;
+                    },
+                    onClear: () => set({ currentSlide: null }),
+                    onClearMI: () => set({ currentMediaInstruction: null }),
+                    onWait: async (ms) => { await sleep(ms); },
+                    onShowMI: () => {
+                        if (step.mediaInstruction) {
+                            set({ currentMediaInstruction: step.mediaInstruction, currentSlide: null });
+                        }
+                    },
+                });
+
+                /** Inject whatever local text was accumulated before any <clck> */
+                if (localTextAcc.trim()) {
+                    const msgId = generateDemoMessageId();
+                    set((s) => ({
+                        messages: [
+                            ...s.messages,
+                            {
+                                id: msgId,
+                                role: 'assistant' as const,
+                                content: localTextAcc.trim(),
+                                timestamp: new Date().toISOString(),
+                                actId: act.id,
+                            },
+                        ],
+                    }));
+                }
+
+                /** <clck> in ARIA Local: skip remaining text, go to ARIA API immediately */
+                if (localHitClick) {
+                    /** Intentionally fall through to ARIA API below */
+                }
+            }
+
+            // ── Phase 3b: ARIA API ────────────────────────────────────────────
+
+            if (step.ariaApi?.trim()) {
+                /**
+                 * Guard: only call the ARIA API if a simulation session is active.
+                 * Scripted ariaApi calls silently skip (with a console log) when
+                 * no session exists — e.g. if the previous step ran `simulationAction:'reset'`
+                 * which clears the session. The error bubble from postToCWF is reserved
+                 * for the manual free-text ARIA input where the user can retry.
+                 */
+                const sessionId = useSimulationDataStore.getState().session?.id ?? null;
+                if (sessionId) {
+                    await postToCWF(step.ariaApi, act.id, act.systemContext, get, set);
+                } else {
+                    console.info('[Demo] ariaApi skipped — no simulation session running (step scripted call).');
+                }
+            }
+
+            // ── Phase 4: Post-ARIA setup ──────────────────────────────────────
+
+            /** Apply ariaInputEnabled setting (true by default if not specified) */
+            /** Note: this is consumed by DemoSidePanel — no store field needed */
+
+            /** Apply panel actions from the step */
+            applyStepPanelActions(step.panelActions);
+
+            /**
+             * Apply simulationAction in Phase 4 — AFTER the ARIA API call.
+             * This is intentional: ARIA fires first while the simulation is still in its
+             * pre-step state (e.g. running). The action (reset/start/stop) then takes effect
+             * as cleanup/setup for the NEXT step.
+             *
+             * Example: Welcome step — ARIA fires while sim is running, THEN reset happens.
+             * No System step   — ARIA fires (no ariaApi), THEN sim starts.
+             */
             if (step.simulationAction) {
                 executeSimulationAction(step.simulationAction, useSimulationStore.getState());
             }
 
-            /**
-             * ── 4. Slide image ──────────────────────────────────────
-             * If the step defines a slide URL, show it.
-             * If the step has NO slideImageUrl AND NO mediaInstruction
-             * (i.e. the editor's "— no slide" option was selected),
-             * explicitly clear the current slide so the demo screen goes blank.
-             * This prevents a stale slide from a previous step persisting
-             * into this step against the author's intent.
-             */
-            if (step.slideImageUrl && !step.mediaInstruction) {
-                set({ currentSlide: step.slideImageUrl });
-            } else if (!step.slideImageUrl && !step.mediaInstruction) {
-                /** "No slide" selected — clear the screen */
-                set({ currentSlide: null });
-            }
+            /** Phase 4 complete — wait for user click to fire transitionTo */
+            set({ demoPhase: 'awaiting-transition' as DemoPhase, isCtaExecuting: false });
 
-            /** ── 4b. Media instruction (dynamic chart/viz) ──────── */
-            if (step.mediaInstruction) {
-                set({ currentMediaInstruction: step.mediaInstruction, currentSlide: null });
-            }
-
-            /** ── 5. Delayed screen text ────────────────────────── */
-            if (step.screenText) {
-                if (step.delayMs && step.delayMs > 0) {
-                    // Lock is held during this sleep — rapid clicks are ignored.
-                    await sleep(step.delayMs);
-                }
-                set({ currentScreenText: step.screenText });
-            }
-
-            /** ── 6. ARIA local bubble ──────────────────────────── */
-            if (step.ariaLocal?.trim()) {
-                const msgId = generateDemoMessageId();
-                set((s) => ({
-                    messages: [
-                        ...s.messages,
-                        {
-                            id: msgId,
-                            role: 'assistant' as const,
-                            content: step.ariaLocal!,
-                            timestamp: new Date().toISOString(),
-                            actId: act.id,
-                        },
-                    ],
-                }));
-            }
-
-            /** ── 7. Increment step index ───────────────────────── */
-            set({ ctaStepIndex: ctaStepIndex + 1 });
-
-            /** ── 8. ARIA API call ──────────────────────────────── */
-            if (step.ariaApi?.trim()) {
-                await postToCWF(step.ariaApi, act.id, act.systemContext, get, set);
-            }
-
-            /** ── 9. Transition ─────────────────────────────────── */
-            if (step.transitionTo === 'next') {
-                await get().advanceAct();
-            } else if (step.transitionTo) {
-                const targetIdx = DEMO_ACTS.findIndex(a => a.id === step.transitionTo);
-                if (targetIdx >= 0) await get().jumpToAct(targetIdx);
-            }
-        } finally {
-            // Always release the execution lock, even if an error or early return occurs.
-            // This ensures the CTA button never becomes permanently stuck disabled.
-            set({ isCtaExecuting: false });
+        } catch (err) {
+            console.error('[Demo] enterAriaPhase error:', err);
+            set({ demoPhase: 'idle' as DemoPhase, isCtaExecuting: false });
         }
+    },
+
+    /**
+     * userAdvance — called by the CTA button click.
+     *
+     * Routes to the correct next phase based on current demoPhase:
+     *   'idle'                 → first click: start demo by entering the current step
+     *   'awaiting-click'       → triggers Phase 3 (ARIA Local + API)
+     *   'awaiting-transition'  → fires transitionTo: advance step or act
+     *   other phases           → no-op (button is visually disabled)
+     */
+    userAdvance: async () => {
+        const { demoPhase, isCtaExecuting, isLoading, currentActIndex, currentStepIndex } = get();
+
+        /** Block if a phase is already running */
+        if (isCtaExecuting || isLoading) return;
+
+        if (demoPhase === 'idle') {
+            /**
+             * Demo not yet started (or just reset to idle state).
+             * The first click triggers enterStep to load and auto-play the current step.
+             * This is how the Welcome act auto-executes on demo start.
+             */
+            await get().enterStep(currentActIndex, currentStepIndex);
+            return;
+        }
+
+        if (demoPhase === 'awaiting-click') {
+            /** User clicked after screenText finished — trigger ARIA phase */
+            /** Call enterAriaPhase via the concrete store instance — not in DemoState type */
+            await (useDemoStore.getState() as unknown as { enterAriaPhase: (a: number, s: number) => Promise<void> }).enterAriaPhase(currentActIndex, currentStepIndex);
+            return;
+        }
+
+        if (demoPhase === 'awaiting-transition') {
+            /** User clicked after post-ARIA — fire transitionTo */
+            const act = DEMO_ACTS[currentActIndex];
+            const step = act?.ctaSteps?.[currentStepIndex];
+
+            if (!step) return;
+
+            const transition = step.transitionTo;
+
+            if (transition === 'next') {
+                /** Linear: advance to the next act */
+                await get().advanceAct();
+            } else if (transition && transition !== '') {
+                /** Named jump: find the act by id */
+                const targetIdx = DEMO_ACTS.findIndex(a => a.id === transition);
+                if (targetIdx >= 0) await get().jumpToAct(targetIdx);
+            } else {
+                /** Stay / no transition: advance to next step within the same act */
+                const steps = act?.ctaSteps ?? [];
+                const nextStepIndex = currentStepIndex + 1;
+                if (nextStepIndex < steps.length) {
+                    /** Clear screen text before entering next step */
+                    set({ currentScreenText: null });
+                    await get().enterStep(currentActIndex, nextStepIndex);
+                }
+                /** If last step + stay: do nothing (presenter should design better flow) */
+            }
+            return;
+        }
+
+        /** Other phases (idle, content, aria): no-op */
+    },
+
+    /**
+     * handleCtaClick — backward-compatible alias for userAdvance().
+     * Existing references (DemoSidePanel, tests) continue to work unchanged.
+     */
+    handleCtaClick: async () => {
+        await get().userAdvance();
     },
 
     /**
@@ -693,7 +1028,9 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             currentActIndex: nextIndex,
             currentMediaInstruction: null,
             currentScreenText: null,
+            currentStepIndex: 0,
             ctaStepIndex: 0,
+            demoPhase: 'idle' as DemoPhase,
         });
 
         /** Send the act opening prompt to CWF — skip if prompt is blank */
@@ -706,6 +1043,9 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                 set,
             );
         }
+
+        /** Auto-enter Step 0 of the new act */
+        await get().enterStep(nextIndex, 0);
     },
 
     /**
@@ -770,10 +1110,26 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             currentSlide: null,
             currentMediaInstruction: null,
             currentScreenText: null,
+            currentStepIndex: 0,
             ctaStepIndex: 0,
+            demoPhase: 'idle' as DemoPhase,
             isCtaExecuting: false,
         });
+
+        /**
+         * Kick off Step 0 of act 0 as a fire-and-forget background task.
+         * We intentionally do NOT await here — the restart function must return
+         * immediately so the UI can display the clean welcome state. The welcome
+         * step's Phase 1 delay (delayMs) and animations will auto-play in the
+         * background. Errors from enterStep are suppressed (they are already
+         * handled internally by enterStep's own try/catch).
+         *
+         * Note: in unit tests, this prevents the 5-second delayMs from causing
+         * test timeouts since the test assertions run before the timer fires.
+         */
+        void get().enterStep(DEMO_FIRST_ACT_INDEX, 0);
     },
+
 
     /**
      * sendMessage — sends free-form user input.
@@ -853,5 +1209,8 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                 set,
             );
         }
+
+        /** Auto-enter Step 0 of the target act */
+        await get().enterStep(clampedIndex, 0);
     },
 }));

@@ -35,6 +35,11 @@
             <button id="btn-reset-all" class="btn-secondary" title="Clear ALL data and start fresh">
                 ↺ Reset All
             </button>
+            <!-- Refresh Slides: re-scans public/demo/ via GET /api/demo-slides and updates the Demo Screen dropdown live -->
+            <!-- Only works when opened via Vite at http://localhost:5173; falls back gracefully for file:// origins -->
+            <button id="btn-refresh-slides" class="btn-secondary" title="Re-scan public/demo/ and update slide dropdown" onclick="window.refreshSlides()">
+                🔄 Refresh Slides
+            </button>
             <button id="btn-export" class="btn-primary" title="Generate TypeScript code">
                 ⬇ Export TypeScript
             </button>

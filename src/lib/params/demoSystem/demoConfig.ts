@@ -2,6 +2,15 @@
  * demoConfig.ts — Demo System Configuration Constants
  *
  * Tunable runtime constants for the Narrative Demo System.
+ *
+ * INLINE COMMAND TOKENS (used in screenText and ARIA Local fields):
+ *   <cls>    — clears the demo screen (removes current slide)
+ *   <clmi>   — clears the active media instruction (removes chart/graph)
+ *   <w:N>    — waits N milliseconds before continuing (N is an integer)
+ *   <MI>     — executes the step's mediaInstruction (shows chart/graph)
+ *   <clck>   — soft auto-click (skips waiting for the user's mouse click):
+ *              in screenText → triggers the ARIA phase immediately
+ *              in ARIA Local → skips remaining local text, goes to ARIA API
  * All values used by demoStore.ts and demo UI components come from here.
  * No hardcoded values anywhere else in the demo module.
  *
@@ -201,3 +210,41 @@ export const DEMO_SCREEN_TEXT_FONT_SIZE_PX: number = 18;
  * 40vh — halved from 80vh to match the 50% panel size reduction.
  */
 export const DEMO_SCREEN_MAX_HEIGHT_VH: number = 43;
+
+// =============================================================================
+// INLINE COMMAND TOKENS
+// =============================================================================
+
+/**
+ * DEMO_CMD_CLEAR_SCREEN — inline command that removes the current slide image
+ * from the demo screen surface. Write <cls> anywhere in screenText or ARIA Local.
+ */
+export const DEMO_CMD_CLEAR_SCREEN: string = '<cls>';
+
+/**
+ * DEMO_CMD_CLEAR_MI — inline command that removes the active media instruction
+ * (chart/graph) from the demo screen. Write <clmi> in screenText or ARIA Local.
+ */
+export const DEMO_CMD_CLEAR_MI: string = '<clmi>';
+
+/**
+ * DEMO_CMD_WAIT_PREFIX — prefix for the wait command (followed by integer ms and >).
+ * Example: <w:1000> waits 1000 ms before the next token is processed.
+ * commandParser detects any token starting with this prefix.
+ */
+export const DEMO_CMD_WAIT_PREFIX: string = '<w:';
+
+/**
+ * DEMO_CMD_MEDIA_INSTRUCTION — inline command that activates the current step's
+ * mediaInstruction (renders a live chart/graph in the media area).
+ * Write <MI> in screenText or ARIA Local to trigger it.
+ */
+export const DEMO_CMD_MEDIA_INSTRUCTION: string = '<MI>';
+
+/**
+ * DEMO_CMD_SOFT_CLICK — inline command that simulates a presenter mouse-click,
+ * removing the need for the user to click manually at that point.
+ * In screenText → triggers the ARIA phase immediately.
+ * In ARIA Local  → skips remaining ARIA Local text and calls ARIA API.
+ */
+export const DEMO_CMD_SOFT_CLICK: string = '<clck>';

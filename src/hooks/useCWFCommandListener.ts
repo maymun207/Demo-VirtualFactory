@@ -76,6 +76,15 @@ import {
     CWF_SCENARIO_SWITCH_ACTION,
 } from '../lib/params/cwfScenarioSwitch';
 /**
+ * Work Order CWF action — constant, ID validator, and display labels
+ * for the set_work_order execute_ui_action type.
+ */
+import {
+    CWF_SET_WORK_ORDER_ACTION,
+    isValidWorkOrderId,
+    WORK_ORDER_DISPLAY_LABELS,
+} from '../lib/params/cwfWorkOrder';
+/**
  * getScenarioByCode — looks up a ScenarioDefinition by its code string.
  * REFERENCE_SCENARIO is the SCN-000 baseline (no overrides). Both are
  * imported from scenarios.ts to avoid duplicating scenario data here.
@@ -506,6 +515,53 @@ async function processUIActionCommand(command: {
                 /** Clamp to valid range — setStationInterval clamps internally */
                 const clampedInterval = Math.max(2, Math.min(7, parsedInterval));
                 sim.setStationInterval(clampedInterval);
+                break;
+            }
+
+            // ── Work Order Selection ───────────────────────────────────────────
+            case CWF_SET_WORK_ORDER_ACTION: {
+                /**
+                 * set_work_order — Select a specific Work Order in the Demo Settings panel.
+                 *
+                 * action_value must be one of: 'WorkID#1', 'WorkID#2', 'WorkID#3'.
+                 * Calls setSelectedWorkOrderId() on workOrderStore — the same action
+                 * the WorkOrderBar dropdown calls when the user manually selects an entry.
+                 *
+                 * This also resets pressLimitReached and tilesSpawned (new production
+                 * batch), matching the manual-dropdown behaviour.
+                 *
+                 * AUTH: not required — selecting a Work Order has no irreversible impact.
+                 */
+
+                /** Validate that a known Work Order ID was provided */
+                if (!isValidWorkOrderId(actionValue)) {
+                    await supabase
+                        .from('cwf_commands')
+                        .update({
+                            status: 'rejected',
+                            rejected_reason: `set_work_order requires action_value 'WorkID#1', 'WorkID#2', or 'WorkID#3'; got '${actionValue ?? 'undefined'}'.`,
+                        })
+                        .eq('id', command.id);
+                    useCWFStore.getState().addSystemMessage(
+                        `⚠️ set_work_order failed: unknown ID '${actionValue}'. ` +
+                        `Valid values: WorkID#1, WorkID#2, WorkID#3.`,
+                    );
+                    return;
+                }
+
+                /** Apply the Work Order — updates dropdown and resets production counters */
+                useWorkOrderStore.getState().setSelectedWorkOrderId(actionValue);
+
+                /** Build a human-readable label for the confirmation message */
+                const workOrderLabel = WORK_ORDER_DISPLAY_LABELS[actionValue];
+
+                /** Post rich confirmation to the CWF chat panel */
+                useCWFStore.getState().addSystemMessage(
+                    `✅ Work Order set to ${workOrderLabel}. ` +
+                    `(Open Demo Settings to view the full Work Order details.)`,
+                );
+
+                console.log(`[CWF Listener] ✅ set_work_order: '${actionValue}' applied.`);
                 break;
             }
 

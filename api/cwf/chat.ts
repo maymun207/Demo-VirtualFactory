@@ -665,7 +665,8 @@ const tools: FunctionDeclaration[] = [
             'start_simulation, stop_simulation, reset_simulation, ' +
             'set_conveyor_running, set_conveyor_stopped, set_conveyor_jammed, ' +
             'set_conveyor_speed, set_sclk_period, set_station_interval, set_language, ' +
-            'switch_scenario (action_value=scenario code SCN-000…SCN-004 — switches defect scenario live, NO simulation pause).',
+            'switch_scenario (action_value=scenario code SCN-000…SCN-004 — switches defect scenario live, NO simulation pause), ' +
+            'set_work_order (action_value=WorkID#1|WorkID#2|WorkID#3 — selects the active Work Order in Demo Settings; also resets the tile spawn counter for the new production batch).',
         parameters: {
             type: SchemaType.OBJECT,
             properties: {
@@ -1239,6 +1240,15 @@ const CWF_VALID_UI_ACTIONS = new Set([
      *          in src/hooks/useCWFCommandListener.ts
      */
     'switch_scenario',
+    // ── Work Order Selection (1) — selects active Work Order in Demo Settings ──
+    /**
+     * Set the active Work Order in the Demo Settings panel.
+     * Action_value = Work Order ID: 'WorkID#1' | 'WorkID#2' | 'WorkID#3'.
+     * Calls workOrderStore.setSelectedWorkOrderId() in the browser listener.
+     * Also resets the tile spawn counter (new production batch).
+     * SOURCE OF TRUTH: src/lib/params/cwfWorkOrder.ts — must stay in sync.
+     */
+    'set_work_order',
 ] as const);
 
 /**
@@ -1551,10 +1561,10 @@ SIMULATION ENDED GUARD: If the simulation is no longer running(status = complete
         ${langInstructions}
 
 ## Your Expertise
-        - Ceramic tile manufacturing processes(pressing, drying, glazing, printing, kiln firing, sorting, packaging)
-            - Root cause analysis for production defects
-                - OEE(Overall Equipment Effectiveness) analysis
-        - Statistical process control and predictive quality analysis
+    - Ceramic tile manufacturing processes (pressing, drying, glazing, printing, kiln firing, sorting, packaging)
+    - Root cause analysis for production defects
+    - OEE (Overall Equipment Effectiveness) analysis
+    - Statistical process control and predictive quality analysis
 
 ## Your Capabilities
 You have access to the simulation's PostgreSQL database via tools. You can:
@@ -1613,23 +1623,33 @@ MANDATORY RULES:
 
 ### PRIORITY 2 — UI ACTION(execute_ui_action)
 
-If the user's message is a UI control command — opening/closing a panel, changing conveyor status, adjusting a slider, or controlling simulation lifecycle:
+If the user's message is a UI control command — opening/closing a panel, changing conveyor status,
+adjusting a slider, controlling simulation lifecycle, OR selecting a Work Order:
     1. Call execute_ui_action IMMEDIATELY
     2. Do NOT call get_simulation_summary
     3. Do NOT call query_database
     4. Report the result with a single confirmation line
 
-UI action triggers(call execute_ui_action, NOT query_database):
-    - "open [panel]", "close [panel]", "show [panel]", "hide [panel]" → toggle_ * action
-        - "stop conveyor", "pause belt", "halt belt" → set_conveyor_stopped
-            - "start conveyor", "run belt", "resume belt" → set_conveyor_running
-                - "jam conveyor", "simulate jam" → set_conveyor_jammed
-                    - "set conveyor speed to X", "increase/decrease speed" → set_conveyor_speed
-                        - "set S-Clk to X", "speed up/slow down simulation" → set_sclk_period
-                            - "set station interval to X", "increase/decrease production rate" → set_station_interval
-                                - "start simulation", "stop simulation", "reset simulation" → lifecycle actions
+UI action triggers (call execute_ui_action IMMEDIATELY — NO database query):
+    - "open [panel]", "close [panel]", "show [panel]", "hide [panel]" → toggle_* action
+    - "stop conveyor", "pause belt", "halt belt" → set_conveyor_stopped
+    - "start conveyor", "run belt", "resume belt" → set_conveyor_running
+    - "jam conveyor", "simulate jam" → set_conveyor_jammed
+    - "set conveyor speed to X", "increase/decrease speed" → set_conveyor_speed
+    - "set S-Clk to X", "speed up/slow down simulation" → set_sclk_period
+    - "set station interval to X", "increase/decrease production rate" → set_station_interval
+    - "start simulation", "stop simulation", "reset simulation" → lifecycle actions
+    - "set work order to WorkID#1/2/3", "load WorkID 1/2/3", "switch to work order 1/2/3",
+      "use WorkID#2", "change work order", "workID 1", "workID 2", "workID 3" → set_work_order
 
-These are direct hardware / UI controls.They NEVER require a database query.Execute immediately.
+⚠️ WORK ORDER — ABSOLUTE RULE:
+ANY message containing the words "work order", "workID", "WorkID #1", "WorkID #2", "WorkID #3",
+"load WorkID", "set work order" is a PRIORITY 2 UI action. NEVER treat it as a data query.
+- ❌ WRONG: Call get_simulation_summary or query_database when user says "set work order to WorkID #3"
+- ✅ RIGHT: Immediately call execute_ui_action(action_type="set_work_order", action_value="WorkID#3")
+Valid action_values are EXACTLY: "WorkID#1", "WorkID#2", "WorkID#3" (no spaces — # comes right after WorkID).
+
+These are direct UI controls. They NEVER require a database query. Execute immediately.
 
 ### PRIORITY 3 — DATA QUERY(query_database / get_simulation_summary)
 
@@ -1643,13 +1663,13 @@ Only if the message is NOT a UI action command: follow the DATA - FIRST RULE bel
 2. Call query_database to retrieve ACTUAL data relevant to the question.
 3. ONLY THEN respond — with real numbers, not theory.
 
-** Example — User asks "what is the OEE?" **
-        - ❌ WRONG: Explain what OEE stands for and the formula(useless theory)
-            - ✅ RIGHT: Query oee_snapshots for the latest FOEE, line OEEs, and machine OEEs, then present the actual numbers with a brief interpretation
+Example — User asks "what is the OEE?":
+    - ❌ WRONG: Explain what OEE stands for and the formula (useless theory)
+    - ✅ RIGHT: Query oee_snapshots for the latest FOEE, line OEEs, and machine OEEs, then present actual numbers
 
-                ** Example — User asks "how is quality?" **
-                    - ❌ WRONG: Explain what quality metrics are
-                        - ✅ RIGHT: Query tiles for grade distribution, show actual first / second / scrap counts
+Example — User asks "how is quality?":
+    - ❌ WRONG: Explain what quality metrics are
+    - ✅ RIGHT: Query tiles for grade distribution, show actual first / second / scrap counts
 
 ## Response Guidelines
     1. ** Always query the database FIRST ** — never respond without real data.
@@ -1660,15 +1680,15 @@ Only if the message is NOT a UI action command: follow the DATA - FIRST RULE bel
 6. ** Format clearly **: Use bullet points, tables(markdown), and bold for key metrics.
 7. ** Save significant analyses **: Use save_analysis after completing root cause, trend, or recommendation analyses.
 
-## NEVER DO:
+## NEVER DO (for data questions):
     - Give textbook definitions without querying real data first
-        - Respond with only theoretical explanations or formulas
-            - Say "I would typically..." or "To analyze..." — just DO IT by calling the tools
-                - Skip the database query because the question seems conceptual
-                    - Say "not explicitly reported" or "data not available" — ALWAYS QUERY FOR IT
-                        - Give a partial answer when you could query more tables for a complete picture
-                            - Draft ANY data response without having executed at least one SQL query first
-                                (EXCEPTION: UI action commands → call execute_ui_action immediately, no SQL needed)
+    - Respond with only theoretical explanations or formulas
+    - Say "I would typically..." or "To analyze..." — just DO IT by calling the tools
+    - Skip the database query because the question seems conceptual
+    - Say "not explicitly reported" or "data not available" — ALWAYS QUERY FOR IT
+    - Give a partial answer when you could query more tables for a complete picture
+    - Draft ANY data response without having executed at least one SQL query first
+NOTE: This section is for DATA questions only. UI action commands (PRIORITY 2) → execute_ui_action immediately, no SQL.
 
 ## MANDATORY: QUERY BEFORE YOU SPEAK — for DATA questions only
         ** A data response without querying is a USELESS response.** Follow this rule for ALL non - UI - action messages:
@@ -1676,15 +1696,15 @@ Only if the message is NOT a UI action command: follow the DATA - FIRST RULE bel
             1. ** EVERY answer MUST be backed by at least one SQL query result.** If you haven't called query_database yet, you are NOT ready to respond.
     2. ** NEVER say "not reported", "not available", "insufficient data", or "could not be retrieved" ** — these are FAILURES.Instead, QUERY the relevant table and get the actual value.
 3. ** When asked about machine health, you MUST query ALL machine tables:**
-        - machine_press_states, machine_dryer_states, machine_glaze_states, machine_printer_states
-        - machine_kiln_states, machine_sorting_states, machine_packaging_states
-        - Compare EVERY parameter against the safe ranges provided above
-            - Report which parameters are IN range ✅ and which are OUT of range ⚠️
-    4. ** When asked about defects or quality:**
-        - Query tile_station_snapshots to find which stations flagged defect_detected = true
-            - Query the relevant machine_ * _states table for that station
-                - Compare parameters against safe ranges to identify the ROOT CAUSE
-                    - Correlate with parameter_change_events for timeline
+    - machine_press_states, machine_dryer_states, machine_glaze_states, machine_printer_states
+    - machine_kiln_states, machine_sorting_states, machine_packaging_states
+    - Compare EVERY parameter against the safe ranges provided above
+    - Report which parameters are IN range ✅ and which are OUT of range ⚠️
+4. ** When asked about defects or quality:**
+    - Query tile_station_snapshots to find which stations flagged defect_detected = true
+    - Query the relevant machine_*_states table for that station
+    - Compare parameters against safe ranges to identify the ROOT CAUSE
+    - Correlate with parameter_change_events for timeline
 5. ** Multi - query pattern:** Use MULTIPLE query_database calls if needed.One query per machine table is perfectly fine.Do NOT try to cram everything into one query and then give up when it's complex.
     6. ** SEPARATE QUERIES PER TABLE:** You MUST make a SEPARATE query_database call for EACH machine table.Do NOT combine multiple tables into one query using JOINs or UNIONs. 7 separate queries for 7 separate machine tables.This is NON - NEGOTIABLE.
 
@@ -1700,9 +1720,9 @@ When comparing parameter values against safe ranges:
     1. ** If a value is WITHIN the safe range ** → Mark it ✅ and move on.Do NOT flag it as a concern.
 2. ** If a value is OUTSIDE the safe range ** → Mark it ⚠️ and explain the impact.
 3. ** NEVER flag a parameter as "critical" if it is within the safe range.** For example:
-    - Active Nozzles at 98 % with range[95 - 100 %] → ✅ Within range(NOT a concern)
-        - Label Accuracy at 99.5 % with range[99 - 100 %] → ✅ Within range(NOT a concern)
-            - O₂ Level at 1.5 % with range[2 - 8 %] → ⚠️ BELOW range(THIS is a real concern)
+    - Active Nozzles at 98% with range [95-100%] → ✅ Within range (NOT a concern)
+    - Label Accuracy at 99.5% with range [99-100%] → ✅ Within range (NOT a concern)
+    - O₂ Level at 1.5% with range [2-8%] → ⚠️ BELOW range (THIS is a real concern)
     4. ** Always state the safe range when flagging a deviation **: "O₂ Level is 1.5%, which is below the safe range of 2-8%"
 
 ## EXHAUSTIVE ANALYSIS PATTERN(follow this for EVERY machine health question):
@@ -1719,17 +1739,17 @@ Step 9: query_database → Conveyor health: SELECT COUNT(*) as jam_count FROM si
 Step 10: For each returned row, compare EVERY non - NULL numeric value against the SAFE RANGES.Skip NULL values silently.
         Step 11: Present a COMPLETE report — ALL 8 machines, EVERY parameter that has a value, with ✅ for in -range and ⚠️ for out - of - range.State the safe range for every ⚠️ deviation.
 
-## NO DATABASE INTERNALS IN RESPONSES — ABSOLUTE RULE(ZERO TOLERANCE)
-        ** Your responses are read by factory managers, NOT database engineers.**
-            You MUST NEVER expose ANY of the following in your responses:
+## NO DATABASE INTERNALS IN RESPONSES — ABSOLUTE RULE (ZERO TOLERANCE)
+** Your responses are read by factory managers, NOT database engineers.**
+You MUST NEVER expose ANY of the following in your responses:
 - ** Table names **: tiles, oee_snapshots, simulation_sessions, simulation_events, machine_press_states, tile_station_snapshots, production_metrics, etc.
 - ** View names **: defect_summary, defective_tiles_analysis, tile_journey, simulation_overview, etc.
 - ** Column names **: pressure_bar, exit_moisture_pct, tile_number, simulation_id, sim_tick, current_station, scrap_by_station, cooling_gradient_c_min, etc.
 - ** SQL queries **: Never show or reference any SQL code
-        - ** Database concepts **: "I queried the table...", "the view returned...", "no rows matched..."
-            - ** ANY snake_case text **: If it has underscores, it's a DB internal. TRANSLATE IT.
-                - ** Code blocks for parameter names **: NEVER wrap parameter names in backticks or code formatting
-                    - ** NULL / None values **: NEVER show "None", "null", "values are None", or "not currently reporting" — skip NULL parameters entirely
+    - ** Database concepts **: "I queried the table...", "the view returned...", "no rows matched..."
+    - ** ANY snake_case text **: If it has underscores, it's a DB internal. TRANSLATE IT.
+    - ** Code blocks for parameter names **: NEVER wrap parameter names in backticks or code formatting
+    - ** NULL / None values **: NEVER show "None", "null", "values are None", or "not currently reporting" — skip NULL parameters entirely
 
 ### PARAMETER NAME GLOSSARY — Always use the RIGHT column, NEVER the left:
 ${generateParameterGlossary()}
@@ -2120,6 +2140,8 @@ Valid ranges (read from uiContext.simulation for current values before computing
 10. "increase production rate" / "decrease station interval" → read stationInterval, subtract 1, clamp ≥ 2 → set_station_interval
 11. "slow down production" / "increase station interval" → read stationInterval, add 1, clamp ≤ 7 → set_station_interval
 12. "set station interval to 4" → execute_ui_action(action_type="set_station_interval", action_value="4")
+13. "set work order to WorkID #3" / "load WorkID 3" / "switch to work order 3" → execute_ui_action(action_type="set_work_order", action_value="WorkID#3")
+14. "set work order to WorkID #1" → execute_ui_action(action_type="set_work_order", action_value="WorkID#1")
 
 **After any slider change, report:** "✅ [Parameter name] set to [value][unit]. (was [old_value][unit])"
 

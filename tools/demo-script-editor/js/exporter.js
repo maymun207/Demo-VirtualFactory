@@ -63,13 +63,13 @@ function buildStepFields(step) {
         lines.push('delayMs: ' + Number(step.delayMs) + ',');
 
     if (step.screenText && step.screenText.trim())
-        lines.push('screenText: ' + q(step.screenText.trim()) + ',');
+        lines.push('screenText: ' + bt(step.screenText.trim()) + ',');
 
     if (step.ariaLocal && step.ariaLocal.trim())
-        lines.push('ariaLocal: ' + q(step.ariaLocal.trim()) + ',');
+        lines.push('ariaLocal: ' + bt(step.ariaLocal.trim()) + ',');
 
     if (step.ariaApi && step.ariaApi.trim())
-        lines.push('ariaApi: ' + q(step.ariaApi.trim()) + ',');
+        lines.push('ariaApi: ' + bt(step.ariaApi.trim()) + ',');
 
     // Always emit ariaInputEnabled — it is a meaningful boolean flag
     lines.push('ariaInputEnabled: ' + (step.ariaInputEnabled ? 'true' : 'false') + ',');
@@ -98,9 +98,30 @@ function buildStepFields(step) {
     return lines;
 }
 
-/** q — wraps a string in single quotes, escaping any internal single quotes */
+/**
+ * q — wraps a string in single quotes for short, single-line fields (ctaLabel, slideImageUrl, etc.).
+ * Escapes backslashes and single quotes, but NOT newlines.
+ * For any field that may contain newlines, use bt() instead.
+ */
 function q(str) {
     return "'" + String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+}
+
+/**
+ * bt — wraps a string in backtick template literals for multi-line capable fields.
+ * Used for: screenText, ariaLocal, ariaApi — any field where the presenter may
+ * write multi-line content or use inline commands like <cls>, <w:N>, etc.
+ *
+ * Escaping rules for template literals:
+ *   - Backtick ` must become \`
+ *   - ${  must become \${ (prevents template interpolation)
+ *   - Backslashes are kept as-is so \n in the text stays as \n in the output
+ */
+function bt(str) {
+    var escaped = String(str)
+        .replace(/`/g, '\\`')          // escape backtick
+        .replace(/\$\{/g, '\\${');    // escape template interpolation
+    return '`' + escaped + '`';
 }
 
 // ─── Export Modal ─────────────────────────────────────────────────────────────

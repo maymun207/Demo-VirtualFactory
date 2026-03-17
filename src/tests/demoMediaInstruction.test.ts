@@ -6,17 +6,13 @@
  *   2. demoStore initialises currentMediaInstruction as null
  *   3. Transition / reset paths clear currentMediaInstruction
  *   4. DemoMediaInstructionRenderer resolves known/unknown instructions correctly
+ *   5. Demo script — which acts/steps carry mediaInstruction in the current script
  *
  * These tests are pure unit tests — no browser, no network, no Supabase.
  *
- * Coverage areas:
- *   - MediaInstruction type contract (compile-time guard via assignment)
- *   - Store state shape (currentMediaInstruction initial value)
- *   - Renderer routing (renders chart for known key, null for unknown)
- *
- * NOTE: DemoConveyorSpeedChart is a visual/SVG component that depends on
- *       ResizeObserver and SVG layout — it is exercised via integration tests
- *       in a browser environment (Playwright), not here.
+ * HISTORY NOTE: mediaInstruction was originally on the No System act (Click #2/#3).
+ * It was later moved to the Basic System act (Click #2) when the No System act was
+ * simplified to a 2-step pure narrative. These tests document the CURRENT design.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -82,77 +78,105 @@ describe('DemoMediaInstructionRenderer resolution', () => {
     });
 });
 
-// ─── 3. demoScript.ts Click #3 of No System has mediaInstruction ─────────────
+// ─── 3. No System act — no longer uses mediaInstruction ──────────────────────
 
-describe('No System act — mediaInstruction structure', () => {
-    /** Import the actual DEMO_ACTS to verify the script is configured correctly. */
+describe('No System act — pure narrative (no mediaInstruction)', () => {
+    /**
+     * HISTORY NOTE: The No System act previously used mediaInstruction: 'chart:conveyor_speed'
+     * on Click #2 and Click #3. That design was replaced when the act was simplified:
+     *   OLD: No System → 3 steps, Click #2/#3 had chart:conveyor_speed
+     *   NEW: No System → 2 steps, pure narrative, no chart
+     *
+     * chart:conveyor_speed now lives in the Basic System act (see next describe block).
+     */
+    let click1: CtaStep;
     let click2: CtaStep;
-    let click3: CtaStep;
 
     beforeEach(async () => {
-        /**
-         * Import lazily to avoid side effects at module evaluation time.
-         * demoScript.ts is pure data — no side effects.
-         */
+        /** Import lazily to avoid side effects at module evaluation time. */
         const { DEMO_ACTS } = await import('../lib/params/demoSystem/demoScript');
         const noMgmtAct = DEMO_ACTS.find((a) => a.id === 'no-management');
         if (!noMgmtAct || !noMgmtAct.ctaSteps) {
             throw new Error('no-management act or ctaSteps missing from DEMO_ACTS');
         }
+        click1 = noMgmtAct.ctaSteps[0];
         click2 = noMgmtAct.ctaSteps[1];
-        click3 = noMgmtAct.ctaSteps[2];
     });
 
-    it('Click #2 has mediaInstruction: chart:conveyor_speed (visual teaser)', () => {
+    it('has exactly 2 ctaSteps — pure narrative, no chart', () => {
         /**
-         * The chart now appears on Click #2 — a live data visual BEFORE the query.
-         * This gives the audience context before ARIA presents the table.
+         * The No System act was simplified to 2 narrative steps.
+         * mediaInstruction was removed when the chart moved to the Basic System act.
+         */
+        expect(click1).toBeDefined();
+        expect(click2).toBeDefined();
+    });
+
+    it('Click #1 has no mediaInstruction (starts simulation, shows factory premise)', () => {
+        /**
+         * Click #1 starts the simulation — the audience sees the factory running.
+         * No chart: the story is "everything looks fine on the outside."
+         */
+        expect(click1.mediaInstruction).toBeUndefined();
+        expect(click1.simulationAction).toBe('start');
+    });
+
+    it('Click #2 has no mediaInstruction (transitions to reveal the hidden losses)', () => {
+        /**
+         * Click #2 is the punchline transition — everything LOOKS fine but
+         * invisible losses are happening. The chart is deferred to Basic System.
+         */
+        expect(click2.mediaInstruction).toBeUndefined();
+        expect(click2.transitionTo).toBe('next');
+    });
+});
+
+// ─── 4. Basic System act — mediaInstruction lives here now ───────────────────
+
+describe('Basic System act — chart:conveyor_speed is on Click #2', () => {
+    /**
+     * mediaInstruction: 'chart:conveyor_speed' was moved from No System to Basic System
+     * so the audience sees the OEE + speed chart TOGETHER when the Basic Panel is open.
+     * This makes the "numbers without context" story more visceral.
+     */
+    let click2: CtaStep;
+
+    beforeEach(async () => {
+        /** Import lazily to avoid side effects at module evaluation time. */
+        const { DEMO_ACTS } = await import('../lib/params/demoSystem/demoScript');
+        const basicAct = DEMO_ACTS.find((a) => a.id === 'basic-system');
+        if (!basicAct || !basicAct.ctaSteps) {
+            throw new Error('basic-system act or ctaSteps missing from DEMO_ACTS');
+        }
+        click2 = basicAct.ctaSteps[1]; // Click #2 = index 1
+    });
+
+    it('Click #2 has mediaInstruction: chart:conveyor_speed', () => {
+        /**
+         * The chart appears alongside the Basic Panel so the audience can
+         * watch belt speed trend while seeing OEE fluctuate in real time.
          */
         expect(click2.mediaInstruction).toBe('chart:conveyor_speed');
     });
 
-    it('Click #2 has no slideImageUrl (chart replaces the static image)', () => {
+    it('Click #2 has no slideImageUrl (chart takes visual priority over static image)', () => {
+        /**
+         * When mediaInstruction is set, no static slide is shown — the chart
+         * component replaces the image area entirely.
+         */
         expect(click2.slideImageUrl).toBeUndefined();
     });
 
-    it('Click #2 opens the controlPanel so the presenter can gesture at live speed', () => {
-        const cpAction = click2.panelActions?.find(p => p.panel === 'controlPanel');
-        expect(cpAction?.state).toBe('open');
-    });
-
-    it('Click #3 has mediaInstruction: chart:conveyor_speed (chart stays visible during query)', () => {
+    it('Click #2 has a positive delayMs for smooth chart render transition', () => {
         /**
-         * Click #3 keeps the chart on screen while ARIA responds with the data table.
-         * The audience can see the visual + the tabular data simultaneously.
+         * delayMs ensures the screenText fades in after the chart has had
+         * time to render its first data points.
          */
-        expect(click3.mediaInstruction).toBe('chart:conveyor_speed');
-    });
-
-    it('Click #3 has no slideImageUrl (chart takes visual priority)', () => {
-        expect(click3.slideImageUrl).toBeUndefined();
-    });
-
-    it('Click #3 has no ariaLocal or ariaApi (no live query — pure chart-transition step)', () => {
-        /**
-         * ariaLocal and ariaApi were removed from Click #3.
-         * No ARIA query is triggered here; ARIA responds via the next act's openingPrompt.
-         */
-        expect(click3.ariaLocal).toBeUndefined();
-        expect(click3.ariaApi).toBeUndefined();
-    });
-
-    it('Click #3 closes all 5 panels (including controlPanel that opened on Click #2)', () => {
-        const panels = click3.panelActions!;
-        expect(panels).toHaveLength(5);
-        panels.forEach(p => expect(p.state).toBe('close'));
-    });
-
-    it('Click #3 has transitionTo: next so step auto-advances after API responds', () => {
-        expect(click3.transitionTo).toBe('next');
+        expect(click2.delayMs).toBeGreaterThan(0);
     });
 });
 
-// ─── 4. demoStore — currentMediaInstruction state management ─────────────────
+// ─── 5. demoStore — currentMediaInstruction state management ─────────────────
 
 describe('demoStore — currentMediaInstruction', () => {
     /**

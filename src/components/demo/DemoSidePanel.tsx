@@ -31,7 +31,6 @@ import type { DemoState } from '../../store/demoStore';
 import { DEMO_ACTS } from '../../lib/params/demoSystem/demoScript';
 import {
     DEMO_SIDE_PANEL_WIDTH_PX,
-    DEMO_ARIA_LOADING_LABEL,
 } from '../../lib/params/demoSystem/demoConfig';
 import { useSimulationDataStore } from '../../store/simulationDataStore';
 import { useUIStore } from '../../store/uiStore';
@@ -71,17 +70,19 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
     /** Whether ARIA is generating a response */
     const isLoading = useDemoStore((s: DemoState) => s.isLoading);
     /**
-     * isCtaExecuting — true while handleCtaClick is running (including delayMs sleep).
-     * Guards against rapid clicks executing the same step multiple times.
+     * demoPhase — tracks which phase the current step is in.
+     * Button is enabled only during 'awaiting-click' and 'awaiting-transition'.
      */
+    const demoPhase = useDemoStore((s: DemoState) => s.demoPhase);
+    /** isCtaExecuting — true while an auto phase is running */
     const isCtaExecuting = useDemoStore((s: DemoState) => s.isCtaExecuting);
-    /** Store actions */
-    const handleCtaClick = useDemoStore((s: DemoState) => s.handleCtaClick);
+    /** userAdvance — the new unified click handler */
+    const userAdvance = useDemoStore((s: DemoState) => s.userAdvance);
     const restartDemo = useDemoStore((s: DemoState) => s.restartDemo);
     const sendMessage = useDemoStore((s: DemoState) => s.sendMessage);
     const jumpToAct = useDemoStore((s: DemoState) => s.jumpToAct);
-    /** CTA slide sequencer position within the current act */
-    const ctaStepIndex = useDemoStore((s: DemoState) => s.ctaStepIndex);
+    /** currentStepIndex — preferred name; same value as ctaStepIndex */
+    const currentStepIndex = useDemoStore((s: DemoState) => s.currentStepIndex);
 
     /** Whether a simulation session is currently running */
     const simHasSession = useSimulationDataStore((s) => !!s.session?.id);
@@ -116,8 +117,31 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
      * ctaButtonLabel — delegated to the deriveCtaButtonLabel utility.
      * Tested independently in src/tests/demoCtaLabel.test.ts.
      */
-    const currentStep = currentAct?.ctaSteps?.[ctaStepIndex];
-    const ctaButtonLabel = deriveCtaButtonLabel({ isLastAct, ctaStepIndex, currentStep });
+    /** Derive active step for the CTA button label */
+    const currentStep = currentAct?.ctaSteps?.[currentStepIndex];
+    const ctaButtonLabel = deriveCtaButtonLabel({ isLastAct, ctaStepIndex: currentStepIndex, currentStep });
+
+    /**
+     * isCTADisabled — the button should only be clickable when the user
+     * needs to take action. Active phases:
+     *   'idle'               → first click starts the demo (triggers enterStep)
+     *   'awaiting-click'     → user click fires ARIA phase
+     *   'awaiting-transition'→ user click fires transitionTo
+     * Auto-executing phases (content, aria) keep the button disabled.
+     * NOTE: simHasSession is NOT required here — the CTA flow (slide/text/transition)
+     * works without a session. Only the ARIA API call needs one, and postToCWF
+     * handles a missing session gracefully with an error bubble.
+     */
+    const isCTADisabled =
+        isLoading ||
+        isCtaExecuting ||
+        (demoPhase !== 'idle' && demoPhase !== 'awaiting-click' && demoPhase !== 'awaiting-transition');
+
+    /**
+     * ctaDisplayLabel — shows 'ARIA responding…' during the aria phase
+     * (when isLoading is set by postToCWF), otherwise shows the script's ctaLabel.
+     */
+    const ctaDisplayLabel = isLoading ? 'ARIA responding…' : ctaButtonLabel;
 
     /** The 5 narrative acts that have a sidebarLabel defined */
     const sidebarActs = DEMO_ACTS.map((act, idx) => ({ act, idx }))
@@ -234,19 +258,13 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                         <button
                             id="demo-sidebar-advance"
                             onClick={() => {
-                                if (isLastAct) {
-                                    void restartDemo();
-                                } else {
-                                    void handleCtaClick();
-                                }
+                                void userAdvance();
                             }}
-                            disabled={isLoading || isCtaExecuting}
+                            disabled={isCTADisabled}
                             title={
                                 isLastAct
                                     ? 'Restart demo'
-                                    : ctaStepIndex === 0
-                                        ? 'Show first slide'
-                                        : `Step ${ctaStepIndex + 1}`
+                                    : `Step ${currentStepIndex + 1}`
                             }
                             className="
                                 flex-2 py-1.5 rounded-md text-[11px] font-bold
@@ -261,7 +279,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                         {/*
                               Button content has two states:
                               - ARIA loading: pulse animation + "ARIA responding…" label
-                                (button is already disabled={isLoading}, this is the visual)
+                                (button is already disabled via isCTADisabled, this is the visual)
                               - Normal: the derived CTA label from the current ctaStep
                         */}
                         {isLoading ? (
@@ -270,10 +288,10 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                                     className="inline-block w-1.5 h-1.5 rounded-full bg-blue-300 animate-ping"
                                     aria-hidden="true"
                                 />
-                                {DEMO_ARIA_LOADING_LABEL}
+                                {ctaDisplayLabel}
                             </span>
                         ) : (
-                            ctaButtonLabel
+                            ctaDisplayLabel
                         )}
                         </button>
                     </div>

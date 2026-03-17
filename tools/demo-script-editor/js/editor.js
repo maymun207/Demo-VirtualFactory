@@ -67,6 +67,8 @@ function renderTabs() {
 
 // ─── Stage Table ─────────────────────────────────────────────────────────────
 
+/** Expose renderStage on window so schema.js can call it after refreshSlides() re-populates window.SLIDES */
+window.renderStage = renderStage;
 function renderStage() {
     const stageId  = state.activeStageId;
     const stage    = STAGES.find(function (s) { return s.id === stageId; });

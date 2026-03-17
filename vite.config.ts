@@ -56,6 +56,15 @@ export default defineConfig({
           });
         },
       },
+      /**
+       * GET /api/demo-slides — proxied to the CWF dev server.
+       * Returns the list of files in public/demo/ so the Demo Script Editor
+       * can dynamically populate its slide dropdown without hard-coding filenames.
+       */
+      '/api/demo-slides': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+      },
     },
   },
 })
