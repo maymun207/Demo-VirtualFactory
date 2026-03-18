@@ -121,42 +121,44 @@ describe('DEMO_ACTS — data integrity', () => {
         expect(new Set(ids).size).toBe(ids.length);
     });
 
-    // ── Welcome act specific tests ─────────────────────────────────────────────
+    // ── Mirror act specific tests ──────────────────────────────────────────────
 
-    describe("Welcome act (id: 'welcome')", () => {
-        const welcome = DEMO_ACTS[0];
+    describe("Mirror act (id: 'mirror')", () => {
+        const mirror = DEMO_ACTS[0];
 
-        it("has id 'welcome'", () => {
-            expect(welcome.id).toBe('welcome');
+        it("has id 'mirror'", () => {
+            expect(mirror.id).toBe('mirror');
         });
 
-        it('has exactly 2 ctaSteps', () => {
+        it('has exactly 3 ctaSteps', () => {
             /**
-             * Welcome has 2 CTA steps:
-             *   1. "Continue" — shows Welcome slide, ARIA input enabled
-             *   2. "Next" — ARIA input enabled
+             * Mirror (Tier 1) has 3 CTA steps:
+             *   0. "Start →" — factory intro + reveal
+             *   1. "Ask the factory →" — CWF wow moment
+             *   2. "Continue →" — 03:47 teaser + fork
              */
-            expect(welcome.ctaSteps).toHaveLength(2);
+            expect(mirror.ctaSteps).toHaveLength(3);
         });
 
         it('act has scenarioCode: SCN-001 (loaded at act entry)', () => {
             /**
              * SCN-001 (Optimal Production baseline) is set at the ACT level
-             * so it loads immediately when the welcome act begins.
+             * so it loads immediately when the mirror act begins.
              */
-            expect(welcome.scenarioCode).toBe('SCN-001');
+            expect(mirror.scenarioCode).toBe('SCN-001');
         });
 
         it('Click #1 — ARIA input is disabled (narration only)', () => {
-            expect(welcome.ctaSteps![0].ariaInputEnabled).toBe(false);
+            expect(mirror.ctaSteps![0].ariaInputEnabled).toBe(false);
         });
 
-        it('Click #2 — ARIA input is disabled (narration only)', () => {
-            expect(welcome.ctaSteps![1].ariaInputEnabled).toBe(false);
+        it('Click #2 — ARIA input is disabled (auto CWF query)', () => {
+            expect(mirror.ctaSteps![1].ariaInputEnabled).toBe(false);
         });
 
-        it('act-level panelActions is empty (clean slate)', () => {
-            expect(welcome.panelActions).toHaveLength(0);
+        it('act-level panelActions closes all 5 panels (clean slate)', () => {
+            expect(mirror.panelActions).toHaveLength(5);
+            mirror.panelActions.forEach(pa => expect(pa.state).toBe('close'));
         });
     });
 
@@ -169,30 +171,28 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(noManagement.id).toBe('no-management');
         });
 
-        it('has exactly 4 ctaSteps', () => {
+        it('has exactly 2 ctaSteps', () => {
             /**
-             * No System act has 4 steps:
-             *   1. Clean slate (cls only)
-             *   2. Narrative + ariaApi
-             *   3. Slide + conveyor speed chart tease
-             *   4. Chart + ariaLocal narrative
+             * No System act has 2 steps:
+             *   0. Conveyor chart + ariaApi query
+             *   1. Financial translation + transition
              */
-            expect(noManagement.ctaSteps).toHaveLength(4);
+            expect(noManagement.ctaSteps).toHaveLength(2);
         });
 
-        it('act-level scenarioCode is null (SCN-001 still active from welcome)', () => {
+        it('act-level scenarioCode is null (SCN-001 still active from mirror)', () => {
             /**
              * No new scenario is loaded — the No System era inherits the baseline
-             * SCN-001 scenario that was set by the Welcome act.
+             * SCN-001 scenario that was set by the Mirror act.
              */
             expect(noManagement.scenarioCode).toBeNull();
         });
 
-        it('Click #1 — ARIA input is disabled (transition step)', () => {
-            expect(noManagement.ctaSteps![0].ariaInputEnabled).toBe(false);
+        it('Click #1 — ARIA input is enabled (interactive query step)', () => {
+            expect(noManagement.ctaSteps![0].ariaInputEnabled).toBe(true);
         });
 
-        it('Click #2 — ARIA input is disabled', () => {
+        it('Click #2 — ARIA input is disabled (transition step)', () => {
             expect(noManagement.ctaSteps![1].ariaInputEnabled).toBe(false);
         });
 

@@ -1,42 +1,59 @@
 /**
- * demoScript.ts — Web Visitor Self-Guided Demo
+ * demoScript.ts — "The Invisible Factory" — Web Visitor Self-Guided Demo
+ *
+ * REDESIGNED: March 2026
  *
  * "Sheet music" for the Virtual Factory Demo Engine.
  * Audience: solo web visitors arriving via "Demo Our Digital Twin"
  * button on ardic.ai — no human presenter, no conference room.
  *
- * DESIGN PRINCIPLES FOR WEB VISITORS:
- *   - ARIA is the sole narrator. Every beat must stand alone.
- *   - screenText carries the visual headline. ariaLocal carries the emotional hook.
- *   - <clck> auto-advances to ARIA so the visitor is never stuck staring at text.
- *   - ariaApi queries are specific enough to produce great responses with sparse data.
- *   - Every act ends with transitionTo: 'next' — the journey is linear and guided.
- *   - simulationAction 'reset-start' fires in Act 0 Step 0 Phase 4 (after ariaLocal).
- *     By Act 1, the sim has been running long enough for real data to appear in CWF.
+ * ═══════════════════════════════════════════════════════════════
+ * TWO-TIER ARCHITECTURE
+ * ═══════════════════════════════════════════════════════════════
  *
- * NARRATIVE ARC (7 acts):
- *   Act 0  Welcome          — Factory comes alive. ARIA introduces the journey.
- *   Act 1  No System        — Invisible throughput loss. No alarm. No one noticed.
- *   Act 2  Basic System     — A dashboard exists. Numbers without causes.
- *   Act 3  Digital Twin     — Kiln crisis. Every tile has a passport. CO₂ revealed.
- *   Act 4  Chat with Factory — Ask the factory anything. Four roles. One language.
- *   Act 5  Autonomous AI    — Cascade failure. Copilot acts. Incident log at 03:47.
- *   Act 6  Close            — Financial translation. The closing question.
+ *   TIER 1 — "The Mirror" (Act 0):
+ *     90–120 seconds, heavily auto-driven via <clck>.
+ *     3 steps, 3 clicks. Catches the busy CEO, the sceptical
+ *     engineer, the factory owner who "just clicked to see."
+ *     Goal: make them feel the weight of money they didn't know
+ *     they were losing.
  *
- * QUALITY MODEL (all acts):
+ *   TIER 2 — "The Journey" (Acts 1–6):
+ *     5–7 minutes, guided click-by-click.
+ *     For the engaged visitor who chose "Show me more."
+ *     Deep narrative, live AI queries, full scenario progression.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * NARRATIVE ARC (7 acts)
+ * ═══════════════════════════════════════════════════════════════
+ *
+ *   Act 0  The Mirror        — Factory starts. Pain revealed. CWF wow. Fork.
+ *   Act 1  No System         — Conveyor drift. Energy waste. Silent loss.
+ *   Act 2  Basic System      — Dashboard exists. Can't explain itself.
+ *   Act 3  Digital Twin      — Kiln crisis. Tile passport. CO₂ opens.
+ *   Act 4  Chat with Factory — Four roles. One language. Parameter change.
+ *   Act 5  Autonomous AI     — Cascade failure. Copilot acts. 03:47 log.
+ *   Act 6  Close             — Financial mirror. The question they can't answer.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * QUALITY MODEL (immutable across all acts)
+ * ═══════════════════════════════════════════════════════════════
+ *
  *   Sorting catches 100% of defects. Customer ALWAYS receives first quality.
  *   Second quality = 40–60% of production cost paid again at rework.
  *   Scrap = 100% total loss. NEVER imply defective tiles reach the customer.
  *
- * CONVEYOR LOSS MODEL (Acts 1 & 2 only, SCN-001):
+ * CONVEYOR LOSS MODEL (Acts 0–2 only, SCN-001):
  *   All machine params within spec. Only variable = conveyor speed drift.
  *   Loss = throughput gap + Kiln gas + Dryer electricity burned during idle.
- *   NEVER mention defects, quality grades, or sorting in Acts 1 & 2.
+ *   NEVER mention defects, quality grades, or sorting in Acts 0–2.
  *
  * CO₂ THREAD:
- *   Introduced in Act 0 (mention), quantified in Act 3 (kiln overconsumption),
- *   queryable in Act 4 (Sustainability Director role), autonomously prevented
- *   in Act 5 (~1,900 kg avoided), monetised in Act 6 (same intervention).
+ *   Seeded in Act 0 (03:47 teaser: "~1,900 kg prevented"),
+ *   quantified in Act 3 (kiln overconsumption),
+ *   queryable in Act 4 (Sustainability role),
+ *   autonomously prevented in Act 5 (same ~1,900 kg),
+ *   monetised in Act 6 (same intervention).
  *
  * Used by: demoStore.ts, DemoMediaView.tsx, DemoSidePanel.tsx
  */
@@ -45,10 +62,6 @@ import type { DemoHeightKey } from './demoConfig';
 
 // ─── Panel Action Types ─────────────────────────────────────────────────────
 
-/**
- * UIPanel — all panels the demo engine can open or close.
- * Maps directly to toggle functions in uiStore.ts.
- */
 export type UIPanel =
     | 'basicPanel'
     | 'dtxfr'
@@ -59,9 +72,6 @@ export type UIPanel =
     | 'passport'
     | 'oeeHierarchy';
 
-/**
- * PanelAction — a single panel open/close instruction for an act or step.
- */
 export interface PanelAction {
     panel: UIPanel;
     state: 'open' | 'close';
@@ -69,38 +79,16 @@ export interface PanelAction {
 
 // ─── Media Instruction Type ────────────────────────────────────────────────
 
-/**
- * MediaInstruction — identifies a dynamic visualisation to render in DemoMediaView.
- * 'chart:conveyor_speed' reads live conveyorStateRecords from simulationDataStore.
- */
 export type MediaInstruction = 'chart:conveyor_speed';
 
 // ─── Screen Text Formatting Types ──────────────────────────────────────────
 
-/** Text alignment for the screenText overlay on the demo screen. */
 export type ScreenTextAlign = 'left' | 'center' | 'right';
-
-/** Font weight for screenText. */
 export type ScreenTextWeight = 'normal' | 'bold';
-
-/** Preset font sizes for screenText (maps to px in DemoMediaView). */
 export type ScreenTextSize = 'sm' | 'md' | 'lg' | 'xl';
 
 // ─── CTA Step ────────────────────────────────────────────────────────────────
 
-/**
- * CtaStep — everything that happens on one CTA button click.
- *
- * Phase execution order (in demoStore.enterStep / enterAriaPhase):
- *   Phase 1 (auto on load): slideImageUrl → scenarioCode → workOrderId → delayMs
- *   Phase 2 (auto):         screenText tokens processed (<cls><clmi><w:N><MI><clck>)
- *                           → <clck> found: go to Phase 3 immediately
- *                           → no <clck>, has screenText: WAIT for user click
- *                           → no screenText: go to Phase 3 immediately
- *   Phase 3 (user or <clck>): ariaLocal → ariaApi
- *   Phase 4 (auto after API): panelActions → simulationAction → awaiting-transition
- *   Phase 5 (user click):     transitionTo fires
- */
 export interface CtaStep {
     ctaLabel?: string;
     slideImageUrl?: string;
@@ -109,18 +97,12 @@ export interface CtaStep {
     workOrderId?: string | null;
     delayMs?: number;
     screenText?: string;
-    /** Text alignment for the screenText overlay. Default: 'center'. */
     screenTextAlign?: ScreenTextAlign;
-    /** Font weight for screenText. Default: 'bold'. */
     screenTextWeight?: ScreenTextWeight;
-    /** Font size preset for screenText. Default: 'lg' (34px). */
     screenTextSize?: ScreenTextSize;
     ariaLocal?: string;
-    /** Text alignment for ARIA Local chat bubbles. Default: 'left'. */
     ariaLocalAlign?: ScreenTextAlign;
-    /** Font weight for ARIA Local chat bubbles. Default: 'normal'. */
     ariaLocalWeight?: ScreenTextWeight;
-    /** Font size preset for ARIA Local chat bubbles. Default: 'md'. */
     ariaLocalSize?: ScreenTextSize;
     ariaApi?: string;
     ariaInputEnabled?: boolean;
@@ -131,10 +113,6 @@ export interface CtaStep {
 
 // ─── Act Definition ─────────────────────────────────────────────────────────
 
-/**
- * DemoAct — a single chapter of the narrative demo.
- * Pure declarative data — the engine reads it, drives all behaviour.
- */
 export interface DemoAct {
     id: string;
     eraLabel: string;
@@ -150,122 +128,301 @@ export interface DemoAct {
     openingPrompt?: string;
 }
 
-// ─── The Demo Script ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// THE DEMO SCRIPT
+// ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * DEMO_ACTS — the complete ordered narrative for the web visitor demo.
- *
- * Web visitor design notes:
- *   - screenText uses <clck> to auto-advance to ARIA — visitor is never stuck.
- *   - ariaLocal is used in early acts (sparse data) for scripted responses.
- *   - ariaApi is used in later acts where Supabase has enough real data.
- *   - openingPrompt fires when advanceAct() loads this act — gives ARIA act context.
- *   - simulationAction 'reset-start' fires in Act 0 / Step 0 / Phase 4.
- */
 export const DEMO_ACTS: DemoAct[] = [
 
     // ══════════════════════════════════════════════════════════════════════
-    // ACT 0 — WELCOME
-    // "Your factory, live."
-    // The factory starts. ARIA introduces herself and the four-stage journey.
-    // simulationAction 'reset-start' fires in Step 0 Phase 4 (after ariaLocal).
+    // ACT 0 — THE MIRROR (Tier 1)
+    // "The factory looks fine. It is not."
+    //
+    // 3 steps, 3 clicks. Heavily auto-driven via <clck>.
+    // The visitor watches a normal-looking factory and discovers the
+    // invisible cost of not knowing. Then ARIA answers a live question.
+    // Then the 03:47 incident seeds the full journey.
+    //
+    // simulationAction: 'reset-start' fires in Step 0 Phase 4 (after
+    // screenText + ariaLocal finish). The factory comes alive visually
+    // AFTER the "everything looks normal" text has primed the visitor.
+    // By Step 1, the sim has run long enough for ariaApi data to exist.
+    //
+    // TIMING BUDGET:
+    //   Step 0: ~35s screenText + ~8s ariaLocal + click = ~45s
+    //   Step 1: ~8s screenText + ~5s ariaApi response + click = ~15s
+    //   Step 2: ~30s screenText + ~5s ariaLocal + click = ~40s
+    //   Total Tier 1: ~100 seconds (target)
     // ══════════════════════════════════════════════════════════════════════
     {
-        id: 'welcome',
-        eraLabel: 'Welcome',
-        eraEmoji: '👋',
+        id: 'mirror',
+        eraLabel: 'The Mirror',
+        eraEmoji: '🪞',
         targetHeightKey: 'tall',
         scenarioCode: 'SCN-001',
-        panelActions: [],
+
+        /** All panels closed — pure 3D factory + text overlay */
+        panelActions: [
+            { panel: 'basicPanel',   state: 'close' },
+            { panel: 'dtxfr',        state: 'close' },
+            { panel: 'cwf',          state: 'close' },
+            { panel: 'oeeHierarchy', state: 'close' },
+            { panel: 'controlPanel', state: 'close' },
+        ],
+
+        /**
+         * No sidebarLabel — Act 0 does not appear in the LED list.
+         * The mirror is the entry experience, not a selectable stage.
+         */
 
         systemContext: `
 You are opening the demo for a solo web visitor arriving from ardic.ai.
-Tone: calm authority, experienced manufacturing consultant, warmly curious.
-You are ARIA — not a salesperson, not a chatbot. You are the factory's intelligence layer.
-Maximum 5 sentences. Introduce the CO₂ dimension as the 4th metric alongside
-OEE, quality, and throughput. End with a clear forward hook pointing to the
-→ Continue button.
+This is the MIRROR act — Tier 1. The visitor has never heard of ARDICTECH,
+may not understand OEE or digital twins, and is probably sceptical.
+
+YOUR JOB: Make them feel the weight of money they are losing right now
+in their own factory. No jargon. No product pitch. No brand mention.
+
+Tone: quiet authority. An experienced factory consultant who has walked
+the floor of hundreds of factories and seen the same silent losses everywhere.
+
+CRITICAL: SCN-001 is running. ALL machine parameters within spec.
+The ONLY variable is conveyor speed drift. NEVER mention defects,
+quality grades, sorting, or machine parameter drift in this act.
+The story is ONLY about invisible throughput loss and wasted energy.
+
+Maximum 3 sentences per response. Every word must earn its place.
         `.trim(),
 
-        /**
-         * openingPrompt is blank for Act 0 — this is the entry act.
-         * restartDemo() does not call advanceAct() so no prompt fires here.
-         * All Act 0 narrative is delivered through ctaSteps ariaLocal.
-         */
+        /** No openingPrompt — Act 0 is the entry point. */
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
-            { // Click #1
-                ctaLabel: 'Start the factory →',
-                delayMs: 500,
-                screenText: `In this demo, you will see how advanced manufacturing intelligence transforms a factory with hidden production losses into a system that detects problems in real time, corrects them automatically, and recovers significant lost value.
-<w:3000><cls> 
-A ceramic tile factory — live, right now.<w:1500>  
-
--Every tile.   
--Every machine.   
--Every gram of CO₂. <w:2000> 
- 
-Nothing is invisible here!
-<w:3000> <cls>`,
-                screenTextAlign: 'left',
-                screenTextWeight: 'normal',
-                screenTextSize: 'sm',
-                ariaLocal: `<cls> <w:2000> <cls>  
-Welcome. I am ARIA — your AI guide through this factory. In the next few minutes, I will take you through four stages of digital transformation: a factory running blind, then one with basic visibility, then one with full traceability, and finally one that monitors and corrects itself autonomously. 
-
-The factory behind me is starting right now. Watch the tiles move. 
-
-Every tile you see will tell a story. 
-
-→ Click to begin.`,
-                ariaLocalSize: 'sm',
-                ariaInputEnabled: false,
-                simulationAction: 'start',
-            },
-            { // Click #2
-                ctaLabel: 'Begin the journey →',
+        ctaSteps: [
+            // ──────────────────────────────────────────────────────────
+            // STEP 0: "Your Factory" + "The Invisible Bleed"
+            // The visitor watches, reads, and feels the shock.
+            // Factory starts in Phase 4 — tiles begin moving AFTER
+            // the reveal text has landed.
+            // ──────────────────────────────────────────────────────────
+            {
+                ctaLabel: 'Start →',
                 scenarioCode: 'SCN-001',
                 workOrderId: 'WorkID#3',
-                screenText: `<cls>   
-Seven stations. One production line.  
+                delayMs: 800,
 
-Press → Dryer → Glaze → Print →   
-Kiln    → Sort → Package. <w:1500> 
+                screenText:
+                    // ── Beat 1: Recognition ──
+                    `This factory produces 4,200 tiles per shift.\n` +
+                    `Seven stations. One production line.\n` +
+                    `Press → Dryer → Glaze → Printer → Kiln → Sort → Package.` +
+                    `<w:4000><cls>` +
 
-One important thing to know before we start. <w:1000>`,
+                    // ── Beat 2: The Invisible Bleed ──
+                    `<w:800>` +
+                    `A factory like this, running normally, loses approximately:\n\n` +
+                    `€47 in wasted energy — every 20 seconds.\n` +
+                    `12 tiles of throughput — never produced, never counted.\n\n` +
+                    `No alarm fires.\n` +
+                    `No report is filed.\n` +
+                    `No one notices.` +
+                    `<w:4000><cls>` +
+
+                    // ── Beat 3: The Silence ──
+                    `<w:600>` +
+                    `This happens every shift. Every day.\n\n` +
+                    `The factory looks fine from the outside.\n` +
+                    `The losses are entirely invisible.` +
+                    `<w:3500><clck>`,
+
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal: `<cls> <w:1000> <cls>  
 
-The sorting station at the end of this line catches every non-conforming tile before it leaves the factory. Your customer always receives first-quality goods. Always.  
+                /**
+                 * ariaLocal — ARIA's first words. Delivered AFTER the
+                 * screenText shock. Short, warm, sets up the next beat.
+                 */
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `Welcome. I am ARIA — the intelligence layer of this factory.\n\n` +
+                    `What you just read is not a worst case. ` +
+                    `It is the everyday reality of factories that have no visibility ` +
+                    `into what is actually happening on their production line.\n\n` +
+                    `The factory behind me is starting now. Watch the tiles move.\n\n` +
+                    `→ Click to ask the factory a question.`,
+                ariaLocalSize: 'sm',
 
-The losses you are about to see are entirely internal — absorbed silently by the manufacturer, every shift, every day, invisible to everyone outside the building. 
+                /**
+                 * No ariaApi — sim hasn't started yet, no data.
+                 * ARIA speaks from scripted knowledge only.
+                 */
 
-That silence is exactly the problem. <w:2000>  
-→ Continue`,
                 ariaInputEnabled: false,
+
+                /**
+                 * simulationAction: 'reset-start' fires in Phase 4,
+                 * AFTER screenText and ariaLocal have finished.
+                 * The factory visually comes alive as the visitor
+                 * processes ARIA's welcome words.
+                 */
+                simulationAction: 'reset-start',
+
+                /**
+                 * transitionTo: null → next step within same act.
+                 * User clicks CTA to advance to Step 1.
+                 */
+            },
+
+            // ──────────────────────────────────────────────────────────
+            // STEP 1: "What If You Could Ask?"
+            // CWF panel opens. ARIA queries live simulation data.
+            // The visitor sees AI answer a real question with real
+            // numbers. This is the WOW moment of Tier 1.
+            //
+            // By this point the sim has been running for ~10-20s
+            // (Step 0 screenText duration + user read time).
+            // There should be some production data in Supabase.
+            // ──────────────────────────────────────────────────────────
+            {
+                ctaLabel: 'Ask the factory →',
+
+                screenText:
+                    `<cls><w:500>` +
+                    `What if you could just ask the factory?\n\n` +
+                    `In plain language. Right now.` +
+                    `<w:2000><clck>`,
+
+                screenTextAlign: 'center',
+                screenTextWeight: 'bold',
+                screenTextSize: 'md',
+
+                /**
+                 * ariaApi — the live CWF call. This is the ONE API call
+                 * in Tier 1. The prompt is optimised for speed and
+                 * conciseness. Gemini queries Supabase and returns a
+                 * real financial figure.
+                 *
+                 * Prompt design:
+                 *   - Asks for ONE summary number (grabs attention)
+                 *   - Requests extrapolation to annual cost (makes it real)
+                 *   - Max 3 sentences (fits attention window)
+                 *   - No jargon, no OEE terminology
+                 *   - If data is sparse (sim just started): the prompt
+                 *     explicitly tells Gemini to estimate conservatively
+                 */
+                ariaApi:
+                    `Using the current simulation data for this session: ` +
+                    `what is the total estimated financial loss so far from ` +
+                    `throughput gaps (tiles not produced due to conveyor speed drift) ` +
+                    `and energy wasted during non-productive periods (Kiln gas + Dryer electricity ` +
+                    `running while belt speed is below nominal)? ` +
+                    `Give ONE total number in euros. ` +
+                    `Then say: "This factory has been running for [X] minutes. ` +
+                    `At this rate, the annual cost would be approximately €[Y]." ` +
+                    `If data is sparse because the simulation just started, estimate ` +
+                    `conservatively based on the production rate you can observe. ` +
+                    `Maximum 3 sentences. Plain language. No technical acronyms.`,
+
+                ariaInputEnabled: false,
+
+                /** Open CWF panel — the visitor sees where the answer came from */
+                panelActions: [
+                    { panel: 'cwf', state: 'open' },
+                ],
+            },
+
+            // ──────────────────────────────────────────────────────────
+            // STEP 2: "The 03:47 Incident" + The Fork
+            // Seeds the autonomous AI story. Delivers the Tier 1 close.
+            // The screenText tells the 03:47 story in compressed form.
+            // ariaLocal delivers the fork: full journey or contact.
+            //
+            // transitionTo: 'next' sends engaged visitors to Act 1
+            // (Tier 2: The Journey).
+            // ──────────────────────────────────────────────────────────
+            {
+                ctaLabel: 'Continue →',
+
+                screenText:
+                    `<cls><w:1000>` +
+                    `That answer came from live production data.\n` +
+                    `The AI queried the database, calculated the loss, and responded ` +
+                    `— in seconds.` +
+                    `<w:3000><cls>` +
+
+                    // ── 03:47 Teaser ──
+                    `<w:800>` +
+                    `Now imagine this.\n\n` +
+                    `03:47 AM. Night shift.\n` +
+                    `Kiln temperature drifts above specification.\n` +
+                    `The shift operator does not notice.` +
+                    `<w:3500><cls>` +
+
+                    `<w:600>` +
+                    `03:48 — The system detects the anomaly.\n` +
+                    `03:48 — Root cause identified.\n` +
+                    `03:49 — Correction applied automatically.\n\n` +
+                    `No one was woken up.\n` +
+                    `The customer received only first-quality tiles.\n` +
+                    `~1,900 kg of CO₂ emissions prevented.` +
+                    `<w:4000><clck>`,
+
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+
+                /**
+                 * ariaLocal — the fork. Invites the visitor to choose
+                 * depth. "Full journey" = click CTA (transitionTo: next).
+                 * "Ask your own question" = use the ARIA input in the
+                 * sidebar (already visible). "Talk to an expert" = link.
+                 */
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `You have just seen three things most factory owners never see:\n\n` +
+                    `1. The silent cost of running blind\n` +
+                    `2. A factory that answers questions in plain language\n` +
+                    `3. A system that corrects problems before humans notice\n\n` +
+                    `What you saw in 90 seconds is available in full detail.\n` +
+                    `→ Click "Continue" to walk through the complete journey — from a factory ` +
+                    `with zero visibility to one that manages itself autonomously.\n\n` +
+                    `Or type your own question to ARIA in the sidebar below.`,
+                ariaLocalSize: 'sm',
+
+                ariaInputEnabled: true,
+
+                /** Close CWF panel — Tier 2 will reopen it in Act 4 */
+                panelActions: [
+                    { panel: 'cwf', state: 'close' },
+                ],
+
+                /** Advance to Act 1 (Tier 2: The Journey) */
                 transitionTo: 'next',
             },
         ],
     },
 
+
     // ══════════════════════════════════════════════════════════════════════
     // ACT 1 — NO MANAGEMENT SYSTEM
     // "The factory looks fine. The tragedy is invisible."
-    // SCN-001: all machine params within spec. Only variable = conveyor speed drift.
-    // NEVER mention defects, quality grades, or sorting in this act.
-    // Loss = throughput gap + energy burned during idle conveyor periods.
+    //
+    // TIER 2 ENTRY POINT. The visitor chose "Continue."
+    // SCN-001 continues — conveyor speed drift ONLY.
+    // 2 steps (reduced from 4). All panels closed.
+    // The conveyor speed chart is the hero visual.
+    //
+    // NEVER mention defects, quality grades, or sorting.
+    // Loss = throughput gap + energy burned during idle.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'no-management',
         eraLabel: 'No System',
         eraEmoji: '🏭',
         targetHeightKey: 'medium',
-        scenarioCode: null,  // SCN-001 already loaded from Act 0
+        scenarioCode: null,   // SCN-001 already loaded from Act 0
 
-        /** Close everything — simulating a factory with zero digital tools */
+        /** All panels closed — factory with zero digital tools */
         panelActions: [
             { panel: 'basicPanel',   state: 'close' },
             { panel: 'dtxfr',        state: 'close' },
@@ -277,6 +434,10 @@ That silence is exactly the problem. <w:2000>
         sidebarLabel: 'No System',
 
         systemContext: `
+TIER 2, Act 1. The visitor chose the full journey. They have already seen the
+Tier 1 mirror (invisible loss, CWF wow moment, 03:47 teaser). Now they are
+walking through the stages.
+
 We are in the "No Management System" era. SCN-001 is running — ALL machine
 parameters are perfectly within specification. The ONLY variable is conveyor
 speed drift: the belt occasionally slows without any operator noticing.
@@ -287,94 +448,102 @@ During conveyor slowdowns:
 - Tiles move slower = fewer tiles per hour = throughput gap vs plan
 - Energy is burned producing nothing during the drift
 
-CRITICAL: You MUST NEVER mention defects, second quality, scrap, sorting,
-quality grades, or machine parameter issues in this act. The story is ONLY
-about invisible throughput loss and wasted energy during conveyor speed drift.
+CRITICAL: NEVER mention defects, second quality, scrap, sorting, quality grades,
+or machine parameter issues. ONLY throughput loss and wasted energy.
 
-Tone: quiet intensity. The factory looks fine from the outside. The tragedy is invisible.
+Tone: quiet revelation. The visitor now sees what they already suspected.
+Maximum 4 sentences per response.
         `.trim(),
 
-        /**
-         * openingPrompt — fires when advanceAct() transitions into this act.
-         * Sets the scene before Step 0 loads. Delivered as ARIA's first message
-         * in the act, so the visitor reads it while the slide loads.
-         */
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
-            { // Click #1
-                ctaLabel: 'Start >NoSystem',
+        ctaSteps: [
+            // STEP 0: Conveyor chart + narration
+            {
+                ctaLabel: 'Show me →',
                 delayMs: 1000,
-                screenText: `Every dip on that chart is a silent transaction: energy in, zero output, no record. <w:3200><cls>
+                mediaInstruction: 'chart:conveyor_speed',
 
-At a factory producing 10 million tiles per year, 
-a 3% throughput gap from conveyor drift costs approximately €180,000–€240,000 annually in lost production capacity 
-— before counting the energy wasted during idle periods. <w:2800><cls>
+                screenText:
+                    `<w:500>` +
+                    `This is the conveyor speed over time.` +
+                    `<MI><w:5000>\n\n` +
+                    `Every dip on this chart is a silent transaction:\n` +
+                    `energy in, zero output, no record.` +
+                    `<w:3000>\n\n` +
+                    `The Kiln keeps burning gas.\n` +
+                    `The Dryer keeps drawing electricity.\n` +
+                    `No tile moves. No alarm fires. No one knows.` +
+                    `<w:3500><clck>`,
 
-No one filed a report. 
-No alarm was triggered. 
-
-It happened, cost money, and disappeared.
-
-What if we at least had a dashboard?<w:2500>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal: `<cls>`,
-                ariaInputEnabled: false,
-            },
-            { // Click #2
-                ctaLabel: 'Next >NoSystem',
-                delayMs: 2000,
-                screenText: `<cls> 
 
-The factory looks normal. Tiles are moving. Machines are running. <w:2500> 
+                /**
+                 * ariaApi — query live session data. The sim has been
+                 * running since Act 0 Step 0 (30-60+ seconds by now).
+                 * There should be meaningful data.
+                 */
+                ariaApi:
+                    `Using the live simulation data for this session: ` +
+                    `what is the current conveyor speed compared to the nominal speed of 1.0? ` +
+                    `How many tiles per hour are being produced vs the theoretical maximum? ` +
+                    `During any conveyor speed drops, what is the estimated energy cost ` +
+                    `of the Kiln and Dryer running without producing tiles? ` +
+                    `Give me concrete numbers from the session data. ` +
+                    `End with: "→ What if we at least had a dashboard?"`,
 
-But watch the belt speed carefully <w:3000><cls> <clck>`,
-                screenTextSize: 'sm',
-                ariaApi: `<cls>
-Using the live simulation data for this session: what is the current conveyor speed compared to the nominal reference speed of 1.0? <w:3000> 
+                ariaInputEnabled: true,
 
-How many tiles per hour are actually being produced versus the theoretical maximum if the belt ran at full speed continuously?<w:3000>
-
-And during any conveyor speed drops you can detect, what is the estimated energy cost of the Kiln and Dryer running without producing tiles?  Give me concrete numbers from the actual session data.<:w1000>`,
-                ariaInputEnabled: false,
+                /** Open control panel to show the conveyor controls */
                 panelActions: [
                     { panel: 'controlPanel', state: 'open' },
                 ],
             },
-            { // Click #3
-                ctaLabel: 'Next >NoSystem',
-                mediaInstruction: 'chart:conveyor_speed',
-                delayMs: 5000,
-                screenText: `This is the conveyor speed over time.<MI><w:6000>
 
+            // STEP 1: Financial translation + transition
+            {
+                ctaLabel: 'Add a dashboard →',
 
-Each dip = the Kiln keeps burning gas. The Dryer keeps drawing electricity. <w:1500>
+                screenText:
+                    `<cls><clmi><w:800>` +
+                    `At a factory producing 10 million tiles per year,\n` +
+                    `a 3% throughput gap from conveyor drift costs approximately\n` +
+                    `€180,000–€240,000 annually in lost production capacity\n` +
+                    `— before counting the energy wasted during idle periods.` +
+                    `<w:3500><clck>`,
 
-No tile moves. 
-
-No alarm fires. 
-
-No one knows.<w:2000><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
+
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `No one filed a report. No alarm was triggered. ` +
+                    `It happened, cost money, and disappeared.\n\n` +
+                    `This is the daily reality of every factory without visibility. ` +
+                    `Not a catastrophe — just a slow, silent drain.\n\n` +
+                    `→ What changes when we add a dashboard?`,
+                ariaLocalSize: 'sm',
+
                 ariaInputEnabled: false,
-            },
-            { // Click #4
-                ctaLabel: 'Next >NoSystem',
-                ariaLocal: `Every dip on that chart is a silent transaction: energy in, zero output, no record. At a factory producing 10 million tiles per year, a 3% throughput gap from conveyor drift costs approximately €180,000–€240,000 annually in lost production capacity — before counting the energy wasted during idle periods. No one filed a report. No alarm was triggered. It happened, cost money, and disappeared. → What if we at least had a dashboard?`,
-                ariaInputEnabled: false,
+
+                panelActions: [
+                    { panel: 'controlPanel', state: 'close' },
+                ],
+
+                transitionTo: 'next',
             },
         ],
     },
+
 
     // ══════════════════════════════════════════════════════════════════════
     // ACT 2 — BASIC MANAGEMENT SYSTEM
     // "We can see the score. We cannot see the game."
     // SCN-001 still. basicPanel opens. Numbers without root cause.
-    // STILL no mention of defects, quality grades, or sorting.
+    // 2 steps. STILL no mention of defects/quality/sorting.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'basic-system',
@@ -383,7 +552,6 @@ No one knows.<w:2000><clck>`,
         targetHeightKey: 'medium',
         scenarioCode: 'SCN-001',
 
-        /** All panels closed at act entry — basicPanel opens in Step 0 Phase 4 */
         panelActions: [
             { panel: 'basicPanel',   state: 'close' },
             { panel: 'dtxfr',        state: 'close' },
@@ -395,54 +563,104 @@ No one knows.<w:2000><clck>`,
         sidebarLabel: 'Basic Management',
 
         systemContext: `
-Basic Panel just opened. The audience can see OEE (85–92%, Performance component
-dragged down by conveyor speed drift), throughput count, and energy figures.
+TIER 2, Act 2. Basic Panel is about to open.
 
+The audience can see OEE (typically 82–92%), throughput count, and energy figures.
 They CANNOT see: when exactly the belt slowed, whether it is trending worse,
-the energy cost per tile produced vs energy cost during idle periods,
-or ANY root cause explanation for why OEE is at that level.
+the energy cost per idle period, or ANY root cause explanation.
 
-Make the distinction between "seeing a number" and "understanding its cause" very sharp.
+Make the distinction between "seeing a number" and "understanding its cause" razor-sharp.
 
 CRITICAL: Still SCN-001. Still ONLY conveyor speed drift. NEVER mention defects,
-second quality, scrap, or machine parameter issues. The story remains throughput and energy.
+second quality, scrap, or machine parameter issues.
+
+Tone: frustrated empathy. "You can see the number. You cannot explain it."
+Maximum 4 sentences per response.
         `.trim(),
 
         openingPrompt:
-            'A KPI dashboard has just been added to the factory. ' +
-            'In 4 sentences: what does the Basic Panel now show the factory manager ' +
-            '(OEE percentage, throughput count, energy figures), ' +
-            'what critical information is still completely invisible to them ' +
-            '(when exactly the belt slowed, trend direction, root cause, idle energy cost per period), ' +
-            'why the gap between "seeing a number" and "understanding its cause" is dangerous, ' +
-            'and what a factory manager typically does when they see an OEE figure they cannot explain. ' +
-            'Still SCN-001 — only throughput and energy, no defects. ' +
-            'End with: "→ The number raises a question. The dashboard cannot answer it."',
+            `A KPI dashboard has just been added to the factory. ` +
+            `In 3 sentences: what does the Basic Panel now show ` +
+            `(OEE percentage, throughput count, energy figures), ` +
+            `what critical information is still completely invisible ` +
+            `(when the belt slowed, trend direction, root cause, idle energy cost), ` +
+            `and why a number without context is worse than no number at all ` +
+            `(it creates false confidence). ` +
+            `Still SCN-001 — only throughput and energy, no defects. ` +
+            `End with: "→ The dashboard raises a question it cannot answer."`,
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
-            { // Click #1
+        ctaSteps: [
+            // STEP 0: Dashboard opens, live data query
+            {
+                ctaLabel: 'Show the dashboard →',
                 slideImageUrl: '/demo/ACT-2.png',
-                screenText: `We added a dashboard. OEE. Throughput. Energy. All visible now. <w:1500>But can we explain any of them?<clck>`,
-                ariaApi: `The Basic Panel is now open. Using the current simulation data: what is the OEE figure right now, and what is the gap between actual throughput and theoretical maximum throughput for this session? What specific information would a factory manager need to understand WHY OEE is at this level — information that the basic dashboard fundamentally cannot provide? Be concrete and specific.`,
+
+                screenText:
+                    `A dashboard. OEE. Throughput. Energy. All visible now.` +
+                    `<w:2000>\n\n` +
+                    `But can we explain any of them?` +
+                    `<w:1500><clck>`,
+
+                screenTextAlign: 'center',
+                screenTextWeight: 'bold',
+                screenTextSize: 'md',
+
+                ariaApi:
+                    `The Basic Panel is now open. Using the current simulation data: ` +
+                    `what is the OEE right now, and what is the gap between ` +
+                    `actual throughput and theoretical maximum? ` +
+                    `Then ask: what specific information would a factory manager need ` +
+                    `to understand WHY OEE is at this level — information that ` +
+                    `the basic dashboard fundamentally cannot provide? Be concrete.`,
+
                 ariaInputEnabled: true,
+
                 panelActions: [
                     { panel: 'basicPanel', state: 'open' },
                 ],
             },
-            { // Click #2
-                screenText: `A number without context is just noise. OEE at 87% — good? Bad? Getting worse? Which machine? <w:1500>The dashboard cannot tell you.<clck>`,
-                ariaLocal: `This is the gap that costs manufacturers millions annually without anyone noticing. They see the score. They cannot see the game. The basic dashboard shows a single point in time with no root cause, no trend, no breakdown by station, no explanation for why today is different from last Tuesday. The answer requires something fundamentally different — not more dashboards. Unit-level traceability. → Continue`,
+
+            // STEP 1: The limitation + transition
+            {
+                ctaLabel: 'Go deeper →',
+
+                screenText:
+                    `<cls><w:600>` +
+                    `OEE at 87%.\n\n` +
+                    `Good? Bad? Getting worse?\n` +
+                    `Which machine? Which parameter? Since when?\n\n` +
+                    `The dashboard cannot answer.` +
+                    `<w:3000><clck>`,
+
+                screenTextAlign: 'center',
+                screenTextWeight: 'normal',
+                screenTextSize: 'md',
+
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `This is the gap that costs manufacturers millions without anyone noticing. ` +
+                    `They see the score. They cannot see the game.\n\n` +
+                    `The dashboard shows a single point in time with no root cause, ` +
+                    `no trend, no breakdown by station, no explanation for why today ` +
+                    `is different from last Tuesday.\n\n` +
+                    `The answer requires something fundamentally different. ` +
+                    `Not more dashboards. Unit-level traceability.\n\n` +
+                    `→ Continue`,
+                ariaLocalSize: 'sm',
+
                 ariaInputEnabled: true,
                 transitionTo: 'next',
             },
         ],
     },
 
+
     // ══════════════════════════════════════════════════════════════════════
     // ACT 3 — DIGITAL TWIN & TILE PASSPORT
     // "Every tile has a complete story. Now we can read it."
-    // SCN-002: Kiln Temperature Crisis (+14°C). DTXFR panel opens.
-    // Double cost of second quality. CO₂ thread opens (18% more gas).
+    // SCN-002: Kiln Temperature Crisis (+14°C). DTXFR opens.
+    // CO₂ thread opens: 18% more gas, embedded carbon in rework.
+    // 2 steps. Show passport FIRST, then explain.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'digital-twin',
@@ -451,140 +669,256 @@ second quality, scrap, or machine parameter issues. The story remains throughput
         targetHeightKey: 'tall',
         scenarioCode: 'SCN-002',
 
-        /** Close basicPanel, open DTXFR Digital Passport */
         panelActions: [
             { panel: 'basicPanel', state: 'close' },
             { panel: 'dtxfr',      state: 'open' },
         ],
 
-        sidebarLabel: 'Digital Transformation',
-        sidebarSubLabel: 'Digital Twin',
+        sidebarLabel: 'Digital Twin',
 
         systemContext: `
-SCN-002 (Kiln Temperature Crisis) just loaded. Kiln running ~14°C above spec.
-Tile Passport (DTXFR) is open — every tile has a complete station-by-station record.
+TIER 2, Act 3. SCN-002 (Kiln Temperature Crisis) just loaded.
+Kiln running ~14°C above specification. DTXFR Tile Passport is open.
 
 Sorting is catching ALL affected tiles. The customer sees NOTHING wrong. But:
 - Scrap tiles: 100% loss — material + energy + labour, zero revenue
-- Second quality tiles: manufacturer pays 40–60% of production cost AGAIN at rework
-  facility. Some recovered, some become scrap. Either way: paid twice.
+- Second quality tiles: manufacturer pays 40–60% of production cost AGAIN at rework.
+  Some recovered, some become scrap. Either way: paid twice.
 
 CO₂ THREAD OPENS HERE:
 - Kiln at +14°C consumes ~18% more natural gas
 - Gas = 1.9 kg CO₂ per m³ — every affected tile carries excess embedded carbon
 - Second-quality tiles carry that carbon to rework, where MORE CO₂ is added
-- Quality cost and carbon cost share the same root cause: the kiln deviation
+- Quality cost and carbon cost share the same root cause
 
-NEVER say "customer received defective tiles" or "warranty claim."
-Pain is entirely internal. Tone: controlled revelation — this is the discovery beat.
+NEVER say "customer received defective tiles."
+Tone: controlled revelation — this is the discovery beat.
+Maximum 5 sentences per response.
         `.trim(),
 
         openingPrompt:
-            'SCN-002 (Kiln Temperature Crisis) has just been loaded. The kiln is running 14°C above specification. ' +
-            'The DTXFR Tile Passport panel is now open showing every tile\'s complete station-by-station record. ' +
-            'In 4 sentences: describe what is happening to tiles right now as they pass through the kiln, ' +
-            'what the tile passport reveals about each affected tile (exact station parameters captured), ' +
-            'the double-cost mechanism of second quality (manufacturer pays 40–60% of production cost again at rework, ' +
-            'some tiles recovered, some scrapped — either way paid twice), ' +
-            'and the CO₂ dimension: kiln at +14°C uses ~18% more natural gas at 1.9 kg CO₂/m³, ' +
-            'meaning every affected tile carries excess embedded carbon that also travels to the rework facility. ' +
-            'Tone: controlled revelation. End with: "→ Let\'s look at a specific tile."',
+            `SCN-002 (Kiln Temperature Crisis) has just been loaded. Kiln running 14°C above spec. ` +
+            `The Tile Passport panel is now open showing every tile's complete station-by-station record. ` +
+            `In 4 sentences: describe what is happening to tiles as they pass through the kiln, ` +
+            `what the tile passport reveals about each affected tile, ` +
+            `the double-cost mechanism of second quality (40–60% paid again at rework), ` +
+            `and the CO₂ dimension: kiln at +14°C uses ~18% more gas at 1.9 kg CO₂/m³, ` +
+            `every affected tile carries excess embedded carbon that also travels to rework. ` +
+            `End with: "→ Let's look at a specific tile."`,
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
-            { // Click #1
+        ctaSteps: [
+            // STEP 0: Kiln crisis + passport reveal
+            {
+                ctaLabel: 'Show the crisis →',
                 slideImageUrl: '/demo/ACT-3.png',
-                screenText: `New scenario: Kiln Temperature Crisis. The kiln is running +14°C above specification. <w:1500>Watch the orange tiles appear on the conveyor. Every one of them has a story.<clck>`,
-                ariaApi: `Using the current simulation data for SCN-002: how many tiles have passed through the kiln so far in this session, how many show kiln-related defects or quality downgrade, and what is the CO₂ impact of running the kiln 14°C above specification? Calculate using: kiln consumes approximately 100 m³ natural gas per hour at nominal, 18% overconsumption at +14°C deviation, emission factor 1.9 kg CO₂ per m³. Give me both the energy waste and the excess CO₂ for the session so far.`,
+
+                screenText:
+                    `New scenario: Kiln Temperature Crisis.\n` +
+                    `The kiln is running +14°C above specification.` +
+                    `<w:2000>\n\n` +
+                    `Watch the tiles. Every one has a digital passport.\n` +
+                    `Every station. Every parameter. Every second.` +
+                    `<w:2000><clck>`,
+
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+
+                ariaApi:
+                    `Using the current simulation data for SCN-002: ` +
+                    `how many tiles have passed through the kiln so far, ` +
+                    `how many show kiln-related quality issues, ` +
+                    `and what is the CO₂ impact of running the kiln 14°C above spec? ` +
+                    `Calculate: kiln ~100 m³ gas/hour nominal, 18% overconsumption at +14°C, ` +
+                    `emission factor 1.9 kg CO₂/m³. ` +
+                    `Give both energy waste and excess CO₂ for the session.`,
+
                 ariaInputEnabled: true,
             },
-            { // Click #2
-                screenText: `The orange tile has a complete digital passport. Press → Dryer → Glaze → Printer → Kiln — every station, every parameter. <w:2000>Click any orange tile in the 3D factory to open its passport.<clck>`,
-                ariaLocal: `This is unit-level traceability. When a tile is classified as second quality, the manufacturer pays approximately 40–60% of the original production cost again at the rework facility. Some tiles are recovered. Some become scrap at rework. Either way: paid twice. And that same tile carries its excess embedded carbon to rework, where a second energy cycle adds more. Quality loss and carbon loss are the same intervention — same root cause, same fix. → What if you could just ask the factory about it?`,
+
+            // STEP 1: Double cost + CO₂ + transition
+            {
+                ctaLabel: 'Ask the factory →',
+
+                screenText:
+                    `<cls><w:600>` +
+                    `Every affected tile carries excess embedded carbon.\n\n` +
+                    `Sent to rework? A second energy cycle adds more CO₂.\n` +
+                    `Scrapped? Total loss — material, energy, carbon.\n\n` +
+                    `Quality cost and carbon cost share the same root cause.\n` +
+                    `Same fix solves both.` +
+                    `<w:3000><clck>`,
+
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `This is unit-level traceability. When a tile is classified as ` +
+                    `second quality, the manufacturer pays 40–60% of the original ` +
+                    `production cost again at rework. Some tiles are recovered. ` +
+                    `Some become scrap at rework. Either way: paid twice.\n\n` +
+                    `And that same tile carries its excess embedded carbon to rework, ` +
+                    `where a second energy cycle adds more.\n\n` +
+                    `What if you could just ask the factory about it?\n\n` +
+                    `→ Continue`,
+                ariaLocalSize: 'sm',
+
                 ariaInputEnabled: true,
                 transitionTo: 'next',
             },
         ],
     },
 
+
     // ══════════════════════════════════════════════════════════════════════
     // ACT 4 — CHAT WITH FACTORY (CWF)
     // "Ask the factory anything. In plain language. Right now."
-    // SCN-003: Glaze Viscosity Drift — subtle, needs AI to detect.
-    // Four-role query framework: CEO, Quality Manager, Shift Supervisor, Sustainability.
+    // SCN-003: Glaze Viscosity Drift. CWF panel opens.
+    // 3 steps: CEO query, Sustainability query, parameter change demo.
     // Interactive: visitor can type their own questions.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'chat-with-factory',
-        eraLabel: 'Chat with Factory',
+        eraLabel: 'CWF',
         eraEmoji: '💬',
         targetHeightKey: 'tall',
         scenarioCode: 'SCN-003',
 
-        /** Close passport, open CWF panel */
         panelActions: [
             { panel: 'dtxfr', state: 'close' },
             { panel: 'cwf',   state: 'open' },
         ],
 
-        sidebarLabel: 'Chat with Your Factory',
-        sidebarSubLabel: 'CWF',
+        sidebarLabel: 'CWF',
+        sidebarSubLabel: 'Chat With Factory',
 
         systemContext: `
-SCN-003 (Glaze Viscosity Drift) is active. Subtle defect — glaze viscosity slightly
-off specification, second-quality rate rising slowly. Easy to attribute to "normal variation"
-until it becomes expensive.
+TIER 2, Act 4. SCN-003 (Glaze Viscosity Drift) is active. Subtle defect —
+glaze viscosity slightly off, second-quality rate rising slowly. Easy to
+attribute to "normal variation" until it becomes expensive.
 
 CWF panel is open. The visitor can type questions in plain language.
 
-Four-role query framework for this act:
-🏢 CEO: quality loss cost and production windows
-🔬 Quality Manager: root cause station and parameter drift
-👷 Shift Supervisor: pattern consistency and trending
-🌿 Sustainability: CO₂ intensity per 1,000 tiles
+Role query framework for this act:
+🏢 CEO / Factory Owner: "How much money are we losing?"
+🌿 Sustainability: "What is our carbon intensity per 1,000 tiles?"
 
-Key insight: the knowledge from 15 years of experienced engineers is now available
-to everyone, at any hour, in plain language. This is organisational resilience.
-CO₂ is now queryable — as accessible as OEE or quality data.
+Key insight: the knowledge of 15 years of experienced engineers is now
+available to everyone, at any hour, in plain language. This is organisational
+resilience. CO₂ is now queryable — as accessible as OEE or quality data.
+
+Maximum 5 sentences per response.
         `.trim(),
 
         openingPrompt:
-            'SCN-003 (Glaze Viscosity Drift) is now active. This is a subtle defect — glaze viscosity ' +
-            'slightly off specification, second-quality rate rising slowly, easy to attribute to normal variation. ' +
-            'The CWF panel is open. In 3 sentences: introduce what the visitor is about to experience ' +
-            '(ask the factory anything in plain language, get answers backed by real production data), ' +
-            'mention that this represents organisational resilience (15 years of engineering knowledge ' +
-            'accessible to anyone, at any hour, in any language), ' +
-            'and invite them to follow the guided queries or type their own question in the CWF panel below. ' +
-            'End with: "→ Let\'s ask."',
+            `SCN-003 (Glaze Viscosity Drift) is now active. Subtle defect — ` +
+            `glaze viscosity slightly off, second-quality rate rising slowly. ` +
+            `The CWF panel is open. In 3 sentences: introduce what the visitor ` +
+            `is about to experience (ask the factory anything in plain language, ` +
+            `get answers from real production data), mention organisational resilience ` +
+            `(15 years of engineering knowledge accessible to anyone, any hour), ` +
+            `and invite them to follow the guided queries or type their own. ` +
+            `End with: "→ Let\'s ask."`,
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
-            { // Click #1
+        ctaSteps: [
+            // STEP 0: CEO question
+            {
+                ctaLabel: 'Ask as CEO →',
                 slideImageUrl: '/demo/ACT-4a.png',
-                screenText: `New scenario: Glaze Viscosity Drift. Subtle. Slow-building. Expensive when ignored. <w:1500>First question — from the CEO.<clck>`,
-                ariaApi: `🏢 CEO QUESTION: I am the CEO. Looking at our current production session, what is our quality situation right now in plain business language? How much is the current glaze viscosity drift costing us — give me an estimate of the double-cost from second-quality tiles (manufacturer pays 40–60% of production cost again at rework). And what production window do we have before this becomes a customer delivery risk? One paragraph. Concrete numbers from the actual session data.`,
+
+                screenText:
+                    `New scenario: Glaze Viscosity Drift.\n` +
+                    `Subtle. Slow-building. Expensive when ignored.` +
+                    `<w:2000>\n\n` +
+                    `First question — from the factory owner.` +
+                    `<w:1500><clck>`,
+
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+
+                ariaApi:
+                    `🏢 FACTORY OWNER QUESTION: ` +
+                    `I run this factory. Looking at our current production session, ` +
+                    `what is our quality situation in plain business language? ` +
+                    `How much is the glaze viscosity drift costing us — estimate ` +
+                    `the double-cost from second-quality tiles (40–60% of production ` +
+                    `cost paid again at rework). And what production window do we have ` +
+                    `before this becomes critical? One paragraph. Real numbers.`,
+
                 ariaInputEnabled: true,
             },
-            { // Click #2
+
+            // STEP 1: Sustainability question
+            {
+                ctaLabel: 'Ask about CO₂ →',
                 slideImageUrl: '/demo/ACT-4b.png',
-                screenText: `Different role. Same factory. Same data. <w:1000>This time — the Sustainability Director.<clck>`,
-                ariaApi: `🌿 SUSTAINABILITY DIRECTOR QUESTION: What is the CO₂ intensity per 1,000 tiles produced in the current session? How does the glaze viscosity drift specifically contribute to excess carbon output — consider both the direct energy at the glaze station and the additional CO₂ embedded in second-quality tiles that go to rework (where a second energy cycle runs). Use emission factors: electricity = 0.4 kg CO₂/kWh, natural gas = 1.9 kg CO₂/m³. How does this compare to what per-tile carbon intensity should be under SCN-001 optimal conditions?`,
+
+                screenText:
+                    `<cls><w:600>` +
+                    `Different role. Same factory. Same data.` +
+                    `<w:1500>\n\n` +
+                    `Now — the sustainability question.` +
+                    `<w:1000><clck>`,
+
+                screenTextAlign: 'center',
+                screenTextWeight: 'normal',
+                screenTextSize: 'md',
+
+                ariaApi:
+                    `🌿 SUSTAINABILITY QUESTION: ` +
+                    `What is the CO₂ intensity per 1,000 tiles in the current session? ` +
+                    `How does the glaze viscosity drift contribute to excess carbon — ` +
+                    `consider both direct energy and the additional CO₂ embedded in ` +
+                    `second-quality tiles sent to rework (second energy cycle). ` +
+                    `Emission factors: electricity 0.4 kg CO₂/kWh, gas 1.9 kg CO₂/m³. ` +
+                    `How does this compare to optimal (SCN-001) conditions?`,
+
                 ariaInputEnabled: true,
             },
-            { // Click #3
+
+            // STEP 2: Parameter change demo (the most impressive interactive moment)
+            {
+                ctaLabel: 'Change a parameter →',
                 slideImageUrl: '/demo/ACT-4c.png',
-                screenText: `One more — the most powerful capability. You can instruct the factory to change a parameter. <w:1500>Type this in the CWF panel on the right:<clck>`,
-                ariaLocal: `💬 Try typing this in the CWF chat panel: "Increase glaze cabin pressure to 0.9 bar" The system will ask for your authorisation code. Type: airtk When confirmed: the parameter changes live — while the factory keeps running. No shutdown. No manual adjustment. No phone call. Intent → authorisation → action. In under 30 seconds. → Now watch what happens when the system does this itself.`,
+
+                screenText:
+                    `<cls><w:800>` +
+                    `The most powerful capability.\n\n` +
+                    `You don't just ask questions.\n` +
+                    `You give instructions.` +
+                    `<w:2500><clck>`,
+
+                screenTextAlign: 'center',
+                screenTextWeight: 'bold',
+                screenTextSize: 'md',
+
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `💬 Type this in the CWF chat panel on the right:\n\n` +
+                    `"Increase glaze cabin pressure to 0.9 bar"\n\n` +
+                    `The system will ask for your authorisation code. Type: airtk\n\n` +
+                    `When confirmed: the parameter changes live — while the factory ` +
+                    `keeps running. No shutdown. No manual adjustment. No phone call.\n\n` +
+                    `Intent → Authorisation → Action. Under 30 seconds.\n\n` +
+                    `→ Now watch what happens when the system does this itself.`,
+                ariaLocalSize: 'sm',
+
                 ariaInputEnabled: true,
                 transitionTo: 'next',
             },
         ],
     },
 
+
     // ══════════════════════════════════════════════════════════════════════
     // ACT 5 — AUTONOMOUS AI COPILOT
     // "At 03:47, the Copilot acted. Before anyone woke up."
     // SCN-004: Multi-Station Cascade. Copilot auto-enabled.
-    // The incident log is the centrepiece. Matter-of-fact precision = power.
+    // The incident log is the centrepiece.
+    // 2 steps. The log is delivered as openingPrompt to Gemini.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'autonomous-ai',
@@ -593,82 +927,137 @@ CO₂ is now queryable — as accessible as OEE or quality data.
         targetHeightKey: 'large',
         scenarioCode: 'SCN-004',
 
-        /** CWF stays open, OEE Hierarchy opens — visitor watches live OEE impact */
         panelActions: [
             { panel: 'cwf',          state: 'open' },
             { panel: 'oeeHierarchy', state: 'open' },
         ],
 
-        /** Auto-enable Copilot when this act starts */
         enableCopilot: true,
 
         sidebarLabel: 'Autonomous AI',
-        sidebarSubLabel: 'Auto Pilot',
+        sidebarSubLabel: 'Copilot',
 
         systemContext: `
-SCN-004 (Multi-Station Cascade Failure) is active. Press and Kiln failing simultaneously.
-Copilot is auto-enabled — monitoring, detecting, and correcting parameters autonomously.
-OEE Hierarchy panel is open — visitor watches live OEE impact.
+TIER 2, Act 5. SCN-004 (Multi-Station Cascade Failure) is active.
+Press and Kiln failing simultaneously. Copilot is auto-enabled.
 
-NARRATIVE DEVICE: Read the following timestamped incident log as if reading from a real
-system log. Tone: quiet awe and controlled precision. Matter-of-fact precision IS the power.
+NARRATIVE DEVICE: Read the timestamped incident log as if reading from a real
+system log. Tone: quiet awe and controlled precision. Precision IS the power.
 
 Incident log (use exact timestamps and values):
 03:47:00 — Press pressure: 296 bar (+12% above spec = 285 bar)
 03:47:23 — ANOMALY DETECTED. Kiln thermal drift trajectory calculated.
 03:48:01 — Root cause confirmed: press pressure → kiln temperature cascade
-03:48:45 — CORRECTIONS APPLIED: press 296→284 bar, kiln setpoint −8°C. No human instruction.
+03:48:45 — CORRECTIONS APPLIED: press 296→284 bar, kiln setpoint −8°C. No human.
 03:51:12 — Recovery trajectory confirmed. First-quality rate returning.
 03:53:40 — ALL PARAMETERS WITHIN SPEC. Recovery complete.
 Tiles in drift window: 61 (48 second quality → rework, 13 scrap → recycled)
 CO₂ overrun prevented: ~1,900 kg
 Duration: 6 minutes 40 seconds. Filed automatically.
 
-The customer received only first-quality tiles. All quality loss was internal.
+The customer received only first-quality tiles.
 The Copilot did not alert someone — it acted.
         `.trim(),
 
         openingPrompt:
-            'SCN-004 (Multi-Station Cascade Failure) has just been loaded. Press and Kiln are failing simultaneously. ' +
-            'The AI Copilot has been enabled and is monitoring the factory autonomously. ' +
-            'Read the following timestamped incident log exactly as written, as if reading from a real system log. ' +
-            'Use precise timestamps and values — do not paraphrase. After the log, add one sentence. ' +
-            '\n\n' +
-            'THE LOG:\n' +
-            '03:47:00 — Press pressure: 296 bar (+12% above spec = 285 bar)\n' +
-            '03:47:23 — ANOMALY DETECTED. Kiln thermal drift trajectory calculated.\n' +
-            '03:48:01 — Root cause confirmed: press pressure → kiln temperature cascade\n' +
-            '03:48:45 — CORRECTIONS APPLIED: press 296→284 bar, kiln setpoint −8°C. No human instruction. No alarm sent.\n' +
-            '03:51:12 — Recovery trajectory confirmed. First-quality rate returning.\n' +
-            '03:53:40 — ALL PARAMETERS WITHIN SPEC. Recovery complete.\n' +
-            'Tiles in drift window: 61 (48 second quality → rework, 13 scrap → recycled)\n' +
-            'CO₂ overrun prevented: ~1,900 kg\n' +
-            'Duration: 6 minutes 40 seconds. Filed automatically.\n' +
-            '\n' +
-            'After the log, add ONLY this one sentence: ' +
-            '"The customer received only first-quality tiles. The Copilot did not alert someone — it acted."',
+            `SCN-004 (Multi-Station Cascade Failure) has just been loaded. ` +
+            `Press and Kiln failing simultaneously. The AI Copilot is enabled ` +
+            `and monitoring autonomously. Read the following incident log exactly ` +
+            `as written, as if reading from a real system log. Use precise timestamps. ` +
+            `After the log, add only this one sentence: ` +
+            `"The customer received only first-quality tiles. The Copilot did not ` +
+            `alert someone — it acted."\n\n` +
+            `THE LOG:\n` +
+            `03:47:00 — Press pressure: 296 bar (+12% above spec = 285 bar)\n` +
+            `03:47:23 — ANOMALY DETECTED. Kiln thermal drift trajectory calculated.\n` +
+            `03:48:01 — Root cause confirmed: press pressure → kiln temperature cascade\n` +
+            `03:48:45 — CORRECTIONS APPLIED: press 296→284 bar, kiln setpoint −8°C. No human instruction.\n` +
+            `03:51:12 — Recovery trajectory confirmed. First-quality rate returning.\n` +
+            `03:53:40 — ALL PARAMETERS WITHIN SPEC. Recovery complete.\n` +
+            `Tiles in drift window: 61 (48 second quality → rework, 13 scrap → recycled)\n` +
+            `CO₂ overrun prevented: ~1,900 kg\n` +
+            `Duration: 6 minutes 40 seconds. Filed automatically.`,
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
-            { // Click #1
+        ctaSteps: [
+            // STEP 0: OEE impact + financial calculation
+            {
+                ctaLabel: 'Show the impact →',
                 slideImageUrl: '/demo/ACT-4d.png',
-                screenText: `New scenario: Multi-Station Cascade Failure. Press + Kiln failing simultaneously. <w:1500>The Copilot is now active. Watch the OEE Hierarchy on the left.<clck>`,
-                ariaApi: `The OEE Hierarchy is now open showing the cascade impact. Using the current simulation data for SCN-004: what is the current factory OEE, which specific line and machine is pulling it down most severely, and what would the monthly financial impact be at a factory producing 10 million tiles per year if OEE remained at the current level? Use the industry benchmark of €8,000–€15,000 per 1% OEE improvement per line per month and give a range based on both ends of the benchmark.`,
+
+                screenText:
+                    `Multi-Station Cascade Failure.\n` +
+                    `Press + Kiln failing simultaneously.` +
+                    `<w:2000>\n\n` +
+                    `The Copilot is active.\n` +
+                    `Watch the OEE Hierarchy on the left.` +
+                    `<w:1500><clck>`,
+
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+
+                ariaApi:
+                    `The OEE Hierarchy is showing the cascade impact. ` +
+                    `Using simulation data for SCN-004: what is the current factory OEE, ` +
+                    `which line and machine is pulling it down most, ` +
+                    `and what would the monthly financial impact be at 10 million tiles/year ` +
+                    `if OEE stayed at the current level? ` +
+                    `Use benchmark: €8,000–€15,000 per 1% OEE improvement per line per month.`,
+
                 ariaInputEnabled: true,
             },
-            { // Click #2
-                screenText: `The factory recovered. Not because someone was paged at 03:47. Not because an expert was called in. <w:1500>Because the system acted first.<clck>`,
-                ariaLocal: `At 03:47, every operator in this building was focused elsewhere. The Copilot detected the cascade in 23 seconds, traced the root cause, applied corrections, confirmed recovery, and filed the incident report — in 6 minutes and 40 seconds. ~1,900 kg of CO₂ were not emitted. 61 tiles were partially recovered. The customer received first-quality goods. This did not require a special team. It required the right foundation. → One final question.`,
+
+            // STEP 1: The recovery + competitive context
+            {
+                ctaLabel: 'The closing question →',
+
+                screenText:
+                    `<cls><w:800>` +
+                    `The factory recovered.\n\n` +
+                    `Not because someone was paged.\n` +
+                    `Not because an expert was called in.\n\n` +
+                    `Because the system acted first.` +
+                    `<w:3000><cls>` +
+
+                    // ── Competitive context ──
+                    `<w:600>` +
+                    `In a conventional factory:\n` +
+                    `Detection: 2–4 hours. Root cause: 1–2 days. Fix: next shift.\n\n` +
+                    `Here:\n` +
+                    `Detection: 23 seconds. Root cause: 38 seconds. Fix: 6 minutes 40 seconds.\n\n` +
+                    `The difference: 847 tiles and €12,400.` +
+                    `<w:4000><clck>`,
+
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `At 03:47, every operator in this building was focused elsewhere. ` +
+                    `The Copilot detected the cascade in 23 seconds, traced the root cause, ` +
+                    `applied corrections, confirmed recovery, and filed the incident report ` +
+                    `— in 6 minutes and 40 seconds.\n\n` +
+                    `~1,900 kg of CO₂ were not emitted. 61 tiles were partially recovered. ` +
+                    `The customer received first-quality goods.\n\n` +
+                    `This did not require a special team. It required the right foundation.\n\n` +
+                    `→ One final question.`,
+                ariaLocalSize: 'sm',
+
                 ariaInputEnabled: true,
                 transitionTo: 'next',
             },
         ],
     },
 
+
     // ══════════════════════════════════════════════════════════════════════
     // ACT 6 — FINANCIAL CLOSE
-    // "The question is not whether to transform. It is how much longer to wait."
-    // Translate the journey into business language. Soft mirror closing.
-    // Financial model: €8,000–€15,000 per 1% OEE per line per month.
+    // "The question is not whether to transform. It is how much
+    //  longer to wait."
+    //
+    // The closing question IS the mechanism.
+    // Soft mirror: reflect their own production gap back as a question.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'close',
@@ -677,50 +1066,93 @@ The Copilot did not alert someone — it acted.
         targetHeightKey: 'tall',
         scenarioCode: null,
 
-        /** OEE Hierarchy stays open — visitor sees recovered OEE post-Copilot */
         panelActions: [
             { panel: 'oeeHierarchy', state: 'open' },
         ],
 
+        sidebarLabel: 'Close',
+
         systemContext: `
-Financial close. OEE Hierarchy panel shows post-Copilot recovered OEE.
+Financial close. OEE Hierarchy shows post-Copilot recovered OEE.
 Translate the entire journey into precise business language.
 
 Financial model:
 - €8,000–€15,000 per 1% OEE improvement per line per month
 - Typical recovery: 3–5 OEE points in first operational quarter
-- Second-quality elimination = double-cost removed AND CO₂ liability removed (same intervention)
+- Second-quality elimination = double-cost removed AND CO₂ liability removed
 - Carbon traceability = compliance advantage 12–18 months ahead of late movers
 
-CLOSE STYLE: soft mirror — reflect the visitor's own potential production gap back
-as a question. NO competitor names. NO customer names. NO manufactured urgency.
-The closing question IS the mechanism. Be precise, credible, and quiet in conviction.
+CLOSE STYLE: soft mirror — reflect the visitor's own production gap back
+as a question. NO competitor names. NO manufactured urgency.
+The question IS the mechanism. Precise, credible, quiet conviction.
+Maximum 5 sentences per response.
         `.trim(),
 
         openingPrompt:
-            'This is the financial close. The OEE Hierarchy is showing the recovered factory performance. ' +
-            'Translate the entire journey the visitor just experienced into precise business language. ' +
-            'Use this financial model: €8,000–€15,000 per 1% OEE improvement per line per month; ' +
-            'typical recovery of 3–5 OEE points in the first operational quarter; ' +
-            'second-quality elimination removes the double-cost AND the CO₂ liability in the same intervention; ' +
-            'carbon traceability creates a compliance advantage 12–18 months ahead of late movers. ' +
-            'Then deliver the closing question as a soft mirror: reflect the visitor\'s own potential ' +
-            'production gap back to them as a question — not about technology, about their operation. ' +
-            'No competitor names. No urgency. Quiet conviction. The question IS the mechanism. ' +
-            'End with: "If you\'d like to explore what this looks like for your specific operation, ' +
-            'the team at ARDICTECH would be glad to continue the conversation. → ardic.ai"',
+            `This is the financial close. Translate the journey into business language. ` +
+            `Financial model: €8,000–€15,000 per 1% OEE improvement per line per month; ` +
+            `3–5 OEE points recovery in first quarter; second-quality elimination removes ` +
+            `double-cost AND CO₂ liability in the same intervention. ` +
+            `Then deliver the closing question as a soft mirror: reflect the visitor's ` +
+            `own production gap back to them. Not about technology — about their operation. ` +
+            `End with: "If you'd like to explore what this looks like for your operation, ` +
+            `the team at ARDICTECH would be glad to continue the conversation. → ardic.ai"`,
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
-            { // Click #1
+        ctaSteps: [
+            // STEP 0: Financial translation + mirror question
+            {
+                ctaLabel: 'Show the numbers →',
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
-                screenText: `The OEE Hierarchy shows the full picture: Factory → Line → Machine → Parameter. <w:2000>Every number has a cause. Every cause has a cost.<clck>`,
-                ariaApi: `Based on everything the visitor has just seen — the invisible throughput loss, the double cost of second quality, the CO₂ dimension, and the autonomous recovery — what is the single most important question a factory manager or CEO should ask themselves after watching this demo? Not about technology. Not about software. About their own operation, their own numbers, their own production gap.`,
+
+                screenText:
+                    `The OEE Hierarchy shows the full picture:\n` +
+                    `Factory → Line → Machine → Parameter.` +
+                    `<w:2500>\n\n` +
+                    `Every number has a cause.\n` +
+                    `Every cause has a cost.` +
+                    `<w:2000><clck>`,
+
+                screenTextAlign: 'center',
+                screenTextWeight: 'bold',
+                screenTextSize: 'md',
+
+                ariaApi:
+                    `Based on everything the visitor just experienced — invisible throughput loss, ` +
+                    `double cost of second quality, the CO₂ dimension, and autonomous recovery — ` +
+                    `what is the single most important question a factory owner should ask ` +
+                    `themselves after watching this demo? Not about technology. About their ` +
+                    `own operation, their own numbers, their own production gap.`,
+
                 ariaInputEnabled: true,
             },
-            { // Click #2
+
+            // STEP 1: CTA + close
+            {
                 slideImageUrl: '/demo/SentialFactory.png',
-                screenText: `This demo runs in your browser. The platform behind it runs in real factories. <w:2000>16 facilities. 1 million+ IoT endpoints. Running since 2008.<clck>`,
-                ariaLocal: `Thank you for taking the time to walk through this journey. If something resonated — the invisible throughput loss, the double cost of rework, the CO₂ dimension, or the 03:47 incident — that instinct is worth exploring. ARDICTECH has worked with manufacturers facing exactly these questions since 2008, across 16 facilities and over a million IoT endpoints. Restart the demo any time to explore a different scenario. Or reach out directly. → ardic.ai`,
+
+                screenText:
+                    `<cls><w:800>` +
+                    `How much total waste did your factory produce last year?\n\n` +
+                    `If you don't know the answer\n` +
+                    `— that is exactly the problem we solve.` +
+                    `<w:4000><clck>`,
+
+                screenTextAlign: 'center',
+                screenTextWeight: 'bold',
+                screenTextSize: 'md',
+
+                ariaLocal:
+                    `<cls><w:500>` +
+                    `Thank you for taking the time to walk through this journey.\n\n` +
+                    `If something resonated — the invisible throughput loss, the double cost ` +
+                    `of rework, the CO₂ dimension, or the 03:47 incident — that instinct ` +
+                    `is worth exploring.\n\n` +
+                    `ARDICTECH has worked with manufacturers facing exactly these questions ` +
+                    `since 2008. 16 facilities. Over a million IoT endpoints.\n\n` +
+                    `Restart the demo any time. Or reach out directly.\n` +
+                    `→ ardic.ai`,
+                ariaLocalSize: 'sm',
+
                 ariaInputEnabled: true,
             },
         ],

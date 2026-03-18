@@ -104,26 +104,26 @@ describe('No System act — pure narrative (no mediaInstruction)', () => {
         click1 = noMgmtAct.ctaSteps![0];
     });
 
-    it('has exactly 4 ctaSteps', () => {
-        expect(noMgmtAct.ctaSteps).toHaveLength(4);
+    it('has exactly 2 ctaSteps', () => {
+        expect(noMgmtAct.ctaSteps).toHaveLength(2);
     });
 
 
 
-    it('Click #1 has no mediaInstruction (pure narrative step)', () => {
+    it('Click #1 has mediaInstruction chart:conveyor_speed', () => {
         /**
-         * Click #1 is a narrative step — ARIA input enabled for Q&A.
-         * No chart: the story is "everything looks fine on the outside."
+         * Click #1 shows the live conveyor speed chart — the hero visual
+         * making the invisible throughput loss visible.
          */
-        expect(click1.mediaInstruction).toBeUndefined();
+        expect(click1.mediaInstruction).toBe('chart:conveyor_speed');
     });
 
-    it('Click #3 has mediaInstruction chart:conveyor_speed', () => {
+    it('Click #2 has no mediaInstruction (transition step)', () => {
         /**
-         * Click #3 shows the live conveyor speed chart — making the invisible
-         * throughput loss visible for the first time.
+         * Click #2 is a financial translation + transition step.
+         * No chart — the story moves to the dashboard act.
          */
-        expect(noMgmtAct.ctaSteps![2].mediaInstruction).toBe('chart:conveyor_speed');
+        expect(noMgmtAct.ctaSteps![1].mediaInstruction).toBeUndefined();
     });
 });
 
