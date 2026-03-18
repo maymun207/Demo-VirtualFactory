@@ -171,7 +171,7 @@ OEE, quality, and throughput. End with a clear forward hook pointing to the
          */
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start the factory →',
                 slideImageUrl: '/demo/Welcome.png',
@@ -243,13 +243,18 @@ Tone: quiet intensity. The factory looks fine from the outside. The tragedy is i
          */
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start >NoSystem',
                 slideImageUrl: '/demo/ACT-1a.png',
                 delayMs: 1000,
-                screenText: `<cls>`,
-                ariaLocal: `<cls>`,
+                screenText: `Every dip on that chart is a silent transaction: energy in, zero output, no record.
+
+At a factory producing 10 million tiles per year, a 3% throughput gap from conveyor drift costs approximately €180,000–€240,000 annually in lost production capacity — before counting the energy wasted during idle periods.
+
+No one filed a report. No alarm was triggered. It happened, cost money, and disappeared.
+
+→ What if we at least had a dashboard?`,
                 ariaInputEnabled: false,
             },
             { // Click #2
@@ -323,7 +328,7 @@ second quality, scrap, or machine parameter issues. The story remains throughput
             'Still SCN-001 — only throughput and energy, no defects. ' +
             'End with: "→ The number raises a question. The dashboard cannot answer it."',
 
-                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-2.png',
                 screenText: `We added a dashboard. OEE. Throughput. Energy. All visible now. <w:1500>But can we explain any of them?<clck>`,
@@ -394,7 +399,7 @@ Pain is entirely internal. Tone: controlled revelation — this is the discovery
             'meaning every affected tile carries excess embedded carbon that also travels to the rework facility. ' +
             'Tone: controlled revelation. End with: "→ Let\'s look at a specific tile."',
 
-                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-3.png',
                 screenText: `New scenario: Kiln Temperature Crisis. The kiln is running +14°C above specification. <w:1500>Watch the orange tiles appear on the conveyor. Every one of them has a story.<clck>`,
@@ -461,7 +466,7 @@ CO₂ is now queryable — as accessible as OEE or quality data.
             'and invite them to follow the guided queries or type their own question in the CWF panel below. ' +
             'End with: "→ Let\'s ask."',
 
-                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-4a.png',
                 screenText: `New scenario: Glaze Viscosity Drift. Subtle. Slow-building. Expensive when ignored. <w:1500>First question — from the CEO.<clck>`,
@@ -552,7 +557,7 @@ The Copilot did not alert someone — it acted.
             'After the log, add ONLY this one sentence: ' +
             '"The customer received only first-quality tiles. The Copilot did not alert someone — it acted."',
 
-                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-4d.png',
                 screenText: `New scenario: Multi-Station Cascade Failure. Press + Kiln failing simultaneously. <w:1500>The Copilot is now active. Watch the OEE Hierarchy on the left.<clck>`,
@@ -614,7 +619,7 @@ The closing question IS the mechanism. Be precise, credible, and quiet in convic
             'End with: "If you\'d like to explore what this looks like for your specific operation, ' +
             'the team at ARDICTECH would be glad to continue the conversation. → ardic.ai"',
 
-                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
                 screenText: `The OEE Hierarchy shows the full picture: Factory → Line → Machine → Parameter. <w:2000>Every number has a cause. Every cause has a cost.<clck>`,

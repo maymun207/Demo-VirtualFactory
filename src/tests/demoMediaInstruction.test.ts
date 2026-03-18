@@ -90,7 +90,6 @@ describe('No System act — pure narrative (no mediaInstruction)', () => {
      * chart:conveyor_speed now lives in the Basic System act (see next describe block).
      */
     let click1: CtaStep;
-    let click2: CtaStep;
 
     let noMgmtAct: (typeof import('../lib/params/demoSystem/demoScript'))['DEMO_ACTS'][number];
 
@@ -103,7 +102,6 @@ describe('No System act — pure narrative (no mediaInstruction)', () => {
         }
         noMgmtAct = act;
         click1 = noMgmtAct.ctaSteps![0];
-        click2 = noMgmtAct.ctaSteps![1];
     });
 
     it('has exactly 4 ctaSteps', () => {
