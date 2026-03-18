@@ -130,12 +130,13 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(welcome.id).toBe('welcome');
         });
 
-        it('has exactly 1 ctaStep', () => {
+        it('has exactly 2 ctaSteps', () => {
             /**
-             * Welcome has 1 CTA step:
-             *   1. Shows introductory screenText and auto-transitions to next act
+             * Welcome has 2 CTA steps:
+             *   1. "Continue" — shows Welcome slide, ARIA input enabled
+             *   2. "Next" — ARIA input enabled
              */
-            expect(welcome.ctaSteps).toHaveLength(1);
+            expect(welcome.ctaSteps).toHaveLength(2);
         });
 
         it('act has scenarioCode: SCN-001 (loaded at act entry)', () => {
@@ -150,8 +151,8 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(welcome.ctaSteps![0].ariaInputEnabled).toBe(false);
         });
 
-        it('Click #1 — transitions to next act', () => {
-            expect(welcome.ctaSteps![0].transitionTo).toBe('next');
+        it('Click #2 — ARIA input is disabled (narration only)', () => {
+            expect(welcome.ctaSteps![1].ariaInputEnabled).toBe(false);
         });
 
         it('act-level panelActions is empty (clean slate)', () => {
@@ -168,13 +169,15 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(noManagement.id).toBe('no-management');
         });
 
-        it('has exactly 2 ctaSteps', () => {
+        it('has exactly 4 ctaSteps', () => {
             /**
-             * No System act has 2 steps:
-             *   1. ARIA input enabled for narrative
-             *   2. ARIA input enabled for Q&A
+             * No System act has 4 steps:
+             *   1. Clean slate (cls only)
+             *   2. Narrative + ariaApi
+             *   3. Slide + conveyor speed chart tease
+             *   4. Chart + ariaLocal narrative
              */
-            expect(noManagement.ctaSteps).toHaveLength(2);
+            expect(noManagement.ctaSteps).toHaveLength(4);
         });
 
         it('act-level scenarioCode is null (SCN-001 still active from welcome)', () => {
@@ -185,12 +188,12 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(noManagement.scenarioCode).toBeNull();
         });
 
-        it('Click #1 — ARIA input is enabled', () => {
-            expect(noManagement.ctaSteps![0].ariaInputEnabled).toBe(true);
+        it('Click #1 — ARIA input is disabled (transition step)', () => {
+            expect(noManagement.ctaSteps![0].ariaInputEnabled).toBe(false);
         });
 
-        it('Click #2 — ARIA input is enabled', () => {
-            expect(noManagement.ctaSteps![1].ariaInputEnabled).toBe(true);
+        it('Click #2 — ARIA input is disabled', () => {
+            expect(noManagement.ctaSteps![1].ariaInputEnabled).toBe(false);
         });
 
         it('act-level panelActions close all 4 panels (zero digital tools)', () => {
@@ -198,7 +201,7 @@ describe('DEMO_ACTS — data integrity', () => {
              * No System era simulates a factory with zero digital tools —
              * all panels are closed at act entry.
              */
-            expect(noManagement.panelActions).toHaveLength(4);
+            expect(noManagement.panelActions).toHaveLength(5);
             noManagement.panelActions.forEach(pa => expect(pa.state).toBe('close'));
         });
     });

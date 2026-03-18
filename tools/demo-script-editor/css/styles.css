@@ -66,6 +66,28 @@ html, body {
 }
 .btn-secondary:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
+/* "📂 Open & Import" — amber accent to distinguish from Export (blue) and Save (green) */
+.btn-import {
+    padding: 7px 16px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    background: rgba(251, 191, 36, 0.15);
+    color: #fcd34d;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.btn-import:hover:not(:disabled) {
+    background: rgba(251, 191, 36, 0.28);
+    color: #fff;
+}
+.btn-import:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 /* ─── Tabs ─────────────────────────────────────────────────────── */
 #stage-tabs {
     display: flex;

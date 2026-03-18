@@ -755,8 +755,8 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                     }));
                 },
                 onClear: () => {
-                    /** <cls> — remove the slide image from screen */
-                    set({ currentSlide: null });
+                    /** <cls> — clear entire demo screen: slide + text overlay + chart + ARIA thread */
+                    set({ currentSlide: null, currentScreenText: null, currentMediaInstruction: null, messages: [] });
                 },
                 onClearMI: () => {
                     /** <clmi> — remove the active media instruction */
@@ -827,7 +827,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                         /** Accumulate ARIA Local text — inject as single bubble at end */
                         localTextAcc += value;
                     },
-                    onClear: () => set({ currentSlide: null }),
+                    onClear: () => set({ currentSlide: null, currentScreenText: null, currentMediaInstruction: null, messages: [] }),
                     onClearMI: () => set({ currentMediaInstruction: null }),
                     onWait: async (ms) => { await sleep(ms); },
                     onShowMI: () => {

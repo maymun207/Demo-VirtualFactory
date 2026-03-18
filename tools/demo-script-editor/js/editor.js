@@ -28,6 +28,20 @@ function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { }
 }
 
+/**
+ * loadImportedState — replaces the in-memory state with imported data,
+ * persists to localStorage, and re-renders the entire UI.
+ * Called by importer.js after parsing a demoScript.ts file.
+ *
+ * @param {Object} newState - A complete editor state object { activeStageId, stages }
+ */
+window.loadImportedState = function (newState) {
+    state = newState;
+    save();
+    renderTabs();
+    renderStage();
+};
+
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function () {

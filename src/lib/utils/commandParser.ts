@@ -6,7 +6,7 @@
  * (demoStore.ts) to process screenText and ARIA Local fields.
  *
  * SUPPORTED COMMANDS (all case-sensitive):
- *   <cls>    — clear demo screen (removes the current slide image)
+ *   <cls>    — clear entire demo screen (slide image + text overlay + chart)
  *   <clmi>   — clear media instruction (removes the active chart/graph)
  *   <w:N>    — wait N milliseconds (N must be a positive integer)
  *   <MI>     — activate the step's mediaInstruction (show chart/graph)

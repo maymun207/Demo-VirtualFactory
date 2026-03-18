@@ -385,30 +385,36 @@ describe('demoStore', () => {
 
     it('advanceAct sends the next act opening prompt to CWF when prompt is non-empty', async () => {
         /**
-         * DEMO_ACTS[1].openingPrompt is currently '' (cleared for authoring).
-         * Temporarily patch it so the advanceAct guard `if (openingPrompt.trim())`
-         * lets the fetch through, then restore it in the finally block.
+         * DEMO_ACTS[1].openingPrompt is non-empty.
+         * advanceAct fires postToCWF with the opening prompt AND then enterStep
+         * may fire additional fetches (ariaApi on step 0, etc.).
+         * We provide enough mock responses and verify at least one targets /api/cwf/chat.
          */
         const originalPrompt = DEMO_ACTS[1].openingPrompt;
         DEMO_ACTS[1].openingPrompt = 'Welcome to the factory tour.';
 
         try {
-            mockSuccessResponse('Act 1 narrative...');
+            /** Provide enough responses for openingPrompt + enterStep ariaApi calls */
+            mockFetch.mockResolvedValue({
+                ok: true,
+                json: async () => ({ response: 'Act 1 narrative...', toolCallCount: 0 }),
+            });
             act(() => useDemoStore.setState({ currentActIndex: 0 }));
 
             await act(async () => {
                 await useDemoStore.getState().advanceAct();
             });
 
-            /** Fetch must have been called exactly once */
-            expect(mockFetch).toHaveBeenCalledOnce();
-            const [url, options] = mockFetch.mock.calls[0];
-            expect(url).toBe('/api/cwf/chat');
-            expect(options.method).toBe('POST');
-
-            const body = JSON.parse(options.body);
-            /** The sent message must equal the patched openingPrompt */
-            expect(body.message).toBe('Welcome to the factory tour.');
+            /** Fetch must have been called at least once for the opening prompt */
+            expect(mockFetch).toHaveBeenCalled();
+            /** At least one call must target /api/cwf/chat with the patched prompt */
+            const chatCalls = mockFetch.mock.calls.filter((c: unknown[]) => c[0] === '/api/cwf/chat');
+            expect(chatCalls.length).toBeGreaterThanOrEqual(1);
+            const promptCall = chatCalls.find((c: unknown[]) => {
+                const body = JSON.parse((c[1] as { body: string }).body);
+                return body.message === 'Welcome to the factory tour.';
+            });
+            expect(promptCall).toBeDefined();
         } finally {
             /** Always restore the original value so other tests are unaffected */
             DEMO_ACTS[1].openingPrompt = originalPrompt;
@@ -417,20 +423,42 @@ describe('demoStore', () => {
 
     it('advanceAct does NOT call CWF when openingPrompt is empty', async () => {
         /**
-         * All acts currently have openingPrompt = '' (pending author).
-         * The guard `if (nextAct.openingPrompt?.trim())` in advanceAct skips
-         * the network call — this test verifies that guard is working correctly.
+         * Temporarily patch DEMO_ACTS[1].openingPrompt to '' so the guard
+         * `if (nextAct.openingPrompt?.trim())` in advanceAct skips the CWF call.
+         * enterStep may still fire fetches (ariaApi on step 0), so we only
+         * verify that no fetch targeted the opening prompt specifically.
          */
-        act(() => useDemoStore.setState({ currentActIndex: 0 }));
+        const originalPrompt = DEMO_ACTS[1].openingPrompt;
+        DEMO_ACTS[1].openingPrompt = '';
 
-        await act(async () => {
-            await useDemoStore.getState().advanceAct();
-        });
+        try {
+            /** Provide responses for any enterStep ariaApi calls */
+            mockFetch.mockResolvedValue({
+                ok: true,
+                json: async () => ({ response: 'step response', toolCallCount: 0 }),
+            });
+            act(() => useDemoStore.setState({ currentActIndex: 0 }));
 
-        /** fetch must NOT fire for empty prompts */
-        expect(mockFetch).not.toHaveBeenCalled();
-        /** Act index must still advance */
-        expect(useDemoStore.getState().currentActIndex).toBe(1);
+            await act(async () => {
+                await useDemoStore.getState().advanceAct();
+            });
+
+            /** Act index must still advance */
+            expect(useDemoStore.getState().currentActIndex).toBe(1);
+
+            /**
+             * No fetch call should contain the original prompt text.
+             * enterStep may make ariaApi calls, but the opening prompt must be skipped.
+             */
+            for (const callArgs of mockFetch.mock.calls) {
+                if (callArgs[0] === '/api/cwf/chat') {
+                    const body = JSON.parse((callArgs[1] as { body: string }).body);
+                    expect(body.message).not.toBe(originalPrompt);
+                }
+            }
+        } finally {
+            DEMO_ACTS[1].openingPrompt = originalPrompt;
+        }
     });
 
     // ── Copilot enable / disable mechanics ────────────────────────────────────

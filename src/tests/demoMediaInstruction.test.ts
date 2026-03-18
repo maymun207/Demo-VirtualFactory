@@ -92,25 +92,25 @@ describe('No System act — pure narrative (no mediaInstruction)', () => {
     let click1: CtaStep;
     let click2: CtaStep;
 
+    let noMgmtAct: (typeof import('../lib/params/demoSystem/demoScript'))['DEMO_ACTS'][number];
+
     beforeEach(async () => {
         /** Import lazily to avoid side effects at module evaluation time. */
         const { DEMO_ACTS } = await import('../lib/params/demoSystem/demoScript');
-        const noMgmtAct = DEMO_ACTS.find((a) => a.id === 'no-management');
-        if (!noMgmtAct || !noMgmtAct.ctaSteps) {
+        const act = DEMO_ACTS.find((a) => a.id === 'no-management');
+        if (!act || !act.ctaSteps) {
             throw new Error('no-management act or ctaSteps missing from DEMO_ACTS');
         }
-        click1 = noMgmtAct.ctaSteps[0];
-        click2 = noMgmtAct.ctaSteps[1];
+        noMgmtAct = act;
+        click1 = noMgmtAct.ctaSteps![0];
+        click2 = noMgmtAct.ctaSteps![1];
     });
 
-    it('has exactly 2 ctaSteps — pure narrative, no chart', () => {
-        /**
-         * The No System act was simplified to 2 narrative steps.
-         * mediaInstruction was removed when the chart moved to the Basic System act.
-         */
-        expect(click1).toBeDefined();
-        expect(click2).toBeDefined();
+    it('has exactly 4 ctaSteps', () => {
+        expect(noMgmtAct.ctaSteps).toHaveLength(4);
     });
+
+
 
     it('Click #1 has no mediaInstruction (pure narrative step)', () => {
         /**
@@ -120,12 +120,12 @@ describe('No System act — pure narrative (no mediaInstruction)', () => {
         expect(click1.mediaInstruction).toBeUndefined();
     });
 
-    it('Click #2 has no mediaInstruction (pure narrative step)', () => {
+    it('Click #4 has mediaInstruction chart:conveyor_speed', () => {
         /**
-         * Click #2 continues the narrative — everything LOOKS fine but
-         * invisible losses are happening. The chart is deferred to Basic System.
+         * Click #4 shows the live conveyor speed chart — making the invisible
+         * throughput loss visible for the first time.
          */
-        expect(click2.mediaInstruction).toBeUndefined();
+        expect(noMgmtAct.ctaSteps![3].mediaInstruction).toBe('chart:conveyor_speed');
     });
 });
 
@@ -149,11 +149,10 @@ describe('Basic System act — chart:conveyor_speed is on Click #2', () => {
         click2 = basicAct.ctaSteps[1]; // Click #2 = index 1
     });
 
-    it('Click #2 has no mediaInstruction (per-act authoring pending)', () => {
+    it('Click #2 has no mediaInstruction (narrative only)', () => {
         /**
-         * ctaSteps currently only set ariaInputEnabled. mediaInstruction
-         * will be added when per-act authoring is completed.
-         * Until then, no chart is rendered on this step.
+         * mediaInstruction was moved to the No System act.
+         * Basic System Click #2 is now a pure narrative step.
          */
         expect(click2.mediaInstruction).toBeUndefined();
     });

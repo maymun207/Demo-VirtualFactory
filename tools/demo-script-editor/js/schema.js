@@ -124,7 +124,7 @@ window.MEDIA_INSTRUCTIONS = [
 ];
 
 /** Maximum click steps allowed per stage */
-window.MAX_STEPS = 4;
+window.MAX_STEPS = 10;
 
 /** localStorage key for persisting editor data between sessions */
 window.STORAGE_KEY = 'vf-demo-script-editor-v1';
