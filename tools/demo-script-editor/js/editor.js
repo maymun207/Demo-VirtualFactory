@@ -116,6 +116,7 @@ function renderStage() {
     addSelectRow(tbody, steps, stageId, 'Demo Screen',      'slideImageUrl',   SLIDES);
     addSelectRow(tbody, steps, stageId, 'Media Instruction','mediaInstruction', MEDIA_INSTRUCTIONS);
     addSelectRow(tbody, steps, stageId, 'Scenario',         'scenarioCode',    SCENARIOS);
+    addSelectRow(tbody, steps, stageId, 'Work Order',       'workOrderId',     WORK_ORDERS);
     addNumberRow(tbody, steps, stageId, 'Delay (ms)',  'delayMs');
     addTextareaRow(tbody, steps, stageId, 'Screen Text', 'screenText',
                    'Text shown on the demo screen surface');

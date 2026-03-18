@@ -75,6 +75,9 @@ import { useCopilotStore } from './copilotStore';
 /** simulationStore — needed to execute simulation actions (start/stop/reset) */
 import { useSimulationStore } from './simulationStore';
 
+/** workOrderStore — needed to switch work orders from CtaStep.workOrderId */
+import { useWorkOrderStore } from './workOrderStore';
+
 /** executeSimulationAction — extracted utility for sim lifecycle control */
 import { executeSimulationAction } from '../lib/utils/simActionExecutor';
 
@@ -718,6 +721,11 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             /** Load the scenario if specified */
             if (step.scenarioCode) {
                 applyScenario(step.scenarioCode);
+            }
+
+            /** Switch the active Work Order if specified */
+            if (step.workOrderId) {
+                useWorkOrderStore.getState().setSelectedWorkOrderId(step.workOrderId);
             }
 
             /** Wait delayMs before showing screen text */

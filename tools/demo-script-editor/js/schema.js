@@ -55,6 +55,14 @@ window.SCENARIOS = [
     { id: 'SCN-004', label: 'SCN-004 · Multi-Station Cascade' },
 ];
 
+/** Work Order options — id = workOrderId in demoScript.ts (CtaStep) */
+window.WORK_ORDERS = [
+    { id: '',          label: '— (no change)' },
+    { id: 'WorkID#1',  label: 'WorkID #1 · 530 tiles · CeramID WEY' },
+    { id: 'WorkID#2',  label: 'WorkID #2 · 850 tiles · CeramID REY' },
+    { id: 'WorkID#3',  label: 'WorkID #3 · 1100 tiles · CeramID OEY' },
+];
+
 /**
  * SLIDES_FALLBACK — used when the editor is opened as a file:// URL and
  * the fetch to /api/demo-slides cannot succeed.
@@ -255,6 +263,7 @@ window.createEmptyStep = function () {
         /** mediaInstruction: dynamic chart/viz key (or '' for static slide). */
         mediaInstruction:  '',
         scenarioCode:      '',
+        workOrderId:       '',
         delayMs:           '',
         screenText:        '',
         ariaLocal:         '',

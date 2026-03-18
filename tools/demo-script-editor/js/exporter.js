@@ -59,6 +59,9 @@ function buildStepFields(step) {
     if (step.scenarioCode)
         lines.push('scenarioCode: ' + q(step.scenarioCode) + ',');
 
+    if (step.workOrderId)
+        lines.push('workOrderId: ' + q(step.workOrderId) + ',');
+
     if (step.delayMs !== '' && step.delayMs !== null && step.delayMs !== undefined)
         lines.push('delayMs: ' + Number(step.delayMs) + ',');
 

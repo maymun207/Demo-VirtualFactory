@@ -15,6 +15,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { DEMO_ACTS } from '../lib/params/demoSystem/demoScript';
+import { WORK_ORDERS } from '../lib/params/demo';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,9 @@ const VALID_PANELS = [
 
 /** All valid CtaStep.simulationAction values */
 const VALID_SIM_ACTIONS = ['start', 'stop', 'reset', 'reset-start'];
+
+/** All valid Work Order IDs (extracted from WORK_ORDERS) */
+const VALID_WORK_ORDER_IDS = WORK_ORDERS.map(wo => wo.id);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +97,30 @@ describe('DEMO_ACTS — data integrity', () => {
         });
     });
 
+    // ── Work Order validation ──────────────────────────────────────────────────
+
+    it('workOrderId references a valid WORK_ORDERS entry when set on a step', () => {
+        DEMO_ACTS.forEach(act => {
+            act.ctaSteps?.forEach((step, stepIdx) => {
+                if (step.workOrderId) {
+                    expect(
+                        VALID_WORK_ORDER_IDS,
+                        `workOrderId '${step.workOrderId}' in act '${act.id}' step #${stepIdx + 1} is not a valid Work Order ID`,
+                    ).toContain(step.workOrderId);
+                }
+            });
+        });
+    });
+
+    it('WORK_ORDERS has at least one entry for workOrderId validation', () => {
+        expect(WORK_ORDERS.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('all WORK_ORDERS entries have unique IDs', () => {
+        const ids = WORK_ORDERS.map(wo => wo.id);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
     // ── Welcome act specific tests ─────────────────────────────────────────────
 
     describe("Welcome act (id: 'welcome')", () => {
@@ -102,13 +130,12 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(welcome.id).toBe('welcome');
         });
 
-        it('has exactly 2 ctaSteps', () => {
+        it('has exactly 1 ctaStep', () => {
             /**
-             * Welcome has 2 CTA steps:
-             *   1. Shows the ACT-0 overview slide
-             *   2. Presenter advances — ARIA input enabled for Q&A
+             * Welcome has 1 CTA step:
+             *   1. Shows introductory screenText and auto-transitions to next act
              */
-            expect(welcome.ctaSteps).toHaveLength(2);
+            expect(welcome.ctaSteps).toHaveLength(1);
         });
 
         it('act has scenarioCode: SCN-001 (loaded at act entry)', () => {
@@ -119,16 +146,12 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(welcome.scenarioCode).toBe('SCN-001');
         });
 
-        it('Click #1 — shows ACT-0 slide', () => {
-            expect(welcome.ctaSteps![0].slideImageUrl).toBe('/demo/ACT-0.png');
+        it('Click #1 — ARIA input is disabled (narration only)', () => {
+            expect(welcome.ctaSteps![0].ariaInputEnabled).toBe(false);
         });
 
-        it('Click #1 — ARIA input is enabled', () => {
-            expect(welcome.ctaSteps![0].ariaInputEnabled).toBe(true);
-        });
-
-        it('Click #2 — ARIA input is enabled', () => {
-            expect(welcome.ctaSteps![1].ariaInputEnabled).toBe(true);
+        it('Click #1 — transitions to next act', () => {
+            expect(welcome.ctaSteps![0].transitionTo).toBe('next');
         });
 
         it('act-level panelActions is empty (clean slate)', () => {
@@ -217,6 +240,53 @@ describe('DEMO_ACTS — data integrity', () => {
 
         it('act-level scenarioCode is SCN-001', () => {
             expect(basicSystem.scenarioCode).toBe('SCN-001');
+        });
+    });
+
+    // ── CtaStep interface field type safety ────────────────────────────────────
+
+    describe('CtaStep field type safety', () => {
+        it('workOrderId is string or null/undefined when present on any step', () => {
+            DEMO_ACTS.forEach(act => {
+                act.ctaSteps?.forEach((step, stepIdx) => {
+                    if (step.workOrderId !== undefined && step.workOrderId !== null) {
+                        expect(
+                            typeof step.workOrderId,
+                            `workOrderId in act '${act.id}' step #${stepIdx + 1} must be a string`,
+                        ).toBe('string');
+                    }
+                });
+            });
+        });
+
+        it('scenarioCode is string or null/undefined when present on any step', () => {
+            DEMO_ACTS.forEach(act => {
+                act.ctaSteps?.forEach((step, stepIdx) => {
+                    if (step.scenarioCode !== undefined && step.scenarioCode !== null) {
+                        expect(
+                            typeof step.scenarioCode,
+                            `scenarioCode in act '${act.id}' step #${stepIdx + 1} must be a string`,
+                        ).toBe('string');
+                    }
+                });
+            });
+        });
+
+        it('delayMs is a non-negative number when present on any step', () => {
+            DEMO_ACTS.forEach(act => {
+                act.ctaSteps?.forEach((step, stepIdx) => {
+                    if (step.delayMs !== undefined) {
+                        expect(
+                            typeof step.delayMs,
+                            `delayMs in act '${act.id}' step #${stepIdx + 1} must be a number`,
+                        ).toBe('number');
+                        expect(
+                            step.delayMs,
+                            `delayMs in act '${act.id}' step #${stepIdx + 1} must be non-negative`,
+                        ).toBeGreaterThanOrEqual(0);
+                    }
+                });
+            });
         });
     });
 
