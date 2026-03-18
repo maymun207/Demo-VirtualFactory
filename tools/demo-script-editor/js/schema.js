@@ -266,8 +266,17 @@ window.createEmptyStep = function () {
         workOrderId:       '',
         delayMs:           '',
         screenText:        '',
+        screenTextAlign:   'center',   /* 'left' | 'center' | 'right' */
+        screenTextWeight:  'bold',     /* 'normal' | 'bold' */
+        screenTextSize:    'lg',       /* 'sm' | 'md' | 'lg' | 'xl' */
         ariaLocal:         '',
+        ariaLocalAlign:    'left',
+        ariaLocalWeight:   'normal',
+        ariaLocalSize:     'md',
         ariaApi:           '',
+        ariaApiAlign:      'left',
+        ariaApiWeight:     'normal',
+        ariaApiSize:       'md',
         ariaInputEnabled:  true,
         panelActions,
         simulationAction:  '',   /* '' = no change */

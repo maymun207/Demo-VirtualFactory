@@ -75,6 +75,17 @@ export interface PanelAction {
  */
 export type MediaInstruction = 'chart:conveyor_speed';
 
+// ─── Screen Text Formatting Types ──────────────────────────────────────────
+
+/** Text alignment for the screenText overlay on the demo screen. */
+export type ScreenTextAlign = 'left' | 'center' | 'right';
+
+/** Font weight for screenText. */
+export type ScreenTextWeight = 'normal' | 'bold';
+
+/** Preset font sizes for screenText (maps to px in DemoMediaView). */
+export type ScreenTextSize = 'sm' | 'md' | 'lg' | 'xl';
+
 // ─── CTA Step ────────────────────────────────────────────────────────────────
 
 /**
@@ -98,7 +109,19 @@ export interface CtaStep {
     workOrderId?: string | null;
     delayMs?: number;
     screenText?: string;
+    /** Text alignment for the screenText overlay. Default: 'center'. */
+    screenTextAlign?: ScreenTextAlign;
+    /** Font weight for screenText. Default: 'bold'. */
+    screenTextWeight?: ScreenTextWeight;
+    /** Font size preset for screenText. Default: 'lg' (34px). */
+    screenTextSize?: ScreenTextSize;
     ariaLocal?: string;
+    /** Text alignment for ARIA Local chat bubbles. Default: 'left'. */
+    ariaLocalAlign?: ScreenTextAlign;
+    /** Font weight for ARIA Local chat bubbles. Default: 'normal'. */
+    ariaLocalWeight?: ScreenTextWeight;
+    /** Font size preset for ARIA Local chat bubbles. Default: 'md'. */
+    ariaLocalSize?: ScreenTextSize;
     ariaApi?: string;
     ariaInputEnabled?: boolean;
     panelActions?: PanelAction[];
@@ -171,13 +194,32 @@ OEE, quality, and throughput. End with a clear forward hook pointing to the
          */
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start the factory →',
-                slideImageUrl: '/demo/Welcome.png',
-                delayMs: 2500,
-                screenText: `<cls>   A ceramic tile factory — live, right now.<w:1500>  -Every tile.   -Every machine.   -Every gram of CO₂. <w:3000>  Nothing is invisible here.<w:3000> <cls> <clck>`,
-                ariaLocal: `<cls> <w:2000> <cls>  Welcome. I am ARIA — your AI guide through this factory. In the next few minutes, I will take you through four stages of digital transformation: a factory running blind, then one with basic visibility, then one with full traceability, and finally one that monitors and corrects itself autonomously. The factory behind me is starting right now. Watch the tiles move. Every tile you see will tell a story.  → Click to begin.`,
+                delayMs: 500,
+                screenText: `In this demo, you will see how advanced manufacturing intelligence transforms a factory with hidden production losses into a system that detects problems in real time, corrects them automatically, and recovers significant lost value.
+<w:3000><cls> 
+A ceramic tile factory — live, right now.<w:1500>  
+
+-Every tile.   
+-Every machine.   
+-Every gram of CO₂. <w:2000> 
+ 
+Nothing is invisible here!
+<w:3000> <cls>`,
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+                ariaLocal: `<cls> <w:2000> <cls>  
+Welcome. I am ARIA — your AI guide through this factory. In the next few minutes, I will take you through four stages of digital transformation: a factory running blind, then one with basic visibility, then one with full traceability, and finally one that monitors and corrects itself autonomously. 
+
+The factory behind me is starting right now. Watch the tiles move. 
+
+Every tile you see will tell a story. 
+
+→ Click to begin.`,
+                ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 simulationAction: 'start',
             },
@@ -185,8 +227,24 @@ OEE, quality, and throughput. End with a clear forward hook pointing to the
                 ctaLabel: 'Begin the journey →',
                 scenarioCode: 'SCN-001',
                 workOrderId: 'WorkID#3',
-                screenText: `<cls>   Seven stations. One production line.  Press → Dryer → Glaze → Print →   Kiln → Sort → Package. <w:1500> One important thing to know before we start. <w:1000>`,
-                ariaLocal: `<cls> <w:1000> <cls>  The sorting station at the end of this line catches every non-conforming tile before it leaves the factory. Your customer always receives first-quality goods. Always.  The losses you are about to see are entirely internal — absorbed silently by the manufacturer, every shift, every day, invisible to everyone outside the building. That silence is exactly the problem. <w:2000>  → Continue`,
+                screenText: `<cls>   
+Seven stations. One production line.  
+
+Press → Dryer → Glaze → Print →   
+Kiln    → Sort → Package. <w:1500> 
+
+One important thing to know before we start. <w:1000>`,
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+                ariaLocal: `<cls> <w:1000> <cls>  
+
+The sorting station at the end of this line catches every non-conforming tile before it leaves the factory. Your customer always receives first-quality goods. Always.  
+
+The losses you are about to see are entirely internal — absorbed silently by the manufacturer, every shift, every day, invisible to everyone outside the building. 
+
+That silence is exactly the problem. <w:2000>  
+→ Continue`,
                 ariaInputEnabled: false,
                 transitionTo: 'next',
             },
@@ -243,38 +301,71 @@ Tone: quiet intensity. The factory looks fine from the outside. The tragedy is i
          */
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start >NoSystem',
-                slideImageUrl: '/demo/ACT-1a.png',
                 delayMs: 1000,
-                screenText: `Every dip on that chart is a silent transaction: energy in, zero output, no record.
+                screenText: `Every dip on that chart is a silent transaction: energy in, zero output, no record. <w:3200><cls>
 
-At a factory producing 10 million tiles per year, a 3% throughput gap from conveyor drift costs approximately €180,000–€240,000 annually in lost production capacity — before counting the energy wasted during idle periods.
+At a factory producing 10 million tiles per year, 
+a 3% throughput gap from conveyor drift costs approximately €180,000–€240,000 annually in lost production capacity 
+— before counting the energy wasted during idle periods. <w:2800><cls>
 
-No one filed a report. No alarm was triggered. It happened, cost money, and disappeared.
+No one filed a report. 
+No alarm was triggered. 
 
-→ What if we at least had a dashboard?`,
+It happened, cost money, and disappeared.
+
+What if we at least had a dashboard?<w:2500>`,
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+                ariaLocal: `<cls>`,
                 ariaInputEnabled: false,
             },
             { // Click #2
                 ctaLabel: 'Next >NoSystem',
-                delayMs: 3000,
-                screenText: `<cls> The factory looks normal. Tiles are moving. Machines are running. <w:1500> But watch the belt speed carefully <w:3000> <cls> <clck>`,
-                ariaApi: `Using the live simulation data for this session: what is the current conveyor speed compared to the nominal reference speed of 1.0?  How many tiles per hour are actually being produced versus the theoretical maximum if the belt ran at full speed continuously? And during any conveyor speed drops you can detect, what is the estimated energy cost of the Kiln and Dryer running without producing tiles?  Give me concrete numbers from the actual session data.`,
+                delayMs: 2000,
+                screenText: `<cls> 
+
+The factory looks normal. Tiles are moving. Machines are running. <w:2500> 
+
+But watch the belt speed carefully <w:3000><cls> <clck>`,
+                screenTextSize: 'sm',
+                ariaApi: `<cls>
+Using the live simulation data for this session: what is the current conveyor speed compared to the nominal reference speed of 1.0? <w:3000> 
+
+How many tiles per hour are actually being produced versus the theoretical maximum if the belt ran at full speed continuously?<w:3000>
+
+And during any conveyor speed drops you can detect, what is the estimated energy cost of the Kiln and Dryer running without producing tiles?  Give me concrete numbers from the actual session data.<:w1000>`,
                 ariaInputEnabled: false,
+                panelActions: [
+                    { panel: 'controlPanel', state: 'open' },
+                ],
             },
             { // Click #3
                 ctaLabel: 'Next >NoSystem',
-                slideImageUrl: '/demo/ACT-1b.png',
-                screenText: `This is the conveyor speed over time.<clmi><MI> <w:1000>Each dip = the Kiln keeps burning gas. The Dryer keeps drawing electricity. <w:1500>No tile moves. No alarm fires. No one knows.<clck>`,
-                ariaInputEnabled: true,
+                mediaInstruction: 'chart:conveyor_speed',
+                delayMs: 5000,
+                screenText: `This is the conveyor speed over time.<MI><w:6000>
+
+
+Each dip = the Kiln keeps burning gas. The Dryer keeps drawing electricity. <w:1500>
+
+No tile moves. 
+
+No alarm fires. 
+
+No one knows.<w:2000><clck>`,
+                screenTextAlign: 'left',
+                screenTextWeight: 'normal',
+                screenTextSize: 'sm',
+                ariaInputEnabled: false,
             },
             { // Click #4
                 ctaLabel: 'Next >NoSystem',
-                mediaInstruction: 'chart:conveyor_speed',
                 ariaLocal: `Every dip on that chart is a silent transaction: energy in, zero output, no record. At a factory producing 10 million tiles per year, a 3% throughput gap from conveyor drift costs approximately €180,000–€240,000 annually in lost production capacity — before counting the energy wasted during idle periods. No one filed a report. No alarm was triggered. It happened, cost money, and disappeared. → What if we at least had a dashboard?`,
-                ariaInputEnabled: true,
+                ariaInputEnabled: false,
             },
         ],
     },
@@ -328,7 +419,7 @@ second quality, scrap, or machine parameter issues. The story remains throughput
             'Still SCN-001 — only throughput and energy, no defects. ' +
             'End with: "→ The number raises a question. The dashboard cannot answer it."',
 
-                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-2.png',
                 screenText: `We added a dashboard. OEE. Throughput. Energy. All visible now. <w:1500>But can we explain any of them?<clck>`,
@@ -399,7 +490,7 @@ Pain is entirely internal. Tone: controlled revelation — this is the discovery
             'meaning every affected tile carries excess embedded carbon that also travels to the rework facility. ' +
             'Tone: controlled revelation. End with: "→ Let\'s look at a specific tile."',
 
-                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-3.png',
                 screenText: `New scenario: Kiln Temperature Crisis. The kiln is running +14°C above specification. <w:1500>Watch the orange tiles appear on the conveyor. Every one of them has a story.<clck>`,
@@ -466,7 +557,7 @@ CO₂ is now queryable — as accessible as OEE or quality data.
             'and invite them to follow the guided queries or type their own question in the CWF panel below. ' +
             'End with: "→ Let\'s ask."',
 
-                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-4a.png',
                 screenText: `New scenario: Glaze Viscosity Drift. Subtle. Slow-building. Expensive when ignored. <w:1500>First question — from the CEO.<clck>`,
@@ -557,7 +648,7 @@ The Copilot did not alert someone — it acted.
             'After the log, add ONLY this one sentence: ' +
             '"The customer received only first-quality tiles. The Copilot did not alert someone — it acted."',
 
-                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/ACT-4d.png',
                 screenText: `New scenario: Multi-Station Cascade Failure. Press + Kiln failing simultaneously. <w:1500>The Copilot is now active. Watch the OEE Hierarchy on the left.<clck>`,
@@ -619,7 +710,7 @@ The closing question IS the mechanism. Be precise, credible, and quiet in convic
             'End with: "If you\'d like to explore what this looks like for your specific operation, ' +
             'the team at ARDICTECH would be glad to continue the conversation. → ardic.ai"',
 
-                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
                 screenText: `The OEE Hierarchy shows the full picture: Factory → Line → Machine → Parameter. <w:2000>Every number has a cause. Every cause has a cost.<clck>`,

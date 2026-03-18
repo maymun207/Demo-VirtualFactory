@@ -481,3 +481,67 @@ html, body {
     color: rgba(255,255,255,0.55);
 }
 
+/* ─── Formatting Toolbar ───────────────────────────────────────── */
+
+.fmt-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.fmt-btn-group {
+    display: inline-flex;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.fmt-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.45);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    min-width: 24px;
+    text-align: center;
+}
+
+.fmt-btn:not(:last-child) {
+    border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.fmt-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.7);
+}
+
+.fmt-btn-active {
+    background: rgba(0, 210, 211, 0.18);
+    color: #00d2d3;
+}
+
+.fmt-btn-active:hover {
+    background: rgba(0, 210, 211, 0.25);
+    color: #00d2d3;
+}
+
+/* Dimmed state — toolbar inactive (no textarea focused) */
+.fmt-toolbar-dim {
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+/* Context label showing which field is being formatted */
+.fmt-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #00d2d3;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    width: 100%;
+    margin-bottom: 2px;
+}

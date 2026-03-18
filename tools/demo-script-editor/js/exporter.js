@@ -68,11 +68,35 @@ function buildStepFields(step) {
     if (step.screenText && step.screenText.trim())
         lines.push('screenText: ' + bt(step.screenText.trim()) + ',');
 
+    // Formatting fields — only emit when they differ from defaults
+    if (step.screenTextAlign && step.screenTextAlign !== 'center')
+        lines.push("screenTextAlign: '" + step.screenTextAlign + "',");
+    if (step.screenTextWeight && step.screenTextWeight !== 'bold')
+        lines.push("screenTextWeight: '" + step.screenTextWeight + "',");
+    if (step.screenTextSize && step.screenTextSize !== 'lg')
+        lines.push("screenTextSize: '" + step.screenTextSize + "',");
+
     if (step.ariaLocal && step.ariaLocal.trim())
         lines.push('ariaLocal: ' + bt(step.ariaLocal.trim()) + ',');
 
+    // ariaLocal formatting — only emit non-defaults (left/normal/md)
+    if (step.ariaLocalAlign && step.ariaLocalAlign !== 'left')
+        lines.push("ariaLocalAlign: '" + step.ariaLocalAlign + "',");
+    if (step.ariaLocalWeight && step.ariaLocalWeight !== 'normal')
+        lines.push("ariaLocalWeight: '" + step.ariaLocalWeight + "',");
+    if (step.ariaLocalSize && step.ariaLocalSize !== 'md')
+        lines.push("ariaLocalSize: '" + step.ariaLocalSize + "',");
+
     if (step.ariaApi && step.ariaApi.trim())
         lines.push('ariaApi: ' + bt(step.ariaApi.trim()) + ',');
+
+    // ariaApi formatting — only emit non-defaults (left/normal/md)
+    if (step.ariaApiAlign && step.ariaApiAlign !== 'left')
+        lines.push("ariaApiAlign: '" + step.ariaApiAlign + "',");
+    if (step.ariaApiWeight && step.ariaApiWeight !== 'normal')
+        lines.push("ariaApiWeight: '" + step.ariaApiWeight + "',");
+    if (step.ariaApiSize && step.ariaApiSize !== 'md')
+        lines.push("ariaApiSize: '" + step.ariaApiSize + "',");
 
     // Always emit ariaInputEnabled — it is a meaningful boolean flag
     lines.push('ariaInputEnabled: ' + (step.ariaInputEnabled ? 'true' : 'false') + ',');

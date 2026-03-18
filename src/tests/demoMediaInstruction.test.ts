@@ -118,12 +118,12 @@ describe('No System act — pure narrative (no mediaInstruction)', () => {
         expect(click1.mediaInstruction).toBeUndefined();
     });
 
-    it('Click #4 has mediaInstruction chart:conveyor_speed', () => {
+    it('Click #3 has mediaInstruction chart:conveyor_speed', () => {
         /**
-         * Click #4 shows the live conveyor speed chart — making the invisible
+         * Click #3 shows the live conveyor speed chart — making the invisible
          * throughput loss visible for the first time.
          */
-        expect(noMgmtAct.ctaSteps![3].mediaInstruction).toBe('chart:conveyor_speed');
+        expect(noMgmtAct.ctaSteps![2].mediaInstruction).toBe('chart:conveyor_speed');
     });
 });
 

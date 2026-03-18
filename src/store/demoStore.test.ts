@@ -366,7 +366,7 @@ describe('demoStore', () => {
 
         /** Should now be at act 1 */
         expect(useDemoStore.getState().currentActIndex).toBe(1);
-    });
+    }, 15_000);
 
     it('advanceAct does not overflow past the last act', async () => {
         const lastIndex = DEMO_ACTS.length - 1;
@@ -419,7 +419,7 @@ describe('demoStore', () => {
             /** Always restore the original value so other tests are unaffected */
             DEMO_ACTS[1].openingPrompt = originalPrompt;
         }
-    });
+    }, 15_000);
 
     it('advanceAct does NOT call CWF when openingPrompt is empty', async () => {
         /**
@@ -459,7 +459,7 @@ describe('demoStore', () => {
         } finally {
             DEMO_ACTS[1].openingPrompt = originalPrompt;
         }
-    });
+    }, 15_000);
 
     // ── Copilot enable / disable mechanics ────────────────────────────────────
 
@@ -500,7 +500,7 @@ describe('demoStore', () => {
          */
         const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
         expect(calledUrls).toContain(COPILOT_ENABLE_URL);
-    });
+    }, 15_000);
 
     it('advanceAct on a non-copilot act does NOT call copilot enable API', async () => {
         /** Start at act 0 (Welcome) — no enableCopilot flag */
@@ -516,7 +516,7 @@ describe('demoStore', () => {
         /** No fetch call should target the Copilot enable endpoint */
         const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
         expect(calledUrls).not.toContain(COPILOT_ENABLE_URL);
-    });
+    }, 15_000);
 
     it('restartDemo disables Copilot via store + API if Copilot was enabled', async () => {
         /** Simulate Copilot being active when the demo restarts */

@@ -134,6 +134,7 @@ function renderStage() {
     addNumberRow(tbody, steps, stageId, 'Delay (ms)',  'delayMs');
     addTextareaRow(tbody, steps, stageId, 'Screen Text', 'screenText',
                    'Text shown on the demo screen surface');
+    addFormattingToolbar(tbody, steps, stageId);
     addTextareaRow(tbody, steps, stageId, 'ARIA Local',  'ariaLocal',
                    'Scripted bubble — injected locally, no API call');
     addTextareaRow(tbody, steps, stageId, 'ARIA API',    'ariaApi',
@@ -243,6 +244,44 @@ function addSelectRow(tbody, steps, stageId, label, field, options) {
     });
 }
 
+// ─── Formatting Toolbar Registry ──────────────────────────────────────────────
+
+/**
+ * Module-level registry that lets textareas communicate with their column's
+ * formatting toolbar.  Reset each time renderStage() runs.
+ *
+ * fmtToolbars[stepIndex] = {
+ *     wrap,          // toolbar \<div\> element
+ *     label,         // small \<span\> showing "Screen Text" / "ARIA Local" etc.
+ *     activeField,   // currently targeted field key (e.g. 'screenText')
+ *     groups,        // { align: [...btns], weight: [...btns], size: [...btns] }
+ *     refresh(field) // reads step data and updates button highlights
+ * }
+ */
+var fmtToolbars = [];
+
+/** Formatting-aware textarea fields and their display names. */
+var FMT_FIELDS = {
+    screenText: 'Screen Text',
+    ariaLocal:  'ARIA Local',
+    ariaApi:    'ARIA API',
+};
+
+/** Suffix map: field → formatting property suffix */
+function fmtKey(field, prop) {
+    // screenText → screenTextAlign, ariaLocal → ariaLocalAlign, ariaApi → ariaApiAlign
+    if (field === 'screenText') return 'screenText' + prop.charAt(0).toUpperCase() + prop.slice(1);
+    if (field === 'ariaLocal')  return 'ariaLocal'  + prop.charAt(0).toUpperCase() + prop.slice(1);
+    return 'ariaApi' + prop.charAt(0).toUpperCase() + prop.slice(1);
+}
+
+/** Defaults per field */
+var FMT_DEFAULTS = {
+    screenText: { align: 'center', weight: 'bold',   size: 'lg' },
+    ariaLocal:  { align: 'left',   weight: 'normal', size: 'md' },
+    ariaApi:    { align: 'left',   weight: 'normal', size: 'md' },
+};
+
 function addTextareaRow(tbody, steps, stageId, label, field, desc) {
     const tr = tbody.insertRow();
     tr.appendChild(labelCell(label, desc));
@@ -256,9 +295,130 @@ function addTextareaRow(tbody, steps, stageId, label, field, desc) {
             state.stages[stageId].steps[i][field] = ta.value;
             save();
         });
+
+        /* ── Toolbar activation on focus ── */
+        if (FMT_FIELDS[field]) {
+            ta.addEventListener('focus', function () {
+                var tb = fmtToolbars[i];
+                if (!tb) return;
+                tb.activeField = field;
+                tb.wrap.classList.remove('fmt-toolbar-dim');
+                tb.label.textContent = FMT_FIELDS[field];
+                tb.label.style.display = '';
+                tb.refresh(field);
+            });
+            ta.addEventListener('blur', function () {
+                /* Short delay — allow clicks on toolbar buttons to register first */
+                setTimeout(function () {
+                    var tb = fmtToolbars[i];
+                    if (tb && tb.activeField === field) {
+                        tb.wrap.classList.add('fmt-toolbar-dim');
+                        tb.activeField = null;
+                    }
+                }, 200);
+            });
+        }
+
         td.appendChild(ta);
     });
 }
+
+function addFormattingToolbar(tbody, steps, stageId) {
+    fmtToolbars = [];   /* reset on each stage render */
+    const tr = tbody.insertRow();
+    tr.appendChild(labelCell('Text Format', 'Align · Weight · Size'));
+    steps.forEach(function (step, i) {
+        const td = tr.insertCell();
+        td.className = 'td-cell';
+        const wrap = document.createElement('div');
+        wrap.className = 'fmt-toolbar fmt-toolbar-dim';   /* start dimmed */
+
+        /* ── Context label ── */
+        const lbl = document.createElement('span');
+        lbl.className = 'fmt-label';
+        lbl.textContent = '';
+        lbl.style.display = 'none';
+        wrap.appendChild(lbl);
+
+        /* ── Alignment group ── */
+        var alignBtns = buildContextualGroup(
+            [['left', '◧'], ['center', '☰'], ['right', '◨']],
+            step, i, stageId, 'align'
+        );
+        wrap.appendChild(alignBtns.el);
+
+        /* ── Weight group ── */
+        var weightBtns = buildContextualGroup(
+            [['normal', 'N'], ['bold', 'B']],
+            step, i, stageId, 'weight'
+        );
+        wrap.appendChild(weightBtns.el);
+
+        /* ── Size group ── */
+        var sizeBtns = buildContextualGroup(
+            [['sm', 'S'], ['md', 'M'], ['lg', 'L'], ['xl', 'XL']],
+            step, i, stageId, 'size'
+        );
+        wrap.appendChild(sizeBtns.el);
+
+        /* ── Register toolbar ── */
+        fmtToolbars[i] = {
+            wrap: wrap,
+            label: lbl,
+            activeField: null,
+            groups: { align: alignBtns, weight: weightBtns, size: sizeBtns },
+            refresh: function (field) {
+                var defs = FMT_DEFAULTS[field] || FMT_DEFAULTS.screenText;
+                var s = state.stages[stageId].steps[i];
+                alignBtns.highlight(s[fmtKey(field, 'align')]  || defs.align);
+                weightBtns.highlight(s[fmtKey(field, 'weight')] || defs.weight);
+                sizeBtns.highlight(s[fmtKey(field, 'size')]   || defs.size);
+            },
+        };
+
+        td.appendChild(wrap);
+    });
+}
+
+/**
+ * buildContextualGroup — toggle button group that writes to whichever field
+ * is currently active in the toolbar registry.
+ */
+function buildContextualGroup(options, step, stepIdx, stageId, prop) {
+    var grp = document.createElement('div');
+    grp.className = 'fmt-btn-group';
+    var buttons = [];
+
+    options.forEach(function (opt) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'fmt-btn';      /* starts unhighlighted — refresh() sets it */
+        btn.textContent = opt[1];
+        btn.title = opt[0];
+        btn.addEventListener('click', function () {
+            var tb = fmtToolbars[stepIdx];
+            if (!tb || !tb.activeField) return;   /* ignore clicks when no field active */
+            var key = fmtKey(tb.activeField, prop);
+            state.stages[stageId].steps[stepIdx][key] = opt[0];
+            save();
+            /* Highlight this button, unhighlight siblings */
+            buttons.forEach(function (b) { b.classList.remove('fmt-btn-active'); });
+            btn.classList.add('fmt-btn-active');
+        });
+        buttons.push(btn);
+        grp.appendChild(btn);
+    });
+
+    return {
+        el: grp,
+        highlight: function (activeValue) {
+            buttons.forEach(function (b) {
+                b.classList.toggle('fmt-btn-active', b.title === activeValue);
+            });
+        },
+    };
+}
+
 
 function addCheckRow(tbody, steps, stageId, label, field, desc) {
     const tr = tbody.insertRow();

@@ -39,8 +39,17 @@ function createEmptyStep() {
         workOrderId:      '',
         delayMs:          '',
         screenText:       '',
+        screenTextAlign:  'center',
+        screenTextWeight: 'bold',
+        screenTextSize:   'lg',
         ariaLocal:        '',
+        ariaLocalAlign:   'left',
+        ariaLocalWeight:  'normal',
+        ariaLocalSize:    'md',
         ariaApi:          '',
+        ariaApiAlign:     'left',
+        ariaApiWeight:    'normal',
+        ariaApiSize:      'md',
         ariaInputEnabled: true,
         panelActions,
         simulationAction: '',
@@ -81,8 +90,10 @@ function mapToEditorStep(parsed: Record<string, unknown>) {
 
     const simpleFields = [
         'ctaLabel', 'slideImageUrl', 'mediaInstruction', 'scenarioCode',
-        'workOrderId', 'screenText', 'ariaLocal', 'ariaApi',
-        'simulationAction', 'transitionTo',
+        'workOrderId', 'screenText', 'screenTextAlign', 'screenTextWeight',
+        'screenTextSize', 'ariaLocal', 'ariaLocalAlign', 'ariaLocalWeight',
+        'ariaLocalSize', 'ariaApi', 'ariaApiAlign', 'ariaApiWeight',
+        'ariaApiSize', 'simulationAction', 'transitionTo',
     ];
     simpleFields.forEach(field => {
         if (parsed[field] !== undefined && parsed[field] !== null) {
@@ -147,11 +158,33 @@ function buildStepFields(step: ReturnType<typeof createEmptyStep>): string[] {
     if (step.screenText && step.screenText.trim())
         lines.push('screenText: ' + bt(step.screenText.trim()) + ',');
 
+    // Formatting fields — only emit when non-default
+    if (step.screenTextAlign && step.screenTextAlign !== 'center')
+        lines.push("screenTextAlign: '" + step.screenTextAlign + "',");
+    if (step.screenTextWeight && step.screenTextWeight !== 'bold')
+        lines.push("screenTextWeight: '" + step.screenTextWeight + "',");
+    if (step.screenTextSize && step.screenTextSize !== 'lg')
+        lines.push("screenTextSize: '" + step.screenTextSize + "',");
+
     if (step.ariaLocal && step.ariaLocal.trim())
         lines.push('ariaLocal: ' + bt(step.ariaLocal.trim()) + ',');
 
+    if (step.ariaLocalAlign && step.ariaLocalAlign !== 'left')
+        lines.push("ariaLocalAlign: '" + step.ariaLocalAlign + "',");
+    if (step.ariaLocalWeight && step.ariaLocalWeight !== 'normal')
+        lines.push("ariaLocalWeight: '" + step.ariaLocalWeight + "',");
+    if (step.ariaLocalSize && step.ariaLocalSize !== 'md')
+        lines.push("ariaLocalSize: '" + step.ariaLocalSize + "',");
+
     if (step.ariaApi && step.ariaApi.trim())
         lines.push('ariaApi: ' + bt(step.ariaApi.trim()) + ',');
+
+    if (step.ariaApiAlign && step.ariaApiAlign !== 'left')
+        lines.push("ariaApiAlign: '" + step.ariaApiAlign + "',");
+    if (step.ariaApiWeight && step.ariaApiWeight !== 'normal')
+        lines.push("ariaApiWeight: '" + step.ariaApiWeight + "',");
+    if (step.ariaApiSize && step.ariaApiSize !== 'md')
+        lines.push("ariaApiSize: '" + step.ariaApiSize + "',");
 
     lines.push('ariaInputEnabled: ' + (step.ariaInputEnabled ? 'true' : 'false') + ',');
 
@@ -500,6 +533,39 @@ describe('DemoScript Editor — buildStepFields', () => {
         const step = createEmptyStep();
         const lines = buildStepFields(step);
         expect(lines.some(l => l.includes('panelActions'))).toBe(false);
+    });
+
+    it('omits formatting fields when default (center/bold/lg)', () => {
+        const step = createEmptyStep();
+        step.screenText = 'some text';
+        const lines = buildStepFields(step);
+        expect(lines.some(l => l.includes('screenTextAlign'))).toBe(false);
+        expect(lines.some(l => l.includes('screenTextWeight'))).toBe(false);
+        expect(lines.some(l => l.includes('screenTextSize'))).toBe(false);
+    });
+
+    it('emits screenTextAlign when non-default', () => {
+        const step = createEmptyStep();
+        step.screenText = 'some text';
+        step.screenTextAlign = 'left';
+        const lines = buildStepFields(step);
+        expect(lines.some(l => l.includes("screenTextAlign: 'left'"))).toBe(true);
+    });
+
+    it('emits screenTextWeight when non-default', () => {
+        const step = createEmptyStep();
+        step.screenText = 'some text';
+        step.screenTextWeight = 'normal';
+        const lines = buildStepFields(step);
+        expect(lines.some(l => l.includes("screenTextWeight: 'normal'"))).toBe(true);
+    });
+
+    it('emits screenTextSize when non-default', () => {
+        const step = createEmptyStep();
+        step.screenText = 'some text';
+        step.screenTextSize = 'xl';
+        const lines = buildStepFields(step);
+        expect(lines.some(l => l.includes("screenTextSize: 'xl'"))).toBe(true);
     });
 });
 

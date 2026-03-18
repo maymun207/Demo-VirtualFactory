@@ -59,7 +59,7 @@ import { DEMO_SYSTEM_PROMPT } from '../lib/params/demoSystem/demoSystemPrompt';
 
 /** Declarative act config — the "sheet music" for the engine */
 import { DEMO_ACTS } from '../lib/params/demoSystem/demoScript';
-import type { DemoAct, UIPanel, CtaStep, MediaInstruction } from '../lib/params/demoSystem/demoScript';
+import type { DemoAct, UIPanel, CtaStep, MediaInstruction, ScreenTextAlign, ScreenTextWeight, ScreenTextSize } from '../lib/params/demoSystem/demoScript';
 
 /** Read-only simulation session data and scenario loader */
 import { useSimulationDataStore } from './simulationDataStore';
@@ -171,6 +171,18 @@ export interface DemoState {
      * Written incrementally by the screenText token processor. Cleared on act transition.
      */
     currentScreenText: string | null;
+    /** Text alignment for the current screenText. Default: 'center'. */
+    currentScreenTextAlign: ScreenTextAlign;
+    /** Font weight for the current screenText. Default: 'bold'. */
+    currentScreenTextWeight: ScreenTextWeight;
+    /** Font size preset for the current screenText. Default: 'lg'. */
+    currentScreenTextSize: ScreenTextSize;
+    /** Text alignment for the current ariaLocal chat bubbles. Default: 'left'. */
+    currentAriaLocalAlign: ScreenTextAlign;
+    /** Font weight for the current ariaLocal chat bubbles. Default: 'normal'. */
+    currentAriaLocalWeight: ScreenTextWeight;
+    /** Font size preset for the current ariaLocal chat bubbles. Default: 'md'. */
+    currentAriaLocalSize: ScreenTextSize;
     /**
      * currentStepIndex — which CtaStep within the current act is active.
      * Replaces ctaStepIndex. Managed by enterStep() and userAdvance().
@@ -659,6 +671,12 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     currentMediaInstruction: null,
     /** No screen text on init */
     currentScreenText: null,
+    currentScreenTextAlign: 'center' as ScreenTextAlign,
+    currentScreenTextWeight: 'bold' as ScreenTextWeight,
+    currentScreenTextSize: 'lg' as ScreenTextSize,
+    currentAriaLocalAlign: 'left' as ScreenTextAlign,
+    currentAriaLocalWeight: 'normal' as ScreenTextWeight,
+    currentAriaLocalSize: 'md' as ScreenTextSize,
     /** No step loaded yet */
     currentStepIndex: 0,
     /** ctaStepIndex — backward-compat alias for currentStepIndex */
@@ -700,7 +718,17 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             const step: CtaStep | undefined = steps[stepIndex];
 
             /** Update step index — drives ctaLabel on the CTA button */
-            set({ currentActIndex: actIndex, currentStepIndex: stepIndex, ctaStepIndex: stepIndex });
+            set({
+                currentActIndex: actIndex,
+                currentStepIndex: stepIndex,
+                ctaStepIndex: stepIndex,
+                currentScreenTextAlign: (step?.screenTextAlign ?? 'center') as ScreenTextAlign,
+                currentScreenTextWeight: (step?.screenTextWeight ?? 'bold') as ScreenTextWeight,
+                currentScreenTextSize: (step?.screenTextSize ?? 'lg') as ScreenTextSize,
+                currentAriaLocalAlign: (step?.ariaLocalAlign ?? 'left') as ScreenTextAlign,
+                currentAriaLocalWeight: (step?.ariaLocalWeight ?? 'normal') as ScreenTextWeight,
+                currentAriaLocalSize: (step?.ariaLocalSize ?? 'md') as ScreenTextSize,
+            });
 
             if (!step) {
                 /** No step at this index — enter idle phase */
@@ -821,13 +849,58 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             if (step.ariaLocal?.trim()) {
                 const localTokens = parseCommands(sanitizeScreenText(step.ariaLocal));
                 let localTextAcc = '';
+                const msgId = generateDemoMessageId();
+
+                /** Insert an empty bubble immediately so the audience sees it appear */
+                set((s) => ({
+                    messages: [
+                        ...s.messages,
+                        {
+                            id: msgId,
+                            role: 'assistant' as const,
+                            content: '',
+                            timestamp: new Date().toISOString(),
+                            actId: act.id,
+                        },
+                    ],
+                }));
 
                 const { hitClick: localHitClick } = await executeTokens(localTokens, {
                     onText: (value) => {
-                        /** Accumulate ARIA Local text — inject as single bubble at end */
+                        /** Stream text progressively — each token updates the bubble */
                         localTextAcc += value;
+                        const trimmed = localTextAcc.trim();
+                        set((s) => {
+                            const msgs = [...s.messages];
+                            const idx = msgs.findIndex((m) => m.id === msgId);
+                            if (idx >= 0) {
+                                msgs[idx] = { ...msgs[idx], content: trimmed };
+                            }
+                            return { messages: msgs };
+                        });
                     },
-                    onClear: () => set({ currentSlide: null, currentScreenText: null, currentMediaInstruction: null, messages: [] }),
+                    onClear: () => {
+                        /** <cls> — clear screen and reset the streaming bubble */
+                        localTextAcc = '';
+                        set((s) => {
+                            const msgs = s.messages.filter((m) => m.id !== msgId);
+                            return {
+                                currentSlide: null,
+                                currentScreenText: null,
+                                currentMediaInstruction: null,
+                                messages: [
+                                    ...msgs,
+                                    {
+                                        id: msgId,
+                                        role: 'assistant' as const,
+                                        content: '',
+                                        timestamp: new Date().toISOString(),
+                                        actId: act.id,
+                                    },
+                                ],
+                            };
+                        });
+                    },
                     onClearMI: () => set({ currentMediaInstruction: null }),
                     onWait: async (ms) => { await sleep(ms); },
                     onShowMI: () => {
@@ -837,21 +910,10 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                     },
                 });
 
-                /** Inject whatever local text was accumulated before any <clck> */
-                if (localTextAcc.trim()) {
-                    const msgId = generateDemoMessageId();
-                    set((s) => ({
-                        messages: [
-                            ...s.messages,
-                            {
-                                id: msgId,
-                                role: 'assistant' as const,
-                                content: localTextAcc.trim(),
-                                timestamp: new Date().toISOString(),
-                                actId: act.id,
-                            },
-                        ],
-                    }));
+                /** Remove the bubble if it ended up empty (e.g. only commands, no text) */
+                const finalContent = localTextAcc.trim();
+                if (!finalContent) {
+                    set((s) => ({ messages: s.messages.filter((m) => m.id !== msgId) }));
                 }
 
                 /** <clck> in ARIA Local: skip remaining text, go to ARIA API immediately */
@@ -872,7 +934,16 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                  */
                 const sessionId = useSimulationDataStore.getState().session?.id ?? null;
                 if (sessionId) {
-                    await postToCWF(step.ariaApi, act.id, act.systemContext, get, set);
+                    /** Strip any embedded commands from the prompt — AI gets clean text */
+                    const cleanPrompt = step.ariaApi
+                        .replace(/<w:\d+>/gi, '')
+                        .replace(/<cls>/gi, '')
+                        .replace(/<clck>/gi, '')
+                        .replace(/<clmi>/gi, '')
+                        .replace(/<MI>/g, '')
+                        .replace(/\s{2,}/g, ' ')
+                        .trim();
+                    await postToCWF(cleanPrompt, act.id, act.systemContext, get, set);
                 } else {
                     console.info('[Demo] ariaApi skipped — no simulation session running (step scripted call).');
                 }
@@ -1036,6 +1107,12 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             currentActIndex: nextIndex,
             currentMediaInstruction: null,
             currentScreenText: null,
+            currentScreenTextAlign: 'center' as ScreenTextAlign,
+            currentScreenTextWeight: 'bold' as ScreenTextWeight,
+            currentScreenTextSize: 'lg' as ScreenTextSize,
+            currentAriaLocalAlign: 'left' as ScreenTextAlign,
+            currentAriaLocalWeight: 'normal' as ScreenTextWeight,
+            currentAriaLocalSize: 'md' as ScreenTextSize,
             currentStepIndex: 0,
             ctaStepIndex: 0,
             demoPhase: 'idle' as DemoPhase,
@@ -1118,6 +1195,12 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             currentSlide: null,
             currentMediaInstruction: null,
             currentScreenText: null,
+            currentScreenTextAlign: 'center' as ScreenTextAlign,
+            currentScreenTextWeight: 'bold' as ScreenTextWeight,
+            currentScreenTextSize: 'lg' as ScreenTextSize,
+            currentAriaLocalAlign: 'left' as ScreenTextAlign,
+            currentAriaLocalWeight: 'normal' as ScreenTextWeight,
+            currentAriaLocalSize: 'md' as ScreenTextSize,
             currentStepIndex: 0,
             ctaStepIndex: 0,
             demoPhase: 'idle' as DemoPhase,
@@ -1190,6 +1273,12 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             currentSlide: null,
             currentMediaInstruction: null,
             currentScreenText: null,
+            currentScreenTextAlign: 'center' as ScreenTextAlign,
+            currentScreenTextWeight: 'bold' as ScreenTextWeight,
+            currentScreenTextSize: 'lg' as ScreenTextSize,
+            currentAriaLocalAlign: 'left' as ScreenTextAlign,
+            currentAriaLocalWeight: 'normal' as ScreenTextWeight,
+            currentAriaLocalSize: 'md' as ScreenTextSize,
             ctaStepIndex: 0,
         });
 

@@ -140,8 +140,10 @@ function mapToEditorStep(parsed) {
     // Map simple string/number/boolean fields
     var simpleFields = [
         'ctaLabel', 'slideImageUrl', 'mediaInstruction', 'scenarioCode',
-        'workOrderId', 'screenText', 'ariaLocal', 'ariaApi',
-        'simulationAction', 'transitionTo',
+        'workOrderId', 'screenText', 'screenTextAlign', 'screenTextWeight',
+        'screenTextSize', 'ariaLocal', 'ariaLocalAlign', 'ariaLocalWeight',
+        'ariaLocalSize', 'ariaApi', 'ariaApiAlign', 'ariaApiWeight',
+        'ariaApiSize', 'simulationAction', 'transitionTo',
     ];
     simpleFields.forEach(function (field) {
         if (parsed[field] !== undefined && parsed[field] !== null) {

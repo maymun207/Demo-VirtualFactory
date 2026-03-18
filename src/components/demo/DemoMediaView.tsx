@@ -33,7 +33,6 @@ import { useDemoStore } from '../../store/demoStore';
 import type { DemoState, DemoMessage } from '../../store/demoStore';
 import {
     DEMO_MOVIE_PATH,
-    DEMO_SCREEN_TEXT_FONT_SIZE_PX,
     DEMO_SCREEN_MAX_HEIGHT_VH,
 } from '../../lib/params/demoSystem/demoConfig';
 import { useUIStore } from '../../store/uiStore';
@@ -82,6 +81,14 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
      * Shown below the slide as a styled caption. Cleared on every act transition.
      */
     const currentScreenText = useDemoStore((s: DemoState) => s.currentScreenText);
+    /** Formatting for the current screenText — driven by CtaStep fields */
+    const screenTextAlign = useDemoStore((s: DemoState) => s.currentScreenTextAlign);
+    const screenTextWeight = useDemoStore((s: DemoState) => s.currentScreenTextWeight);
+    const screenTextSize = useDemoStore((s: DemoState) => s.currentScreenTextSize);
+    /** Formatting for the current ariaLocal chat bubbles */
+    const ariaLocalAlign = useDemoStore((s: DemoState) => s.currentAriaLocalAlign);
+    const ariaLocalWeight = useDemoStore((s: DemoState) => s.currentAriaLocalWeight);
+    const ariaLocalSize = useDemoStore((s: DemoState) => s.currentAriaLocalSize);
 
     /** Scroll anchor ref — auto-scrolls to newest message */
     const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -203,12 +210,21 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                     {currentScreenText && (
                         <div
                             ref={screenTextRef}
-                            className="w-full px-8 pt-6 pb-3 text-center"
+                            className={`w-full px-8 pt-6 pb-3 ${
+                                screenTextAlign === 'left' ? 'text-left' :
+                                screenTextAlign === 'right' ? 'text-right' : 'text-center'
+                            }`}
                             style={{ animation: 'fadeIn 0.6s ease-in' }}
                         >
                             <p
-                                className="font-semibold text-white/95 tracking-wide leading-tight whitespace-pre-wrap"
-                                style={{ fontSize: DEMO_SCREEN_TEXT_FONT_SIZE_PX }}
+                                className={`${
+                                    screenTextWeight === 'normal' ? 'font-normal' : 'font-semibold'
+                                } text-white/95 tracking-wide leading-tight whitespace-pre-wrap`}
+                                style={{
+                                    fontSize: screenTextSize === 'sm' ? 20 :
+                                             screenTextSize === 'md' ? 27 :
+                                             screenTextSize === 'xl' ? 42 : 34,
+                                }}
                             >
                                 {currentScreenText}
                             </p>
@@ -314,9 +330,13 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                             );
                         }
 
-                        /** Assistant message — left-aligned clean prose */
+                        /** Assistant message — left-aligned clean prose with formatting */
                         return (
-                            <div key={msg.id} className="flex justify-start px-5 py-2">
+                            <div key={msg.id} className={`flex px-5 py-2 ${
+                                ariaLocalAlign === 'center' ? 'justify-center' :
+                                ariaLocalAlign === 'right'  ? 'justify-end' :
+                                                              'justify-start'
+                            }`}>
                                 {msg.isStreaming ? (
                                     /* Streaming dots placeholder */
                                     <span className="flex items-center gap-1 py-2 px-1">
@@ -327,9 +347,19 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                                 ) : (
                                     <pre className={`
                                         whitespace-pre-wrap wrap-break-word font-sans
-                                        text-base leading-relaxed max-w-[90%]
+                                        leading-relaxed max-w-[90%]
                                         ${msg.error ? 'text-red-300' : 'text-white/85'}
-                                    `}>
+                                        ${ariaLocalWeight === 'bold' ? 'font-semibold' : 'font-normal'}
+                                        ${ariaLocalAlign === 'center' ? 'text-center' :
+                                          ariaLocalAlign === 'right'  ? 'text-right' :
+                                                                        'text-left'}
+                                    `}
+                                    style={{
+                                        fontSize: ariaLocalSize === 'sm' ? '14px' :
+                                                  ariaLocalSize === 'md' ? '16px' :
+                                                  ariaLocalSize === 'lg' ? '20px' :
+                                                  ariaLocalSize === 'xl' ? '26px' : '16px',
+                                    }}>
                                         {msg.content}
                                     </pre>
                                 )}
