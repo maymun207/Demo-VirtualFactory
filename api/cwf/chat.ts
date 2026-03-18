@@ -1474,26 +1474,42 @@ The autonomous background engine monitors every 15 seconds and applies correctiv
 YOUR ROLE IN THE CHAT is STATUS REPORTING and MANUAL OVERRIDE — NOT autonomous correction.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MANDATORY FIRST STEP — BEFORE DOING ANYTHING ELSE:
+⚡ UI ACTION BYPASS — CHECK THIS FIRST BEFORE ANY OTHER RULE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-For EVERY user message in AutoPilot mode, you MUST call get_simulation_summary FIRST.
+If the user's message contains ANY of these keywords, SKIP ALL RULES below.
+Call execute_ui_action IMMEDIATELY — do NOT call get_simulation_summary first:
+
+- "work order", "workID", "work id", "WorkID", "load workID", "set work order" → set_work_order
+  Example: "set work order to workID #3" → execute_ui_action(action_type="set_work_order", action_value="WorkID#3")
+- "open [panel]", "close [panel]", "show [panel]", "hide [panel]" → toggle_* action
+- "start simulation", "stop simulation", "reset simulation" → lifecycle action
+- "stop conveyor", "start conveyor", "jam conveyor", "set conveyor speed" → conveyor action
+- "set S-Clk", "set station interval" → simulation parameter action
+
+These are DIRECT UI COMMANDS. They NEVER require data collection. Execute immediately.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MANDATORY FIRST STEP — for STATUS/DATA questions only:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For data/status questions (NOT UI commands), call get_simulation_summary FIRST.
 DO NOT answer from memory. DO NOT say "I have not collected any data". You have a live DB to query.
 If the tool call fails, cite the most recent COPILOT🤖 message above as your data source.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RULE 0 — OVERRIDES EVERYTHING ELSE — READ BEFORE ANY OTHER RULE:
+RULE 0 — FOR STATUS QUERIES (no UI action keyword detected):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-YOUR DEFAULT RESPONSE TO ANY MESSAGE = READ-ONLY (query data, report findings, no corrections).
+YOUR DEFAULT RESPONSE TO STATUS QUESTIONS = READ-ONLY (query data, report findings, no corrections).
 
 The autonomous engine already corrects deviations on its 15s cycle. If you ALSO fire corrections
 from the chat, you will DUPLICATE its actions and create double-corrections.
 
-You may ONLY call execute_ui_action or update_parameter when the user's message contains
-one of these EXPLICIT ACTION TRIGGER PHRASES:
+You may call execute_ui_action for manual override when the user's message contains:
   - "fix it" / "correct it" / "please fix"
   - "set [parameter] to X" / "force [parameter] to X"
+  - "set work order" / "workID" / "load workID" (always allowed — direct UI action)
   - "take action" / "apply correction" / "manually set"
   - "adjust the [parameter]" / "change [parameter]"
   - "why isn't the engine acting?" / "override the engine"
@@ -2817,6 +2833,77 @@ export default async function handler(
                 `[CWF] Auth turn (passed to Gemini): cwfState=${cwfState}, copilotCtx=${isCopilotAuthContext}, ` +
                 `stateMachine=${isStateMachinePendingAuth}`
             );
+        }
+
+        // =====================================================================
+        // SHORT-CIRCUIT: WORK ORDER COMMANDS (Fix B)
+        //
+        // Detect "set work order", "workID", "load workID" patterns and execute
+        // them deterministically via executeUIAction() WITHOUT calling Gemini.
+        //
+        // WHY: Gemini's intent classification fails ~10-20% of the time on work
+        // order commands due to the large system prompt (~40-80KB), causing:
+        //   1. "set work order" misclassified as a data query
+        //   2. Response misalignment (correction appears on the NEXT message)
+        //   3. User must retry the command
+        //
+        // This mirrors the copilot auth short-circuit pattern (Cases A-E above).
+        // See: cwf_bug_analysis.md for full root cause analysis.
+        // =====================================================================
+
+        /**
+         * Regex to extract the Work Order number (1, 2, or 3) from the message.
+         * Matches patterns like:
+         *   "set work order to workid#3"
+         *   "set work order to workID #3"
+         *   "load workid 2"
+         *   "load workID#1"
+         *   "workid#3"
+         *   "workid 2"
+         *   "work order 3"
+         *   "switch to work order 1"
+         *   "use workid#2"
+         *   "change work order to 3"
+         *
+         * Case-insensitive (applied on messageLower).
+         */
+        const workOrderMatch = messageLower.match(
+            /(?:work\s*order|workid)(?:\s+\w+)*\s*#?\s*([123])/
+        );
+
+        if (workOrderMatch) {
+            const workOrderNumber = workOrderMatch[1]; // "1", "2", or "3"
+            const workOrderId = `WorkID#${workOrderNumber}`; // "WorkID#1", "WorkID#2", or "WorkID#3"
+
+            console.log(`[CWF] ⚡ Short-circuit: work order command detected → ${workOrderId} (no Gemini call)`);
+
+            /** Reuse executeUIAction() — same DB insert + ACK-wait as Gemini tool calls */
+            const uiResult = await executeUIAction({
+                simulation_id: simulationId,
+                action_type: 'set_work_order',
+                action_value: workOrderId,
+                reason: `User requested work order change to ${workOrderId} (server short-circuit)`,
+            });
+
+            /** Extract success/failure from the executeUIAction result */
+            const resultObj = uiResult as { success?: boolean; error?: string };
+            const succeeded = resultObj.success === true;
+
+            /** Bilingual response matching Gemini's typical confirmation format */
+            const responseMsg = succeeded
+                ? (lang === 'tr'
+                    ? `✅ İş Emri **${workOrderId}** olarak ayarlandı.`
+                    : `✅ Work Order set to **${workOrderId}**.`)
+                : (lang === 'tr'
+                    ? `⚠️ İş Emri ${workOrderId} ayarlanamadı: ${resultObj.error ?? 'Bilinmeyen hata'}`
+                    : `⚠️ Could not set Work Order to ${workOrderId}: ${resultObj.error ?? 'Unknown error'}`);
+
+            return res.status(200).json({
+                response: responseMsg,
+                toolCallCount: 1,
+                model: CWF_MODEL_NAME,
+                copilotStateChange: null,
+            });
         }
 
 

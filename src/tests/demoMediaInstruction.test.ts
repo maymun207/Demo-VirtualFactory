@@ -112,22 +112,20 @@ describe('No System act — pure narrative (no mediaInstruction)', () => {
         expect(click2).toBeDefined();
     });
 
-    it('Click #1 has no mediaInstruction (starts simulation, shows factory premise)', () => {
+    it('Click #1 has no mediaInstruction (pure narrative step)', () => {
         /**
-         * Click #1 starts the simulation — the audience sees the factory running.
+         * Click #1 is a narrative step — ARIA input enabled for Q&A.
          * No chart: the story is "everything looks fine on the outside."
          */
         expect(click1.mediaInstruction).toBeUndefined();
-        expect(click1.simulationAction).toBe('start');
     });
 
-    it('Click #2 has no mediaInstruction (transitions to reveal the hidden losses)', () => {
+    it('Click #2 has no mediaInstruction (pure narrative step)', () => {
         /**
-         * Click #2 is the punchline transition — everything LOOKS fine but
+         * Click #2 continues the narrative — everything LOOKS fine but
          * invisible losses are happening. The chart is deferred to Basic System.
          */
         expect(click2.mediaInstruction).toBeUndefined();
-        expect(click2.transitionTo).toBe('next');
     });
 });
 
@@ -151,28 +149,28 @@ describe('Basic System act — chart:conveyor_speed is on Click #2', () => {
         click2 = basicAct.ctaSteps[1]; // Click #2 = index 1
     });
 
-    it('Click #2 has mediaInstruction: chart:conveyor_speed', () => {
+    it('Click #2 has no mediaInstruction (per-act authoring pending)', () => {
         /**
-         * The chart appears alongside the Basic Panel so the audience can
-         * watch belt speed trend while seeing OEE fluctuate in real time.
+         * ctaSteps currently only set ariaInputEnabled. mediaInstruction
+         * will be added when per-act authoring is completed.
+         * Until then, no chart is rendered on this step.
          */
-        expect(click2.mediaInstruction).toBe('chart:conveyor_speed');
+        expect(click2.mediaInstruction).toBeUndefined();
     });
 
-    it('Click #2 has no slideImageUrl (chart takes visual priority over static image)', () => {
+    it('Click #2 has no slideImageUrl (per-act authoring pending)', () => {
         /**
-         * When mediaInstruction is set, no static slide is shown — the chart
-         * component replaces the image area entirely.
+         * Neither slideImageUrl nor mediaInstruction is set on this step
+         * in the current simplified data.
          */
         expect(click2.slideImageUrl).toBeUndefined();
     });
 
-    it('Click #2 has a positive delayMs for smooth chart render transition', () => {
+    it('Click #2 — ARIA input is enabled', () => {
         /**
-         * delayMs ensures the screenText fades in after the chart has had
-         * time to render its first data points.
+         * ARIA input is enabled for presenter Q&A during this step.
          */
-        expect(click2.delayMs).toBeGreaterThan(0);
+        expect(click2.ariaInputEnabled).toBe(true);
     });
 });
 

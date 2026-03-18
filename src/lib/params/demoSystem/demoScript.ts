@@ -312,23 +312,15 @@ You are opening the demo. Tone = calm authority, experienced manufacturing consu
 You must introduce CO₂ as the 4th dimension of the journey alongside OEE, quality, and throughput.
 Never be hyperbolic. Be precise and credible. Maximum 5 sentences for the welcome.
         `.trim(),
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Continue',
-                slideImageUrl: '/demo/Welcome.png',
-                delayMs: 5000,
-                screenText: `<cls> Let's start our journey`,
-                ariaApi: `load workID #3`,
-                ariaInputEnabled: false,
-                panelActions: [
-                    { panel: 'basicPanel', state: 'close' },
-                    { panel: 'dtxfr', state: 'close' },
-                    { panel: 'cwf', state: 'close' },
-                    { panel: 'oeeHierarchy', state: 'close' },
-                    { panel: 'controlPanel', state: 'close' },
-                ],
-                simulationAction: 'reset',
-                transitionTo: 'next',
+                slideImageUrl: '/demo/ACT-0.png',
+                ariaInputEnabled: true,
+            },
+            { // Click #2
+                ctaLabel: 'Next',
+                ariaInputEnabled: true,
             },
         ],
         /** Opening prompt: cleared — to be authored per-act. */
@@ -361,21 +353,12 @@ Never be hyperbolic. Be precise and credible. Maximum 5 sentences for the welcom
          *   2. Live conveyor speed chart (mediaInstruction) — visual teaser, control panel opens
          *   3. Static slide (ACT-1b) + ariaLocal + ariaApi query — ARIA responds with real data, auto-advance
          */
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
-                ctaLabel: 'Continue',
-                delayMs: 300,
-                screenText: `In many factories without a manufacturing management system, visibility is limited to the outcomes of production—scrap levels, second-quality output, and monthly energy bills—while the underlying causes of these losses remain largely invisible. <w:3200>`,
-                ariaInputEnabled: false,
-                simulationAction: 'start',
+                ariaInputEnabled: true,
             },
             { // Click #2
-                ctaLabel: 'Next',
-                delayMs: 600,
-                screenText: `Now, production started everything is looking great... \n <w:1000>
-Is everything really going well? <w:2200> <clck>`,
-                ariaInputEnabled: false,
-                transitionTo: 'next',
+                ariaInputEnabled: true,
             },
         ],
         /** Sidebar LED label — displayed in DemoSidePanel stage list */
@@ -451,33 +434,12 @@ CRITICAL: Still SCN-001. Still ONLY conveyor speed drift. NEVER mention defects,
 quality, scrap, sorting, or machine parameter issues. The story remains throughput and energy.
         `.trim(),
         /** Two CTA steps: chart + Basic/Control panels open so the audience sees live OEE alongside the chart. */
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
-                ctaLabel: 'Continue',
-                slideImageUrl: '/demo/ACT-1a.png',
-                delayMs: 500,
-                screenText: `You can see how OEE fluctuates at the Basic screen. Do you know why? \n Let's dive in... <w:2000> <clck>`,
-                ariaInputEnabled: false,
-                panelActions: [
-                    { panel: 'basicPanel', state: 'open' },
-                ],
+                ariaInputEnabled: true,
             },
             { // Click #2
-                ctaLabel: 'Next',
-                mediaInstruction: 'chart:conveyor_speed',
-                delayMs: 300,
-                screenText: `OEE fluctuates and that impacys the OEE <cls> <w:600> <MI> <w:2000>`,
-                ariaInputEnabled: false,
-            },
-            { // Click #3
-                slideImageUrl: '/demo/ACT-1b.png',
-                delayMs: 500,
-                ariaApi: `set work order to workID #3`,
                 ariaInputEnabled: true,
-                panelActions: [
-                    { panel: 'basicPanel', state: 'close' },
-                ],
-                transitionTo: 'next',
             },
         ],
         /** Opening prompt: cleared — to be authored per-act. */
@@ -534,7 +496,7 @@ NEVER say "customer received defective tiles" or "warranty claim."
 The pain is entirely internal. Tone: controlled escalation — this is the revelation beat.
         `.trim(),
         /** Two CTA steps: ARIA narrative + audience interaction. */
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ariaInputEnabled: true,
             },
@@ -598,7 +560,7 @@ available to everyone, at any hour, in any language, on any device. This is not
 convenience — it is organisational resilience.
         `.trim(),
         /** Two CTA steps: ARIA narrative + audience interaction. */
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 ariaInputEnabled: true,
             },
@@ -665,7 +627,7 @@ Customer received only first-quality tiles. All quality loss is internal.
 The Copilot did not prevent a bad outcome by alerting someone — it prevented it by ACTING.
         `.trim(),
         /** Two CTA steps: ARIA narrative + audience interaction. */
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 ariaInputEnabled: true,
             },
@@ -727,7 +689,7 @@ The closing question IS the mechanism. Be precise, credible, and quiet in convic
          * Two CTA steps: ARIA closing narrative + audience Q&A.
          * No further stage transition — this is the final act.
          */
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
             { // Click #1
                 ariaInputEnabled: true,
             },

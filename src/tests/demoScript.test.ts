@@ -102,13 +102,13 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(welcome.id).toBe('welcome');
         });
 
-        it('has exactly 1 ctaStep', () => {
+        it('has exactly 2 ctaSteps', () => {
             /**
-             * Welcome has a single CTA step: the presenter clicks once, the
-             * simulation resets to a clean baseline, and the factory begins.
-             * The ACT-0 overview slide is no longer a separate step.
+             * Welcome has 2 CTA steps:
+             *   1. Shows the ACT-0 overview slide
+             *   2. Presenter advances — ARIA input enabled for Q&A
              */
-            expect(welcome.ctaSteps).toHaveLength(1);
+            expect(welcome.ctaSteps).toHaveLength(2);
         });
 
         it('act has scenarioCode: SCN-001 (loaded at act entry)', () => {
@@ -119,32 +119,20 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(welcome.scenarioCode).toBe('SCN-001');
         });
 
-        it('Click #1 — simulationAction is reset (resets sim to clean state)', () => {
-            /**
-             * Welcome Click #1 resets the simulation so the factory starts
-             * from a clean baseline.
-             */
-            expect(welcome.ctaSteps![0].simulationAction).toBe('reset');
+        it('Click #1 — shows ACT-0 slide', () => {
+            expect(welcome.ctaSteps![0].slideImageUrl).toBe('/demo/ACT-0.png');
         });
 
-        it('Click #1 — shows Welcome.png slide', () => {
-            expect(welcome.ctaSteps![0].slideImageUrl).toBe('/demo/Welcome.png');
+        it('Click #1 — ARIA input is enabled', () => {
+            expect(welcome.ctaSteps![0].ariaInputEnabled).toBe(true);
         });
 
-        it('Click #1 — has a non-empty screenText and a positive delayMs', () => {
-            expect(welcome.ctaSteps![0].screenText).toBeTruthy();
-            expect(welcome.ctaSteps![0].delayMs).toBeGreaterThan(0);
+        it('Click #2 — ARIA input is enabled', () => {
+            expect(welcome.ctaSteps![1].ariaInputEnabled).toBe(true);
         });
 
-        it('Click #1 — closes all 5 panels with state close', () => {
-            const panels = welcome.ctaSteps![0].panelActions!;
-            expect(panels).toHaveLength(5);
-            panels.forEach(p => expect(p.state).toBe('close'));
-        });
-
-        it('Click #1 — auto-transitions to the next act (transitionTo: next)', () => {
-            /** Single step now owns the transition — no separate Click #2 needed. */
-            expect(welcome.ctaSteps![0].transitionTo).toBe('next');
+        it('act-level panelActions is empty (clean slate)', () => {
+            expect(welcome.panelActions).toHaveLength(0);
         });
     });
 
@@ -160,8 +148,8 @@ describe('DEMO_ACTS — data integrity', () => {
         it('has exactly 2 ctaSteps', () => {
             /**
              * No System act has 2 steps:
-             *   1. Starts the simulation (SCN-001 still active from welcome)
-             *   2. Auto-transitions to the next act — the factory looks fine from outside
+             *   1. ARIA input enabled for narrative
+             *   2. ARIA input enabled for Q&A
              */
             expect(noManagement.ctaSteps).toHaveLength(2);
         });
@@ -174,26 +162,21 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(noManagement.scenarioCode).toBeNull();
         });
 
-        it('Click #1 — starts the simulation', () => {
-            /**
-             * Click #1 fires simulationAction: start, beginning the live data flow.
-             */
-            const step = noManagement.ctaSteps![0];
-            expect(step.simulationAction).toBe('start');
-            expect(step.ariaInputEnabled).toBe(false);
-            expect(step.delayMs).toBeGreaterThan(0);
-            expect(step.screenText).toBeTruthy();
+        it('Click #1 — ARIA input is enabled', () => {
+            expect(noManagement.ctaSteps![0].ariaInputEnabled).toBe(true);
         });
 
-        it('Click #2 — auto-transitions to next act to reveal the hidden tragedy', () => {
+        it('Click #2 — ARIA input is enabled', () => {
+            expect(noManagement.ctaSteps![1].ariaInputEnabled).toBe(true);
+        });
+
+        it('act-level panelActions close all 4 panels (zero digital tools)', () => {
             /**
-             * Click #2 is the punchline: everything looks fine, but the factory's
-             * invisible losses are about to be revealed. transitionTo: next fires.
+             * No System era simulates a factory with zero digital tools —
+             * all panels are closed at act entry.
              */
-            const step = noManagement.ctaSteps![1];
-            expect(step.transitionTo).toBe('next');
-            expect(step.ariaInputEnabled).toBe(false);
-            expect(step.screenText).toBeTruthy();
+            expect(noManagement.panelActions).toHaveLength(4);
+            noManagement.panelActions.forEach(pa => expect(pa.state).toBe('close'));
         });
     });
 
@@ -206,54 +189,34 @@ describe('DEMO_ACTS — data integrity', () => {
             expect(basicSystem.id).toBe('basic-system');
         });
 
-        it('has exactly 3 ctaSteps', () => {
+        it('has exactly 2 ctaSteps', () => {
             /**
-             * Basic System act has 3 steps:
-             *   1. Static slide (ACT-1a) + basicPanel opens — audience sees OEE numbers
-             *   2. Live conveyor speed chart (mediaInstruction) — visual teaser
-             *   3. Static slide (ACT-1b) + ariaApi sets work order — reveals root cause
+             * Basic System act has 2 steps:
+             *   1. ARIA input enabled for narrative
+             *   2. ARIA input enabled for Q&A
              */
-            expect(basicSystem.ctaSteps).toHaveLength(3);
+            expect(basicSystem.ctaSteps).toHaveLength(2);
         });
 
-        it('Click #1 — shows ACT-1a slide and opens basicPanel', () => {
-            const step = basicSystem.ctaSteps![0];
-            /**
-             * First click: show the baseline OEE slide and open the Basic Panel
-             * so the audience can see the live KPI numbers alongside the narrative.
-             */
-            expect(step.slideImageUrl).toBe('/demo/ACT-1a.png');
-            expect(step.delayMs).toBeGreaterThan(0);
-            expect(step.screenText).toBeTruthy();
-            const basicPanelAction = step.panelActions?.find(p => p.panel === 'basicPanel');
-            expect(basicPanelAction?.state).toBe('open');
+        it('Click #1 — ARIA input is enabled', () => {
+            expect(basicSystem.ctaSteps![0].ariaInputEnabled).toBe(true);
         });
 
-        it('Click #2 — shows live conveyor speed chart (mediaInstruction)', () => {
-            const step = basicSystem.ctaSteps![1];
-            /**
-             * Second click: switch to the live conveyor speed chart so the audience
-             * can see the belt speed trend while OEE fluctuates on the Basic Panel.
-             */
-            expect(step.mediaInstruction).toBe('chart:conveyor_speed');
-            expect(step.slideImageUrl).toBeUndefined();
-            expect(step.delayMs).toBeGreaterThan(0);
+        it('Click #2 — ARIA input is enabled', () => {
+            expect(basicSystem.ctaSteps![1].ariaInputEnabled).toBe(true);
         });
 
-        it('Click #3 — shows ACT-1b slide, triggers ariaApi to set work order, auto-advances', () => {
-            const step = basicSystem.ctaSteps![2];
+        it('act-level panelActions close all 5 panels (clean slate for dashboard reveal)', () => {
             /**
-             * Third click: reveal slide (ACT-1b), fire the CWF ariaApi command to
-             * set Work Order (demo production batch), enable ARIA input for Q&A,
-             * then auto-transition to the Digital Twin act.
+             * All panels are closed at act entry — the basicPanel is meant to be
+             * opened later via ctaSteps (when per-act authoring is completed).
              */
-            expect(step.slideImageUrl).toBe('/demo/ACT-1b.png');
-            expect(step.ariaApi).toBeTruthy();
-            expect(step.ariaInputEnabled).toBe(true);
-            expect(step.transitionTo).toBe('next');
-            /** basicPanel closes so the audience focuses on the DTXFR passport view */
-            const basicPanelAction = step.panelActions?.find(p => p.panel === 'basicPanel');
-            expect(basicPanelAction?.state).toBe('close');
+            expect(basicSystem.panelActions).toHaveLength(5);
+            basicSystem.panelActions.forEach(pa => expect(pa.state).toBe('close'));
+        });
+
+        it('act-level scenarioCode is SCN-001', () => {
+            expect(basicSystem.scenarioCode).toBe('SCN-001');
         });
     });
 

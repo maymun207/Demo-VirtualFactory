@@ -49,5 +49,21 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "vitest": "^4.0.18"
-  }
+  },
+  "description": "",
+  "main": "eslint.config.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maymun207/Demo-VirtualFactory.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/maymun207/Demo-VirtualFactory/issues"
+  },
+  "homepage": "https://github.com/maymun207/Demo-VirtualFactory#readme"
 }
