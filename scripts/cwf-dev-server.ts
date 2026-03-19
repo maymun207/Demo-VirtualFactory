@@ -2,13 +2,13 @@
  * scripts/cwf-dev-server.ts — Local CWF API Development Server
  *
  * A lightweight Node.js HTTP server that wraps the Vercel serverless function
- * at `api/cwf/chat.ts`, allowing CWF to work during local development with
- * `npm run dev` (Vite).
+ * at `api/cwf/chat.ts` and `api/cwf/demo-chat.ts`, allowing CWF to work
+ * during local development with `npm run dev` (Vite).
  *
  * When running locally, Vite serves the frontend but cannot serve Vercel
  * serverless functions. This server fills that gap by:
  *   1. Listening on a configurable port (default 3001)
- *   2. Accepting POST requests to /api/cwf/chat
+ *   2. Accepting POST requests to /api/cwf/chat and /api/cwf/demo-chat
  *   3. Delegating to the same handler used by Vercel in production
  *   4. Returning the same JSON response format
  *
@@ -103,6 +103,9 @@ for (const envVar of REQUIRED_ENV_VARS) {
 
 /** Import the handler from the api/cwf/chat.ts module */
 const { default: handler } = await import('../api/cwf/chat.js');
+
+/** Import the demo-chat handler (slim prompt, 2 tools, 4-loop cap) */
+const { default: demoChatHandler } = await import('../api/cwf/demo-chat.js');
 
 /**
  * Import the CopilotEngine singleton.
@@ -432,12 +435,35 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // ─── CWF Chat Endpoint ──────────────────────────────────────────────────
+    // ─── CWF Demo Chat Endpoint ──────────────────────────────────────────────
 
-    /** Only handle POST /api/cwf/chat */
-    if (req.method !== 'POST' || !req.url?.startsWith('/api/cwf/chat')) {
+    /** POST /api/cwf/demo-chat — slim, fast endpoint for demo ariaApi calls */
+    if (req.method === 'POST' && req.url?.startsWith('/api/cwf/demo-chat')) {
+        try {
+            const body = await collectBody(req);
+            (req as unknown as { body: unknown }).body = body;
+            const resShim = createVercelResponseShim(res);
+            await demoChatHandler(req as never, resShim as never);
+        } catch (error) {
+            console.error('[CWF-Demo] Dev server error:', error);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: (error as Error).message }));
+        }
+        return;
+    }
+
+    // ─── CWF Chat Endpoint (GET warmup + POST chat) ─────────────────────────
+
+    /** Only handle GET or POST /api/cwf/chat */
+    if (!req.url?.startsWith('/api/cwf/chat')) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Not found. Use POST /api/cwf/chat or /api/cwf/copilot/*' }));
+        res.end(JSON.stringify({ error: 'Not found. Use POST /api/cwf/chat, POST /api/cwf/demo-chat, or /api/cwf/copilot/*' }));
+        return;
+    }
+
+    if (req.method !== 'GET' && req.method !== 'POST') {
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
     }
 
@@ -465,7 +491,8 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
     console.log('')
     console.log('  🏭 CWF Dev Server running');
-    console.log(`  ➜  Local: http://127.0.0.1:${PORT}/api/cwf/chat`);
+    console.log(`  ➜  Chat:  http://127.0.0.1:${PORT}/api/cwf/chat`);
+    console.log(`  ➜  Demo:  http://127.0.0.1:${PORT}/api/cwf/demo-chat`);
     console.log(`  ➜  Supabase: ${process.env.SUPABASE_URL}`);
     console.log(`  ➜  Gemini Model: gemini-2.5-flash`);
     console.log('');

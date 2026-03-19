@@ -28,7 +28,7 @@
 
 /** The 7 narrative acts — id must match DemoAct.id in demoScript.ts */
 window.STAGES = [
-    { id: 'welcome',           emoji: '👋', label: 'Welcome' },
+    { id: 'mirror',            emoji: '🪞', label: 'The Mirror' },
     { id: 'no-management',     emoji: '❌', label: 'No System' },
     { id: 'basic-system',      emoji: '📊', label: 'Basic Management' },
     { id: 'digital-twin',      emoji: '🔗', label: 'Digital Twin' },
@@ -94,7 +94,7 @@ window.SLIDES = SLIDES_FALLBACK;
 window.TRANSITIONS = [
     { id: '',                  label: '— (stay / no transition)' },
     { id: 'next',              label: '→ Linear: Next Stage' },
-    { id: 'welcome',           label: 'Jump → Welcome' },
+    { id: 'mirror',            label: 'Jump → The Mirror' },
     { id: 'no-management',     label: 'Jump → No System' },
     { id: 'basic-system',      label: 'Jump → Basic Management' },
     { id: 'digital-twin',      label: 'Jump → Digital Twin' },

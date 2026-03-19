@@ -2,7 +2,7 @@
 trigger: always_on
 ---
 
-Whenever tehre is change you made in teh DB tables or crone jos or anything in the nature make sure to do teh followings:
+Whenever there is change you made in teh DB tables or crone jos or anything in the nature make sure to do teh followings:
 
 - Every change make sure ahs supabase implemtation as well
 

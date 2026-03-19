@@ -41,6 +41,17 @@ import {
   DEMO_SIDE_PANEL_WIDTH_PX,
 } from "./lib/params/demoSystem/demoConfig";
 
+/**
+ * Pre-warm the CWF knowledge base cache.
+ * GET /api/cwf/chat triggers fetchKnowledgeBase() in the same serverless
+ * function instance that handles interactive CWF POST requests, ensuring
+ * the in-memory Google Drive cache is populated before the first CWF query.
+ * Fire-and-forget — failure is silent and non-blocking.
+ */
+if (typeof window !== 'undefined') {
+    fetch('/api/cwf/chat', { method: 'GET' }).catch(() => {});
+}
+
 function App() {
   /** Activate KPI synchronization (reacts to simulation clock changes) */
   useKPISync();

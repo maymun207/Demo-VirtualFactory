@@ -90,6 +90,7 @@ function createAuthClient() {
 export async function fetchKnowledgeBase(): Promise<string> {
     /** Return cached content if still within TTL */
     if (cachedContent !== null && (Date.now() - cachedAt) < CACHE_TTL_MS) {
+        console.info(`[CWF KnowledgeDocs] Cache hit (age: ${Math.round((Date.now() - cachedAt) / 1000)}s)`);
         return cachedContent;
     }
 
@@ -99,6 +100,8 @@ export async function fetchKnowledgeBase(): Promise<string> {
         /** No folder configured — silently skip (CWF still works without it) */
         return '';
     }
+
+    console.info('[CWF KnowledgeDocs] Cache miss — fetching from Google Drive...');
 
     try {
         /** Create authenticated Drive client */

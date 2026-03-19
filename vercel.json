@@ -7,6 +7,9 @@
     "api/cwf/chat.ts": {
       "maxDuration": 60
     },
+    "api/cwf/demo-chat.ts": {
+      "maxDuration": 30
+    },
     "api/cwf/copilot/evaluate.ts": {
       "maxDuration": 30
     },

@@ -29,9 +29,9 @@
 
 /**
  * DEMO_API_ENDPOINT — The CWF API endpoint the Demo System calls.
- * Uses the same endpoint as the regular CWF panel — no separate backend.
+ * Uses the dedicated demo-chat endpoint: slim prompt, 2 tools, 4-loop cap.
  */
-export const DEMO_API_ENDPOINT: string = '/api/cwf/chat';
+export const DEMO_API_ENDPOINT: string = '/api/cwf/demo-chat';
 
 /**
  * DEMO_MAX_HISTORY_MESSAGES — Maximum conversation turns sent per API request.

@@ -2270,7 +2270,7 @@ export default async function handler(
 ) {
     // CORS headers — allow requests from any origin (the frontend is on a different domain during dev)
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     // Handle preflight CORS requests
@@ -2278,7 +2278,29 @@ export default async function handler(
         return res.status(200).end();
     }
 
-    // Only POST is supported
+    // ── GET = Cache Warmup ──────────────────────────────────────────
+    // Pre-populates the Google Drive knowledge base cache so the first
+    // interactive CWF query doesn't pay the 1-4s fetch penalty.
+    // Called fire-and-forget by the frontend on page load.
+    if (req.method === 'GET') {
+        try {
+            const startMs = Date.now();
+            const kb = await fetchKnowledgeBase();
+            const elapsedMs = Date.now() - startMs;
+            console.log(`[CWF] Warmup: knowledge cache ${kb.length > 0 ? 'populated' : 'empty'} (${elapsedMs}ms)`);
+            return res.status(200).json({
+                ok: true,
+                cached: kb.length > 0,
+                chars: kb.length,
+                ms: elapsedMs,
+            });
+        } catch (err) {
+            console.warn('[CWF] Warmup failed:', (err as Error).message);
+            return res.status(200).json({ ok: true, cached: false, chars: 0 });
+        }
+    }
+
+    // Only POST is supported beyond this point
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }

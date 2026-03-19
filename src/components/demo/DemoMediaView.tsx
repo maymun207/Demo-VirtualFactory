@@ -160,18 +160,19 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
             style={{
                 top: headerHeight,
                 /**
-                 * Horizontally centered in the full viewport.
-                 * left: 50% + translateX(-50%) gives equal distance
-                 * from the left and right browser edges at all times,
-                 * regardless of window size.
+                 * Left edge anchored, expanded 15% to the right.
+                 * Original: 421px centred (left: 50%, translateX(-50%)).
+                 * New: 484px (421 × 1.15) with left edge unchanged.
+                 * translateX(-43.5%) keeps the left edge at the same
+                 * position as the original 421px centred layout.
                  */
                 left: '50%',
-                transform: 'translateX(-50%)',
+                transform: 'translateX(-43.5%)',
                 /**
-                 * Width: capped at 421px (50% size reduction base, +8%).
-                 * Falls back to 90vw on narrow viewports so it never clips.
+                 * Width: 484px = original 421px + 15% rightward expansion.
+                 * Falls back to 95vw on narrow viewports so it never clips.
                  */
-                width: `min(421px, 90vw)`,
+                width: `min(484px, 95vw)`,
                 transition: 'top 250ms cubic-bezier(0.4, 0, 0.2, 1)',
             }}
         >

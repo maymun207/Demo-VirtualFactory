@@ -388,7 +388,7 @@ describe('demoStore', () => {
          * DEMO_ACTS[1].openingPrompt is non-empty.
          * advanceAct fires postToCWF with the opening prompt AND then enterStep
          * may fire additional fetches (ariaApi on step 0, etc.).
-         * We provide enough mock responses and verify at least one targets /api/cwf/chat.
+         * We provide enough mock responses and verify at least one targets /api/cwf/demo-chat.
          */
         const originalPrompt = DEMO_ACTS[1].openingPrompt;
         DEMO_ACTS[1].openingPrompt = 'Welcome to the factory tour.';
@@ -407,8 +407,8 @@ describe('demoStore', () => {
 
             /** Fetch must have been called at least once for the opening prompt */
             expect(mockFetch).toHaveBeenCalled();
-            /** At least one call must target /api/cwf/chat with the patched prompt */
-            const chatCalls = mockFetch.mock.calls.filter((c: unknown[]) => c[0] === '/api/cwf/chat');
+            /** At least one call must target /api/cwf/demo-chat with the patched prompt */
+            const chatCalls = mockFetch.mock.calls.filter((c: unknown[]) => c[0] === '/api/cwf/demo-chat');
             expect(chatCalls.length).toBeGreaterThanOrEqual(1);
             const promptCall = chatCalls.find((c: unknown[]) => {
                 const body = JSON.parse((c[1] as { body: string }).body);
@@ -451,7 +451,7 @@ describe('demoStore', () => {
              * enterStep may make ariaApi calls, but the opening prompt must be skipped.
              */
             for (const callArgs of mockFetch.mock.calls) {
-                if (callArgs[0] === '/api/cwf/chat') {
+                if (callArgs[0] === '/api/cwf/demo-chat') {
                     const body = JSON.parse((callArgs[1] as { body: string }).body);
                     expect(body.message).not.toBe(originalPrompt);
                 }
@@ -476,7 +476,7 @@ describe('demoStore', () => {
 
         /**
          * mockFetch must answer TWO calls:
-         *   1) /api/cwf/chat     — the opening prompt
+         *   1) /api/cwf/demo-chat — the opening prompt
          *   2) /api/cwf/copilot/enable — the Copilot enable API (fire-and-forget)
          * We set up two responses so neither call hangs.
          */
@@ -524,7 +524,7 @@ describe('demoStore', () => {
 
         /**
          * mockFetch answers only the Copilot disable call.
-         * No /api/cwf/chat call is expected — restartDemo no longer auto-sends
+         * No /api/cwf/demo-chat call is expected — restartDemo no longer auto-sends
          * the welcome prompt to avoid racing against session teardown.
          */
         mockFetch
@@ -540,8 +540,8 @@ describe('demoStore', () => {
         /** One of the fetch calls must target the Copilot disable endpoint */
         const calledUrls = mockFetch.mock.calls.map((c) => c[0]);
         expect(calledUrls).toContain(COPILOT_DISABLE_URL);
-        /** /api/cwf/chat must NOT have been called (no welcome prompt race) */
-        expect(calledUrls).not.toContain('/api/cwf/chat');
+        /** /api/cwf/demo-chat must NOT have been called (no welcome prompt race) */
+        expect(calledUrls).not.toContain('/api/cwf/demo-chat');
     });
 
     it('restartDemo does not call copilot disable if Copilot was not enabled', async () => {
@@ -586,7 +586,7 @@ describe('demoStore', () => {
 
     // ── fetch payload shape ────────────────────────────────────────────────────
 
-    it('sendMessage posts to /api/cwf/chat with ARIA persona in conversationHistory', async () => {
+    it('sendMessage posts to /api/cwf/demo-chat with ARIA persona in conversationHistory', async () => {
         mockSuccessResponse();
         await act(async () => {
             await useDemoStore.getState().sendMessage('Payload test');
@@ -594,7 +594,7 @@ describe('demoStore', () => {
 
         expect(mockFetch).toHaveBeenCalledOnce();
         const [url, options] = mockFetch.mock.calls[0];
-        expect(url).toBe('/api/cwf/chat');
+        expect(url).toBe('/api/cwf/demo-chat');
         expect(options.method).toBe('POST');
 
         const body = JSON.parse(options.body);
