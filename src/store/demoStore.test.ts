@@ -261,14 +261,12 @@ describe('demoStore', () => {
 
     // ── API request body ──────────────────────────────────────────────────────
 
-    it('sends simulationHistory (not empty []) and uiContext in the API request body', async () => {
+    it('sends narrativeContext and uiContext (no simulationHistory) in the API request body', async () => {
         /**
-         * Root-cause regression guard: demo ARIA previously sent simulationHistory:[]
-         * and no uiContext, causing the server-side Gemini agent to say "I don't have
-         * historical data" even when the data existed in Supabase.
-         * This test ensures the request body contains the correct fields so the
-         * server can inject uiContext into the Gemini system prompt and ARIA can
-         * make proper tool calls (e.g. query conveyor speed history).
+         * Regression guard: postToCWF now sends narrativeContext (per-act framing)
+         * as a dedicated field instead of packing DEMO_SYSTEM_PROMPT into
+         * conversationHistory. simulationHistory is no longer sent (demo-chat.ts
+         * doesn't use it). uiContext is still present.
          */
         mockSuccessResponse('ok');
         await act(async () => {
@@ -278,8 +276,11 @@ describe('demoStore', () => {
         expect(mockFetch).toHaveBeenCalledOnce();
         const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body as string);
 
-        /** simulationHistory must be an array (not the empty literal []) */
-        expect(Array.isArray(requestBody.simulationHistory)).toBe(true);
+        /** narrativeContext must be a string (may be empty for free-form messages) */
+        expect(typeof requestBody.narrativeContext).toBe('string');
+
+        /** simulationHistory must NOT be present — removed from the payload */
+        expect(requestBody.simulationHistory).toBeUndefined();
 
         /** uiContext must be present with at minimum simulation + config sub-objects */
         expect(requestBody.uiContext).toBeDefined();
@@ -586,7 +587,7 @@ describe('demoStore', () => {
 
     // ── fetch payload shape ────────────────────────────────────────────────────
 
-    it('sendMessage posts to /api/cwf/demo-chat with ARIA persona in conversationHistory', async () => {
+    it('sendMessage posts to /api/cwf/demo-chat with clean conversationHistory and narrativeContext', async () => {
         mockSuccessResponse();
         await act(async () => {
             await useDemoStore.getState().sendMessage('Payload test');
@@ -602,13 +603,16 @@ describe('demoStore', () => {
         expect(body.language).toBe('en');
         expect(body.simulationId).toBe('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
 
-        /** Conversation history must start with the ARIA persona seed */
-        expect(body.conversationHistory[0].role).toBe('user');
-        /** Check for ARIA persona content — not a hardcoded string */
-        expect(body.conversationHistory[0].content).toContain('You are ARIA');
-        /** Second turn must be ARIA's acknowledgement */
-        expect(body.conversationHistory[1].role).toBe('assistant');
-        expect(body.conversationHistory[1].content).toContain('ARIA in Demo Mode');
+        /** conversationHistory must be clean — no ARIA persona seed injected */
+        expect(Array.isArray(body.conversationHistory)).toBe(true);
+        /** For a first message there should be no prior history */
+        expect(body.conversationHistory).toHaveLength(0);
+
+        /** narrativeContext must be present as a string */
+        expect(typeof body.narrativeContext).toBe('string');
+
+        /** simulationHistory must NOT be in the payload */
+        expect(body.simulationHistory).toBeUndefined();
     });
 
     // ── slideImageUrl image message injection ──────────────────────────────────

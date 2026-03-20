@@ -282,7 +282,9 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                       * ──────────────────────────────────────────────────────── */}
 
                     {/* ── MESSAGES ───────────────────────────────────────────── */}
-                    {messages.map((msg: DemoMessage) => {
+                    {messages
+                        .filter((msg) => msg.role !== 'user')
+                        .map((msg: DemoMessage) => {
                         const isUser = msg.role === 'user';
                         const isSystem = msg.role === 'system';
 

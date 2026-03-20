@@ -8,10 +8,11 @@
  * Purpose-built for speed: slim system prompt, 2 tools, 4-loop cap,
  * no knowledge base, no copilot state machine, no auth flows.
  *
- * The demo engine injects ARIA's personality, quality model guardrails,
- * and per-act narrative context via the conversationHistory field.
- * This endpoint only provides DB knowledge (schema, ranges) and
- * speed instructions for Gemini.
+ * The demo engine sends per-act narrative context via a dedicated
+ * `narrativeContext` field (NOT via conversationHistory). This endpoint
+ * builds ONE coherent systemInstruction containing: DB schema, quality
+ * guardrail, response rules, and the act-specific narrative context.
+ * conversationHistory contains only real user/assistant messages.
  *
  * Architecture: This is a SEPARATE endpoint from /api/cwf/chat.
  * The main chat.ts continues to handle interactive CWF panel queries,
@@ -69,29 +70,15 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // =============================================================================
 
 const DB_SCHEMA_DEMO = `
-## DATABASE SCHEMA — Ceramic Tile Production Line Simulator (Demo Subset)
+## DATABASE SCHEMA — Ceramic Tile Production Simulator (Slim)
 
 ### Core Tables:
+simulation_sessions — Each simulation run (id UUID PK, session_code, status, current_sim_tick, started_at)
+tiles — Every tile (id, simulation_id, tile_number, status, current_station, final_grade: first_quality|second_quality|scrap|pending)
 
-**simulation_sessions** — Each simulation run
-- id (UUID PK), session_code (VARCHAR 6-char unique), name, description
-- tick_duration_ms, production_tick_ratio, station_gap_production_ticks
-- status (created|running|paused|completed|aborted)
-- current_sim_tick, current_production_tick
-- target_tiles_per_hour, target_first_quality_pct
-- started_at, completed_at, created_at, updated_at
-
-**tiles** — Every tile produced
-- id (UUID PK), simulation_id (FK), tile_number (SERIAL)
-- created_at_sim_tick, created_at_production_tick, completed_at_sim_tick
-- status (in_production|scrapped_at_press|scrapped_at_dryer|scrapped_at_glaze|scrapped_at_printer|scrapped_at_kiln|sorted|packaged|completed)
-- current_station (press|dryer|glaze|printer|kiln|sorting|packaging)
-- final_grade (first_quality|second_quality|third_quality|scrap|pending)
-- width_mm, height_mm, thickness_mm, weight_g
-
-### Machine State Tables (one per station, all share base columns):
-Base columns: id, simulation_id, sim_tick, production_tick, is_operating, fault_code, created_at
-UNIQUE constraint on each: (simulation_id, sim_tick)
+### Machine State Tables (one per station, shared base columns):
+Base: id, simulation_id, sim_tick, production_tick, is_operating, fault_code
+UNIQUE: (simulation_id, sim_tick)
 
 ${generateSchemaRangesText()}
 
@@ -99,35 +86,24 @@ ${generateSchemaRangesText()}
 
 **tile_station_snapshots** — Snapshot when tile passes each station
 - tile_id (FK), simulation_id (FK), station, station_order (1-7)
-- entry_sim_tick, entry_production_tick, exit_sim_tick, processing_duration_ticks
-- machine_state_id (FK to respective machine table)
-- parameters_snapshot (JSONB — denormalized machine params)
-- tile_measurements (JSONB)
+- entry_sim_tick, exit_sim_tick, processing_duration_ticks
+- parameters_snapshot (JSONB), tile_measurements (JSONB)
 - defect_detected (BOOL), defect_types (defect_type[]), defect_severity (0-1), scrapped_here (BOOL)
 
 ### OEE & Metrics:
 
-**oee_snapshots** — Periodic hierarchical OEE snapshots (inserted every ~10s while running)
+**oee_snapshots** — Periodic hierarchical OEE snapshots (every ~10s while running)
 - simulation_id (FK), sim_tick, elapsed_minutes
 - Station counts: press_spawned, press_output, dryer_output, glaze_output, digital_output, kiln_input, kiln_output, sorting_usable_output, packaging_output, conveyor_clean_output, theoretical_a, theoretical_b
 - Machine OEEs (0-100): moee_press, moee_dryer, moee_glaze, moee_digital, moee_conveyor, moee_kiln, moee_sorting, moee_packaging
 - Line OEEs (0-100): loee_line1 (press→printer), loee_line2 (conveyor), loee_line3 (kiln→packaging)
 - Factory OEE: foee (0-100), bottleneck ('A' press-limited or 'B' kiln-limited)
-- Energy totals: energy_total_kwh, energy_total_gas, energy_total_co2, energy_kwh_per_tile
+- Energy: energy_total_kwh, energy_total_gas, energy_total_co2, energy_kwh_per_tile
 - Per-station energy: energy_press_kwh, energy_dryer_kwh, energy_glaze_kwh, energy_digital_kwh, energy_conveyor_kwh, energy_kiln_kwh, energy_sorting_kwh, energy_packaging_kwh, energy_dryer_gas, energy_kiln_gas
 
-**telemetry** — Per-simulation time-series telemetry (machine metrics per tick)
-- machine_id ('press'|'dryer'|'glaze'|'printer'|'kiln'|'sorting'|'packaging'|'conveyor'|'factory')
-- simulation_id (FK), s_clock (INTEGER — sim tick), p_clock (INTEGER — production tick)
-- status, conveyor_speed
-- oee, ftq, scrap_rate, energy_kwh, gas_m3, co2_kg (only on machine_id='factory')
-- UNIQUE constraint on (machine_id, simulation_id, s_clock)
-
-**conveyor_states** — Per-tick conveyor snapshots (speed, status, fault_count)
-
-**simulation_events** — State transitions during simulation
-- simulation_id (FK), sim_tick, event_type ('started'|'stopped'|'drain_started'|'drain_completed'|'force_stopped'|'resumed'|'reset'|'work_order_completed')
-- details (JSONB), created_at
+telemetry — Per-tick machine metrics (machine_id, simulation_id, s_clock, oee, ftq, scrap_rate, energy_kwh, co2_kg). UNIQUE: (machine_id, simulation_id, s_clock)
+conveyor_states — Per-tick conveyor snapshots (speed, status, fault_count)
+simulation_events — State transitions (event_type: started|stopped|drain_started|drain_completed|work_order_completed, sim_tick, details JSONB)
 
 ### Defect Types (enum):
 Press: crack_press, delamination, dimension_variance, density_variance, edge_defect, press_explosion
@@ -137,22 +113,17 @@ Printer: line_defect_print, white_spot, color_shift, saturation_variance, blur, 
 Kiln: crack_kiln, warp_kiln, corner_lift, pinhole_kiln, color_fade, size_variance_kiln, thermal_shock_crack
 Packaging: chip, edge_crack_pack, crush_damage
 
-### EXAMPLE SQL QUERIES:
+### EXAMPLE QUERIES:
 
-**Defect root cause — which stations are causing defects?**
+**Defect root cause:**
 SELECT tss.station, COUNT(*) as defect_count, array_agg(DISTINCT unnest_dt) as defect_types
-FROM tile_station_snapshots tss
-CROSS JOIN LATERAL unnest(tss.defect_types) AS unnest_dt
+FROM tile_station_snapshots tss CROSS JOIN LATERAL unnest(tss.defect_types) AS unnest_dt
 WHERE tss.simulation_id = '<session_id>' AND tss.defect_detected = true
 GROUP BY tss.station ORDER BY defect_count DESC
 
-**OEE trend over time:**
-SELECT sim_tick, foee, moee_press, moee_kiln, moee_conveyor, loee_line1, loee_line2, loee_line3
+**OEE trend:**
+SELECT sim_tick, foee, moee_press, moee_kiln, loee_line1, loee_line2, loee_line3
 FROM oee_snapshots WHERE simulation_id = '<session_id>' ORDER BY sim_tick
-
-**Energy consumption by station:**
-SELECT energy_total_kwh, energy_kwh_per_tile, energy_press_kwh, energy_kiln_kwh, energy_total_co2
-FROM oee_snapshots WHERE simulation_id = '<session_id>' ORDER BY sim_tick DESC LIMIT 1
 
 ### SAFE RANGES — Compare actual values against these to find deviations:
 
@@ -164,12 +135,11 @@ ${generateSafeRangesText()}
 // =============================================================================
 
 /**
- * Build the slim demo system prompt (~2,000 tokens).
- * Contains DB schema, speed rules, and language instructions only.
- * ARIA personality, quality model, and narrative context are injected
- * by the client via conversationHistory.
+ * Build the demo system prompt (~2,100 tokens).
+ * Contains: DB schema, quality guardrail, response rules, language instructions,
+ * and act-specific narrative context. Everything Gemini needs in ONE instruction.
  */
-function buildDemoSystemPrompt(language: 'tr' | 'en'): string {
+function buildDemoSystemPrompt(language: 'tr' | 'en', narrativeContext: string): string {
     const langInstructions = language === 'tr'
         ? `LANGUAGE: Respond in Turkish (Türkçe). Use Turkish manufacturing terminology.
            If the user writes in English, still respond in Turkish unless they explicitly ask for English.`
@@ -180,42 +150,40 @@ function buildDemoSystemPrompt(language: 'tr' | 'en'): string {
 
 ${langInstructions}
 
+══════════════════════════════════════════════════════════════
+QUALITY MODEL — IMMOVABLE GUARDRAIL
+══════════════════════════════════════════════════════════════
+The sorting station catches 100% of non-conforming tiles BEFORE
+anything leaves the factory. Customer ALWAYS receives good tiles.
+
+Three outcomes:
+1. FIRST QUALITY → shipped to customer (only revenue-generating outcome)
+2. SECOND QUALITY → rework facility (manufacturer pays 40-60% again)
+3. SCRAP → 100% loss (materials + energy + labour, zero revenue)
+
+NEVER imply defective tiles reach the customer. NEVER say "customer
+complaint", "warranty claim", or "recall". Quality loss is entirely
+internal — frame it as wasted cost, wasted energy, lost margin.
+
 ${DB_SCHEMA_DEMO}
 
 ══════════════════════════════════════════════════════════════
-DEMO ENGINE RESPONSE RULES — STRICT
+RESPONSE RULES
 ══════════════════════════════════════════════════════════════
-The ARIA personality and narrative context are provided in the conversation history —
-you do NOT need to add personality or narrative framing. Your job: query the database,
-calculate the answer, and return it clearly.
-
-PREFER get_simulation_summary as your primary data source. It returns
-session info, tile counts by grade, active scenario, latest OEE snapshot
-(all 8 machine OEEs, 3 line OEEs, factory OEE), energy totals, and
-recent events. Only call query_database if get_simulation_summary does
-not contain the specific data point requested.
-
-MAXIMUM 2 tool calls before generating your response. After 2 calls,
-use whatever data you have. Estimate if needed. State confidence.
-
-MAXIMUM 5 sentences. Lead with the key number or finding.
-
-No preambles ("Let me analyze...", "Based on the data...").
-Start with the answer.
-
-Round numbers to 1 decimal place. Use € for monetary values.
-Use metric units. Use percentage for rates.
-
-If the simulation just started and data is sparse, say so briefly
-and give your best estimate based on available data. Do NOT refuse
-to answer or say "insufficient data."
-
-When querying with query_database, ALWAYS filter by simulation_id.
-Never query across sessions.
-
-NEVER expose database internals (table names, column names, SQL queries).
-Speak in manufacturing language. If you cannot find data, say
-"this information is not available for this session."
+Call get_simulation_summary FIRST. It has OEE, tiles, energy, scenario.
+Only use query_database if get_simulation_summary lacks the specific data.
+Maximum 2 tool calls. Then answer with what you have.
+Maximum 5 sentences. Start with the key number.
+Round to 1 decimal. € for money. % for rates. Metric units.
+If data is sparse, estimate from available data. Never refuse to answer.
+ALWAYS filter by simulation_id. Never query across sessions.
+Never expose table names, column names, or SQL. Speak manufacturing language.
+${narrativeContext ? `
+══════════════════════════════════════════════════════════════
+ACT-SPECIFIC NARRATIVE CONTEXT (from the demo engine)
+══════════════════════════════════════════════════════════════
+${narrativeContext}
+` : ''}
 `;
 }
 
@@ -386,6 +354,7 @@ export default async function handler(
             sessionCode = '',
             conversationHistory = [],
             language = 'en',
+            narrativeContext = '',
             // ── Future-proof fields (accepted but not yet used in v1) ──
             actId: _actId,
             scenarioCode: _scenario,
@@ -396,6 +365,7 @@ export default async function handler(
             sessionCode?: string;
             conversationHistory?: Array<{ role: string; content: string }>;
             language?: string;
+            narrativeContext?: string;
             actId?: string;
             scenarioCode?: string;
             responseHint?: string;
@@ -409,18 +379,52 @@ export default async function handler(
 
         const lang = (language === 'tr' ? 'tr' : 'en') as 'tr' | 'en';
 
-        console.log(`[CWF-Demo] Request — lang: ${lang}, simId: ${simulationId.slice(0, 8)}…, sessionCode: ${sessionCode}, msg length: ${message.length}`);
+        console.log(`[CWF-Demo] Request — lang: ${lang}, simId: ${simulationId.slice(0, 8)}…, msg: ${message.length}c, narrative: ${narrativeContext.length}c`);
 
         // =================================================================
         // Build Gemini conversation from client-provided history + message
         // =================================================================
+
+        /**
+         * Gemini SDK hard rules for chat history:
+         *   1. First entry MUST be role 'user' (not 'model')
+         *   2. Entries must strictly alternate: user → model → user → model
+         *   3. History passed to startChat must end with 'model'
+         *      (sendMessage adds the next 'user' turn)
+         *
+         * After postToCWF stopped injecting a fake user/assistant seed,
+         * conversationHistory can start with an assistant message (ARIA's
+         * response from a prior step). We sanitize to prevent SDK errors.
+         */
+        const mappedHistory: Content[] = conversationHistory.map(
+            (msg: { role: string; content: string }) => ({
+                role: msg.role === 'user' ? ('user' as const) : ('model' as const),
+                parts: [{ text: msg.content }] as Part[],
+            })
+        );
+
+        // Drop leading 'model' entries until we find a 'user' entry
+        while (mappedHistory.length > 0 && mappedHistory[0].role !== 'user') {
+            mappedHistory.shift();
+        }
+
+        // Enforce strict alternation: drop consecutive same-role entries
+        const cleanHistory: Content[] = [];
+        for (const entry of mappedHistory) {
+            if (cleanHistory.length === 0 || cleanHistory[cleanHistory.length - 1].role !== entry.role) {
+                cleanHistory.push(entry);
+            }
+        }
+
+        // History must end with 'model' (sendMessage adds the next 'user' turn)
+        while (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role === 'user') {
+            cleanHistory.pop();
+        }
+
+        console.log(`[CWF-Demo] History: ${conversationHistory.length} raw → ${cleanHistory.length} clean`);
+
         const contents: Content[] = [
-            ...conversationHistory.map(
-                (msg: { role: string; content: string }) => ({
-                    role: msg.role === 'user' ? ('user' as const) : ('model' as const),
-                    parts: [{ text: msg.content }] as Part[],
-                })
-            ),
+            ...cleanHistory,
             {
                 role: 'user' as const,
                 parts: [
@@ -436,7 +440,7 @@ export default async function handler(
         // =================================================================
         const model = genAI.getGenerativeModel({
             model: MODEL_NAME,
-            systemInstruction: buildDemoSystemPrompt(lang),
+            systemInstruction: buildDemoSystemPrompt(lang, narrativeContext),
             tools: [{ functionDeclarations: tools }],
         });
 

@@ -54,8 +54,6 @@ import {
 /** Inline command parser — tokenises screenText and ARIA Local fields */
 import { parseCommands, executeTokens } from '../lib/utils/commandParser';
 
-/** ARIA storyteller persona — injected as synthetic conversation seed */
-import { DEMO_SYSTEM_PROMPT } from '../lib/params/demoSystem/demoSystemPrompt';
 
 /** Declarative act config — the "sheet music" for the engine */
 import { DEMO_ACTS } from '../lib/params/demoSystem/demoScript';
@@ -81,13 +79,7 @@ import { useWorkOrderStore } from './workOrderStore';
 /** executeSimulationAction — extracted utility for sim lifecycle control */
 import { executeSimulationAction } from '../lib/utils/simActionExecutor';
 
-/**
- * getSimulationHistory — reads this browser's local simulation session history.
- * Passed to the CWF API so ARIA can reference previous runs by session code.
- * An empty array causes the backend to skip history context, leading to hallucinations;
- * we must always pass the real history (even if it is empty from a fresh browser).
- */
-import { getSimulationHistory } from '../services/simulationHistoryService';
+
 
 // =============================================================================
 // TYPES
@@ -464,7 +456,7 @@ function sanitizeScreenText(text: string): string {
  *
  * @param text          - The prompt string to send (openingPrompt or user free-form)
  * @param actId         - Act id if triggered by act advance, null for free-form
- * @param systemContext - Per-act AI framing appended after DEMO_SYSTEM_PROMPT
+ * @param systemContext - Per-act narrative framing sent as narrativeContext to the server
  * @param get           - Zustand store getter
  * @param set           - Zustand store setter
  */
@@ -536,25 +528,17 @@ async function postToCWF(
     }, DEMO_ARIA_LOADING_TIMEOUT_MS);
 
     try {
-        // ── Build conversation history with ARIA persona seed ────────────────
+        // ── Build clean conversation history (real messages only) ────────────
+        // The ARIA persona seed is NO LONGER injected here. The server-side
+        // demo-chat.ts receives narrativeContext as a separate field and
+        // injects it into Gemini's systemInstruction — not the conversation.
 
         const recentHistory = messages
             .filter((m) => m.role !== 'system')
             .slice(-DEMO_MAX_HISTORY_MESSAGES)
             .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-        const fullSystemContext = systemContext
-            ? `${DEMO_SYSTEM_PROMPT}\n\nACT-SPECIFIC CONTEXT:\n${systemContext}`
-            : DEMO_SYSTEM_PROMPT;
-
         const conversationHistory = [
-            { role: 'user' as const, content: fullSystemContext },
-            {
-                role: 'assistant' as const,
-                content:
-                    'Understood. I am ARIA in Demo Mode. ' +
-                    'I will guide this presentation with warmth, clarity, and Socratic engagement.',
-            },
             ...recentHistory,
         ];
 
@@ -592,7 +576,7 @@ async function postToCWF(
                 sessionCode,
                 conversationHistory,
                 language: 'en',
-                simulationHistory: getSimulationHistory(),
+                narrativeContext: systemContext || '',
                 uiContext,
             }),
         });
