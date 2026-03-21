@@ -29,7 +29,8 @@ function generateAllTypeScript() {
         out.push('ctaSteps: [');
         steps.forEach(function (step, i) {
             out.push('    { // Click #' + (i + 1));
-            buildStepFields(step).forEach(function (line) { out.push('        ' + line); });
+            var heights = extractStepHeights(state, stage.id, i);
+            buildStepFields(step, heights).forEach(function (line) { out.push('        ' + line); });
             out.push('    },');
         });
         out.push('],');
@@ -43,7 +44,7 @@ function generateAllTypeScript() {
  * buildStepFields — converts one step object into an array of TypeScript lines.
  * Fields with empty/default values are omitted for cleanliness.
  */
-function buildStepFields(step) {
+function buildStepFields(step, editorHeights) {
     const lines = [];
 
     if (step.ctaLabel && step.ctaLabel.trim())
@@ -119,10 +120,34 @@ function buildStepFields(step) {
     if (step.transitionTo)
         lines.push('transitionTo: ' + q(step.transitionTo) + ',');
 
+    // editorHeights — persist textarea dimensions for the DemoScript Editor
+    if (editorHeights && Object.keys(editorHeights).length > 0) {
+        var parts = [];
+        ['screenText', 'ariaLocal', 'ariaApi'].forEach(function (f) {
+            if (editorHeights[f]) parts.push(f + ': ' + editorHeights[f]);
+        });
+        if (parts.length > 0)
+            lines.push('editorHeights: { ' + parts.join(', ') + ' },');
+    }
+
     if (lines.length === 0)
         lines.push('// (empty step — no fields configured yet)');
 
     return lines;
+}
+
+/**
+ * extractStepHeights — pulls height values from state.textareaHeights
+ * for a specific stage/step and returns them as { screenText, ariaLocal, ariaApi }.
+ */
+function extractStepHeights(state, stageId, stepIdx) {
+    if (!state.textareaHeights) return null;
+    var heights = {};
+    ['screenText', 'ariaLocal', 'ariaApi'].forEach(function (field) {
+        var h = state.textareaHeights[stageId + '-' + stepIdx + '-' + field];
+        if (h) heights[field] = h;
+    });
+    return Object.keys(heights).length > 0 ? heights : null;
 }
 
 /**

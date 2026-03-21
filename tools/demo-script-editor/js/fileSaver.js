@@ -86,8 +86,10 @@ function generateCtaBlockForAct(stageId) {
         // Click number comment aids readability in the source file
         lines.push('            { // Click #' + (i + 1));
 
+        // Extract textarea heights for this step (for editor persistence)
+        var heights = extractStepHeights(state, stageId, i);
         // buildStepFields returns an array of "key: value," string lines
-        buildStepFields(step).forEach(function (line) {
+        buildStepFields(step, heights).forEach(function (line) {
             // Indent each field line 16 spaces (inside the step object)
             lines.push('                ' + line);
         });

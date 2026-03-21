@@ -170,6 +170,11 @@ function mapToEditorStep(parsed) {
         });
     }
 
+    // Preserve editorHeights if present (passed through but not stored on step)
+    if (parsed.editorHeights && typeof parsed.editorHeights === 'object') {
+        step._editorHeights = parsed.editorHeights;
+    }
+
     return step;
 }
 
@@ -271,9 +276,27 @@ window.openAndImport = async function () {
         });
 
         // 4. Build new editor state
+        var textareaHeights = {};
+
+        // Extract editorHeights from imported steps into the flat textareaHeights map
+        STAGES.forEach(function (stage) {
+            var stageSteps = stages[stage.id].steps;
+            stageSteps.forEach(function (step, i) {
+                if (step._editorHeights) {
+                    ['screenText', 'ariaLocal', 'ariaApi'].forEach(function (field) {
+                        if (step._editorHeights[field]) {
+                            textareaHeights[stage.id + '-' + i + '-' + field] = step._editorHeights[field];
+                        }
+                    });
+                    delete step._editorHeights; // clean up temp property
+                }
+            });
+        });
+
         var newState = {
             activeStageId: STAGES[0].id,
             stages: stages,
+            textareaHeights: textareaHeights,
         };
 
         // 5. Load into editor
