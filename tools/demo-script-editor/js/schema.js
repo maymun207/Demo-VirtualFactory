@@ -290,5 +290,5 @@ window.createEmptyStep = function () {
 window.createInitialState = function () {
     const stages = {};
     STAGES.forEach(s => { stages[s.id] = { steps: [createEmptyStep(), createEmptyStep()] }; });
-    return { activeStageId: STAGES[0].id, stages };
+    return { activeStageId: STAGES[0].id, stages, textareaHeights: {} };
 };

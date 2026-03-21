@@ -285,16 +285,40 @@ var FMT_DEFAULTS = {
 function addTextareaRow(tbody, steps, stageId, label, field, desc) {
     const tr = tbody.insertRow();
     tr.appendChild(labelCell(label, desc));
+
+    /* Ensure textareaHeights bucket exists (handles old localStorage data) */
+    if (!state.textareaHeights) state.textareaHeights = {};
+
     steps.forEach(function (step, i) {
         const td = tr.insertCell();
         td.className = 'td-cell';
         const ta = document.createElement('textarea');
         ta.className = 'c-textarea'; ta.rows = 3; ta.placeholder = '—';
         ta.value = step[field] || '';
+
+        /* ── Restore saved height ── */
+        var htKey = stageId + '-' + i + '-' + field;
+        var savedH = state.textareaHeights[htKey];
+        if (savedH) ta.style.height = savedH + 'px';
+
         ta.addEventListener('input', function () {
             state.stages[stageId].steps[i][field] = ta.value;
             save();
         });
+
+        /* ── Persist height on resize ── */
+        if (typeof ResizeObserver !== 'undefined') {
+            var skipFirst = true; /* skip the initial observe callback */
+            var ro = new ResizeObserver(function (entries) {
+                if (skipFirst) { skipFirst = false; return; }
+                var h = Math.round(entries[0].contentRect.height);
+                if (h > 0) {
+                    state.textareaHeights[htKey] = h;
+                    save();
+                }
+            });
+            ro.observe(ta);
+        }
 
         /* ── Toolbar activation on focus ── */
         if (FMT_FIELDS[field]) {

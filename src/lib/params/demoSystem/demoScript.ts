@@ -197,54 +197,40 @@ Maximum 3 sentences per response. Every word must earn its place.
         /** No openingPrompt — Act 0 is the entry point. */
         openingPrompt: '',
 
-                ctaSteps: [
+                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start →',
                 scenarioCode: 'SCN-001',
                 workOrderId: 'WorkID#3',
                 delayMs: 800,
-                screenText:
-                    `4,200 tiles per shift.\n` +
-                    `Seven stations. One line.` +
-                    `<w:2500><cls>` +
-                    `<w:500>` +
-                    `This factory loses €47 every 20 seconds.\n` +
-                    `No alarm. No report. No one notices.` +
-                    `<w:2500><cls>` +
-                    `<w:500>` +
-                    `Every shift. Every day. Silently.` +
-                    `<w:2000><clck>`,
+                screenText: `4,200 tiles per shift.
+Seven stations. One line.<w:2500><cls><w:500>This factory loses €47 every 20 seconds.
+No alarm. No report. No one notices.<w:2500><cls><w:500>Every shift. Every day. Silently.<w:2000><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `I am ARIA — this factory's intelligence layer.\n\n` +
-                    `What you just read is not a worst case.\n` +
-                    `It is the everyday reality of factories running blind.\n\n` +
-                    `The factory behind me is starting now.\n` +
-                    `→ Click to ask it a question.`,
+                ariaLocal: `<cls><w:300>I am ARIA — this factory's intelligence layer.
+
+What you just read is not a worst case.
+It is the everyday reality of factories running blind.
+
+The factory behind me is starting now.
+→ Click to ask it a question.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 simulationAction: 'reset-start',
             },
             { // Click #2
                 ctaLabel: 'Ask the factory →',
-                screenText:
-                    `<cls><w:400>` +
-                    `What if you could just ask?` +
-                    `<w:1500><clck>`,
-                screenTextAlign: 'center',
-                screenTextWeight: 'bold',
-                screenTextSize: 'lg',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `📊 Throughput: 3,840 tiles/hour — 8.6% below plan.\n` +
-                    `Conveyor drift averaging 0.91x nominal.\n\n` +
-                    `Kiln and Dryer burning energy during every speed dip.\n` +
-                    `Session loss so far: ~€94.\n` +
-                    `Annual projection: ~€206,000.\n\n` +
-                    `That answer took 3 seconds. No analyst. No report.`,
+                screenText: `<cls><w:400>What if you could just ask?<w:2500><clck>`,
+                ariaLocal: `<cls><w:3000>📊 Throughput: 3,840 tiles/hour — 8.6% below plan.
+Conveyor drift averaging 0.91x nominal.
+
+Kiln and Dryer burning energy during every speed dip.
+Session loss so far: ~€94.
+Annual projection: ~€206,000.
+
+That answer took 3 seconds. No analyst. No report.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 panelActions: [
@@ -253,33 +239,21 @@ Maximum 3 sentences per response. Every word must earn its place.
             },
             { // Click #3
                 ctaLabel: 'Continue →',
-                screenText:
-                    `<cls><w:500>` +
-                    `That answer came from live data.` +
-                    `<w:2000><cls>` +
-                    `<w:400>` +
-                    `03:47 AM. Night shift.\n` +
-                    `Kiln drifts above spec. No one notices.` +
-                    `<w:2500><cls>` +
-                    `<w:400>` +
-                    `03:48 — Detected.\n` +
-                    `03:48 — Root cause found.\n` +
-                    `03:49 — Corrected. Automatically.` +
-                    `<w:2500><cls>` +
-                    `<w:400>` +
-                    `No one woke up.\n` +
-                    `~1,900 kg CO₂ prevented.` +
-                    `<w:2000><clck>`,
+                screenText: `<cls><w:500>That answer came from live data.<w:2000><cls><w:400>03:47 AM. Night shift.
+Kiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.
+03:48 — Root cause found.
+03:49 — Corrected. Automatically.<w:2500><cls><w:400>No one woke up.
+~1,900 kg CO₂ prevented.<w:2000><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `Three things most factory owners never see:\n\n` +
-                    `1. The silent cost of running blind\n` +
-                    `2. A factory that answers in plain language\n` +
-                    `3. A system that corrects before humans notice\n\n` +
-                    `→ Click to walk through the full journey.`,
+                ariaLocal: `<cls><w:300>Three things most factory owners never see:
+
+1. The silent cost of running blind
+2. A factory that answers in plain language
+3. A system that corrects before humans notice
+
+→ Click to walk through the full journey.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -345,28 +319,22 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                ctaSteps: [
+                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show me →',
                 mediaInstruction: 'chart:conveyor_speed',
                 delayMs: 1000,
-                screenText:
-                    `<w:300>` +
-                    `Conveyor speed. Real time.` +
-                    `<MI><w:4000>` +
-                    `Every dip: energy in. Zero output. No record.` +
-                    `<w:2500><clck>`,
+                screenText: `<w:300>Conveyor speed. Real time.<MI><w:4000>Every dip: energy in. Zero output. No record.<w:2500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `Speed: 0.87x nominal.\n` +
-                    `Output: 3,650 tiles/hr vs 4,200 theoretical.\n` +
-                    `Gap: 550 tiles/hr — 13.1% below plan.\n\n` +
-                    `Last dip (12s at 0.6x): €0.93 energy, 14 tiles lost.\n` +
-                    `No alarm. No log.\n` +
-                    `→ What if we had a dashboard?`,
+                ariaLocal: `<cls><w:300>Speed: 0.87x nominal.
+Output: 3,650 tiles/hr vs 4,200 theoretical.
+Gap: 550 tiles/hr — 13.1% below plan.
+
+Last dip (12s at 0.6x): €0.93 energy, 14 tiles lost.
+No alarm. No log.
+→ What if we had a dashboard?`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -375,21 +343,17 @@ Maximum 4 sentences per response.
             },
             { // Click #2
                 ctaLabel: 'Add a dashboard →',
-                screenText:
-                    `<cls><clmi><w:500>` +
-                    `10 million tiles/year.\n` +
-                    `3% drift = €180K–€240K lost annually.\n` +
-                    `Before counting wasted energy.` +
-                    `<w:2500><clck>`,
+                screenText: `<cls><clmi><w:500>10 million tiles/year.
+3% drift = €180K–€240K lost annually.
+Before counting wasted energy.<w:2500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `No report filed. No alarm triggered.\n` +
-                    `It happened. Cost money. Disappeared.\n\n` +
-                    `Not a catastrophe. A slow, silent drain.\n` +
-                    `→ Add a dashboard.`,
+                ariaLocal: `<cls><w:300>No report filed. No alarm triggered.
+It happened. Cost money. Disappeared.
+
+Not a catastrophe. A slow, silent drain.
+→ Add a dashboard.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 panelActions: [
@@ -442,27 +406,21 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                ctaSteps: [
+                                                        ctaSteps: [
             { // Click #1
-                ctaLabel: 'Show the dashboard →',
+                ctaLabel: 'Show dashboard →',
                 slideImageUrl: '/demo/ACT-2.png',
-                screenText:
-                    `OEE. Throughput. Energy.\n` +
-                    `All visible now.` +
-                    `<w:2000>` +
-                    `\nBut can we explain any of them?` +
-                    `<w:1500><clck>`,
-                screenTextAlign: 'center',
-                screenTextWeight: 'bold',
+                screenText: `OEE. Throughput. Energy.
+All visible now.<w:2000>
+But can we explain any of them?<w:1500><clck>`,
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `OEE: 87.3%. Throughput: 3,814/hr.\n` +
-                    `Energy: 142.7 kWh this session.\n\n` +
-                    `Looks reasonable. But:\n` +
-                    `When did the belt slow? Is it trending worse?\n` +
-                    `Which station? What caused it?\n` +
-                    `The dashboard cannot answer.`,
+                ariaLocal: `<cls><w:300>OEE: 87.3%. Throughput: 3,814/hr.
+Energy: 142.7 kWh this session.
+
+Looks reasonable. But:
+When did the belt slow? Is it trending worse?
+Which station? What caused it?
+The dashboard cannot answer.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -471,22 +429,18 @@ Maximum 4 sentences per response.
             },
             { // Click #2
                 ctaLabel: 'Go deeper →',
-                screenText:
-                    `<cls><w:500>` +
-                    `OEE 87%. Good? Bad? Getting worse?\n` +
-                    `Which machine? Since when?\n\n` +
-                    `The dashboard is silent.` +
-                    `<w:2000><clck>`,
-                screenTextAlign: 'center',
+                screenText: `<cls><w:500>OEE 87%. Good? Bad? Getting worse?
+Which machine? Since when?
+
+The dashboard is silent.<w:2000><clck>`,
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `They see the score. Not the game.\n\n` +
-                    `No root cause. No trend. No breakdown by station.\n` +
-                    `The answer needs something fundamentally different.\n` +
-                    `Not more dashboards. Traceability.\n` +
-                    `→ Continue`,
+                ariaLocal: `<cls><w:300>They see the score. Not the game.
+
+No root cause. No trend. No breakdown by station.
+The answer needs something fundamentally different.
+Not more dashboards. Traceability.
+→ Continue`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -538,46 +492,37 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                ctaSteps: [
+                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the crisis →',
                 slideImageUrl: '/demo/ACT-3.png',
-                screenText:
-                    `Kiln: +14°C above spec.` +
-                    `<w:2000>` +
-                    `\nEvery tile has a digital passport.` +
-                    `<w:1500><clck>`,
+                screenText: `Kiln: +14°C above spec.<w:2000>
+Every tile has a digital passport.<w:1500><clck>`,
                 screenTextAlign: 'left',
-                screenTextWeight: 'bold',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `SCN-002 active. Kiln running 14°C above spec.\n` +
-                    `The Tile Passport shows every station record.\n\n` +
-                    `+14°C = 18% more gas. 1.9 kg CO₂/m³.\n` +
-                    `Every affected tile carries excess carbon.\n` +
-                    `Second quality = paid twice. Scrap = total loss.`,
+                ariaLocal: `<cls><w:300>SCN-002 active. Kiln running 14°C above spec.
+The Tile Passport shows every station record.
+
++14°C = 18% more gas. 1.9 kg CO₂/m³.
+Every affected tile carries excess carbon.
+Second quality = paid twice. Scrap = total loss.`,
                 ariaLocalSize: 'sm',
                 ariaApi: `Tiles through kiln so far, how many show quality issues.CO₂ impact: kiln ~100 m³ gas/hour, +18% at 14°C overshoot,1.9 kg CO₂/m³. Give energy waste and excess CO₂ this session.Also note: second-quality tiles cost 40-60% of production cost again at rework,and carry excess embedded carbon to the rework facility.`,
                 ariaInputEnabled: true,
             },
             { // Click #2
                 ctaLabel: 'Ask the factory →',
-                screenText:
-                    `<cls><w:500>` +
-                    `Affected tile → rework → second energy cycle → more CO₂.\n` +
-                    `Quality cost and carbon cost: same root cause.` +
-                    `<w:2500><clck>`,
+                screenText: `<cls><w:500>Affected tile → rework → second energy cycle → more CO₂.
+Quality cost and carbon cost: same root cause.<w:2500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `Second quality: 40–60% of production cost paid again.\n` +
-                    `Some recovered. Some scrapped at rework. Either way: paid twice.\n\n` +
-                    `Same tile carries excess carbon to rework.\n` +
-                    `One fix solves both.\n` +
-                    `→ What if you could ask the factory?`,
+                ariaLocal: `<cls><w:300>Second quality: 40–60% of production cost paid again.
+Some recovered. Some scrapped at rework. Either way: paid twice.
+
+Same tile carries excess carbon to rework.
+One fix solves both.
+→ What if you could ask the factory?`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -628,25 +573,21 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                ctaSteps: [
+                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Ask as CEO →',
                 slideImageUrl: '/demo/ACT-4a.png',
-                screenText:
-                    `Glaze Viscosity Drift.\n` +
-                    `Subtle. Slow-building.` +
-                    `<w:2000>` +
-                    `\nThe factory owner asks first.` +
-                    `<w:1500><clck>`,
+                screenText: `Glaze Viscosity Drift.
+Subtle. Slow-building.<w:2000>
+The factory owner asks first.<w:1500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `SCN-003 active. Glaze viscosity slightly off.\n` +
-                    `CWF panel open. Ask anything in plain language.\n\n` +
-                    `15 years of engineering knowledge,\n` +
-                    `accessible to anyone, any hour, any language.`,
+                ariaLocal: `<cls><w:300>SCN-003 active. Glaze viscosity slightly off.
+CWF panel open. Ask anything in plain language.
+
+15 years of engineering knowledge,
+accessible to anyone, any hour, any language.`,
                 ariaLocalSize: 'sm',
                 ariaApi: `The CWF panel is now open — the visitor can ask the factory anything in plainlanguage. This is 15 years of engineering knowledge accessible to anyone, at anyhour. First question, from the factory owner: 🏢 What is our quality situation?How much is glaze viscosity drift costing us — double-cost from second-qualitytiles (40-60% of production cost at rework)? Production window before critical?`,
                 ariaInputEnabled: true,
@@ -654,11 +595,7 @@ Maximum 5 sentences per response.
             { // Click #2
                 ctaLabel: 'Ask about CO₂ →',
                 slideImageUrl: '/demo/ACT-4b.png',
-                screenText:
-                    `<cls><w:500>` +
-                    `Different role. Same factory. Same data.` +
-                    `<w:1500><clck>`,
-                screenTextAlign: 'center',
+                screenText: `<cls><w:500>Different role. Same factory. Same data.<w:1500><clck>`,
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
                 ariaApi: `🌿 CO₂ intensity per 1,000 tiles this session.Glaze drift contribution: direct energy + CO₂ in second-quality tiles sentto rework. Factors: 0.4 kg/kWh, 1.9 kg/m³. Compare to SCN-001 optimal.`,
@@ -667,22 +604,16 @@ Maximum 5 sentences per response.
             { // Click #3
                 ctaLabel: 'Change a parameter →',
                 slideImageUrl: '/demo/ACT-4c.png',
-                screenText:
-                    `<cls><w:500>` +
-                    `You don't just ask questions.\n` +
-                    `You give instructions.` +
-                    `<w:2000><clck>`,
-                screenTextAlign: 'center',
-                screenTextWeight: 'bold',
-                screenTextSize: 'lg',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `💬 In the CWF panel, type:\n` +
-                    `"Increase glaze cabin pressure to 0.9 bar"\n\n` +
-                    `Auth code: airtk\n\n` +
-                    `Parameter changes live. No shutdown. No phone call.\n` +
-                    `Intent → Auth → Action. Under 30 seconds.\n` +
-                    `→ Now watch it do this itself.`,
+                screenText: `<cls><w:500>You don't just ask questions.
+You give instructions.<w:2000><clck>`,
+                ariaLocal: `<cls><w:300>💬 In the CWF panel, type:
+"Increase glaze cabin pressure to 0.9 bar"
+
+Auth code: airtk
+
+Parameter changes live. No shutdown. No phone call.
+Intent → Auth → Action. Under 30 seconds.
+→ Now watch it do this itself.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -739,77 +670,66 @@ The Copilot did not alert someone — it acted.
 
         openingPrompt: '',
 
-                ctaSteps: [
+                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the incident →',
                 slideImageUrl: '/demo/ACT-4d.png',
-                screenText:
-                    `Cascade Failure. Press + Kiln.` +
-                    `<w:2000>` +
-                    `\nCopilot active. Watch.` +
-                    `<w:1500><clck>`,
+                screenText: `Cascade Failure. Press + Kiln.<w:2000>
+Copilot active. Watch.<w:1500><clck>`,
                 screenTextAlign: 'left',
-                screenTextWeight: 'bold',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:500>` +
-                    `📋 INCIDENT LOG\n\n` +
-                    `03:47:00 — Press: 296 bar (+12% above spec)\n` +
-                    `03:47:23 — ANOMALY DETECTED\n` +
-                    `03:48:01 — Root cause: press → kiln cascade\n` +
-                    `03:48:45 — CORRECTED. Press 296→284, kiln −8°C\n` +
-                    `03:51:12 — Recovery confirmed\n` +
-                    `03:53:40 — ALL WITHIN SPEC\n\n` +
-                    `61 tiles affected. ~1,900 kg CO₂ prevented.\n` +
-                    `Duration: 6 min 40 sec. Filed automatically.\n\n` +
-                    `Customer received only first-quality tiles.\n` +
-                    `The Copilot did not alert someone — it acted.`,
+                ariaLocal: `<cls><w:500>📋 INCIDENT LOG
+
+03:47:00 — Press: 296 bar (+12% above spec)
+03:47:23 — ANOMALY DETECTED
+03:48:01 — Root cause: press → kiln cascade
+03:48:45 — CORRECTED. Press 296→284, kiln −8°C
+03:51:12 — Recovery confirmed
+03:53:40 — ALL WITHIN SPEC
+
+61 tiles affected. ~1,900 kg CO₂ prevented.
+Duration: 6 min 40 sec. Filed automatically.
+
+Customer received only first-quality tiles.
+The Copilot did not alert someone — it acted.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
             },
             { // Click #2
-                screenText:
-                    `OEE Hierarchy: the cascade impact.` +
-                    `<w:2000>` +
-                    `\nWatch the numbers.` +
-                    `<w:1500><clck>`,
+                ctaLabel: 'Next',
+                screenText: `OEE Hierarchy: the cascade impact.<w:2000>
+Watch the numbers.<w:1500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `Factory OEE during cascade: 38.2%\n\n` +
-                    `Line 1 (Press→Printer): 41.3%\n` +
-                    `Line 3 (Kiln→Packaging): 33.7%\n` +
-                    `Line 2 (Conveyor): 52.1%\n\n` +
-                    `At 10M tiles/year: €1.1M–€2.1M monthly gap.\n` +
-                    `Recovered in 6 minutes 40 seconds.`,
+                ariaLocal: `<cls><w:300>Factory OEE during cascade: 38.2%
+
+Line 1 (Press→Printer): 41.3%
+Line 3 (Kiln→Packaging): 33.7%
+Line 2 (Conveyor): 52.1%
+
+At 10M tiles/year: €1.1M–€2.1M monthly gap.
+Recovered in 6 minutes 40 seconds.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
             },
             { // Click #3
-                ctaLabel: 'The closing question →',
-                screenText:
-                    `<cls><w:500>` +
-                    `Not because someone was paged.\n` +
-                    `Because the system acted first.` +
-                    `<w:2500><cls>` +
-                    `<w:400>` +
-                    `Conventional: detect 2–4 hrs. Fix: next shift.\n` +
-                    `Here: detect 23 sec. Fix: 6 min 40 sec.\n\n` +
-                    `Difference: 847 tiles. €12,400.` +
-                    `<w:3000><clck>`,
+                ctaLabel: 'Closing question →',
+                screenText: `<cls><w:500>Not because someone was paged.
+Because the system acted first.<w:2500><cls><w:400>Conventional: detect 2–4 hrs. Fix: next shift.
+Here: detect 23 sec. Fix: 6 min 40 sec.
+
+Difference: 847 tiles. €12,400.<w:3000><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `At 03:47, every operator was elsewhere.\n` +
-                    `23 seconds to detect. 38 seconds to trace.\n` +
-                    `6 minutes 40 seconds to full recovery.\n\n` +
-                    `~1,900 kg CO₂ not emitted. 61 tiles recovered.\n` +
-                    `No special team. The right foundation.\n` +
-                    `→ One final question.`,
+                ariaLocal: `<cls><w:300>At 03:47, every operator was elsewhere.
+23 seconds to detect. 38 seconds to trace.
+6 minutes 40 seconds to full recovery.
+
+~1,900 kg CO₂ not emitted. 61 tiles recovered.
+No special team. The right foundation.
+→ One final question.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -857,47 +777,39 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                ctaSteps: [
+                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the numbers →',
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
-                screenText:
-                    `Factory → Line → Machine → Parameter.` +
-                    `<w:2000>` +
-                    `\nEvery number has a cause. Every cause has a cost.` +
-                    `<w:2000><clck>`,
-                screenTextAlign: 'center',
-                screenTextWeight: 'bold',
+                screenText: `Factory → Line → Machine → Parameter.<w:2000>
+Every number has a cause. Every cause has a cost.<w:2000><clck>`,
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `€8K–€15K per 1% OEE, per line, per month.\n` +
-                    `Typical first-quarter recovery: 3–5 points.\n\n` +
-                    `Eliminating second quality removes the double cost\n` +
-                    `AND the CO₂ liability. Same intervention.\n\n` +
-                    `How much of your production cost goes to losses\n` +
-                    `you cannot currently see?`,
+                ariaLocal: `<cls><w:300>€8K–€15K per 1% OEE, per line, per month.
+Typical first-quarter recovery: 3–5 points.
+
+Eliminating second quality removes the double cost
+AND the CO₂ liability. Same intervention.
+
+How much of your production cost goes to losses
+you cannot currently see?`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
             },
             { // Click #2
+                ctaLabel: 'End of Demo',
                 slideImageUrl: '/demo/SentialFactory.png',
-                screenText:
-                    `<cls><w:500>` +
-                    `How much waste did your factory produce last year?\n\n` +
-                    `If you don't know — that's exactly where we start.` +
-                    `<w:3000><clck>`,
-                screenTextAlign: 'center',
-                screenTextWeight: 'bold',
+                screenText: `<cls><w:3500>How much waste did your factory produce last year?
+
+If you don't know — that's exactly where we start.<w:3000><clck>`,
                 screenTextSize: 'md',
-                ariaLocal:
-                    `<cls><w:300>` +
-                    `Thank you for walking through this journey.\n\n` +
-                    `If something resonated — the invisible loss,\n` +
-                    `the double cost, the CO₂, or the 03:47 incident —\n` +
-                    `that instinct is worth exploring.\n\n` +
-                    `ARDICTECH. Since 2008. 16 facilities. 1M+ IoT endpoints.\n` +
-                    `→ ardic.ai`,
+                ariaLocal: `<cls><w:300>Thank you for walking through this journey.
+
+If something resonated — the invisible loss,
+the double cost, the CO₂, or the 03:47 incident —
+that instinct is worth exploring.
+
+ARDICTECH. Since 2008. 16 facilities. 1M+ IoT endpoints.
+→ ardic.ai`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
             },
