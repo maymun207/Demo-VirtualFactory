@@ -109,6 +109,8 @@ export interface CtaStep {
     panelActions?: PanelAction[];
     simulationAction?: 'start' | 'stop' | 'reset' | 'reset-start';
     transitionTo?: 'next' | string | null;
+    /** Editor-only: persisted textarea pixel heights for the DemoScript Editor */
+    editorHeights?: { screenText?: number; ariaLocal?: number; ariaApi?: number };
 }
 
 // ─── Act Definition ─────────────────────────────────────────────────────────
