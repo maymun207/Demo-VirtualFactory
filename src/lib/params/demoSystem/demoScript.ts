@@ -197,7 +197,7 @@ Maximum 3 sentences per response. Every word must earn its place.
         /** No openingPrompt — Act 0 is the entry point. */
         openingPrompt: '',
 
-                                                                                ctaSteps: [
+                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start →',
                 scenarioCode: 'SCN-001',
@@ -313,12 +313,12 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                ctaSteps: [
+                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show me →',
                 mediaInstruction: 'chart:conveyor_speed',
                 delayMs: 1000,
-                screenText: `<w:300>Conveyor speed. Real time.<MI><w:4000>Every dip: energy in. Zero output. No record.<w:2500><clck>`,
+                screenText: `<w:600>Conveyor speed. Real time.<MI><w:5000>Every dip: energy in. Zero output. No record.<w:2500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
@@ -338,7 +338,7 @@ No alarm. No log.
                 ctaLabel: 'Add a dashboard →',
                 screenText: `<cls><clmi><w:500>10 million tiles/year.
 3% drift = €180K–€240K lost annually.
-Before counting wasted energy.<w:2500><clck>`,
+Before counting wasted energy.<w:4000><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
@@ -398,13 +398,13 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                ctaSteps: [
+                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show dashboard →',
                 slideImageUrl: '/demo/ACT-2.png',
                 screenText: `OEE. Throughput. Energy.
-All visible now.<w:2000>
-But can we explain any of them?<w:1500><clck>`,
+All visible now.<w:3500>
+But can we explain any of them?<w:3000><clck>`,
                 screenTextSize: 'md',
                 ariaLocal: `<cls><w:300>OEE: 87.3%. Throughput: 3,814/hr.
 Energy: 142.7 kWh this session.
@@ -422,7 +422,7 @@ The dashboard cannot answer.`,
                 ctaLabel: 'Go deeper →',
                 screenText: `<cls><w:500>OEE 87%. Good? Bad? Getting worse?
 Which machine? Since when?
-The dashboard is silent.<w:2000><clck>`,
+The dashboard is silent.<w:5000><clck>`,
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
                 ariaLocal: `<cls><w:300>They see the score. Not the game.
@@ -481,7 +481,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                ctaSteps: [
+                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the crisis →',
                 slideImageUrl: '/demo/ACT-3.png',
@@ -493,7 +493,7 @@ Every tile has a digital passport.<w:1500><clck>`,
 The Tile Passport shows every station record.
 +14°C = 18% more gas. 1.9 kg CO₂/m³.
 Every affected tile carries excess carbon.
-Second quality = paid twice. Scrap = total loss.`,
+Second quality = paid twice. Scrap = total loss.<w:3500><clck>`,
                 ariaLocalSize: 'sm',
                 ariaApi: `Tiles through kiln so far, how many show quality issues.CO₂ impact: kiln ~100 m³ gas/hour, +18% at 14°C overshoot,1.9 kg CO₂/m³. Give energy waste and excess CO₂ this session.Also note: second-quality tiles cost 40-60% of production cost again at rework,and carry excess embedded carbon to the rework facility.`,
                 ariaInputEnabled: true,
@@ -501,7 +501,7 @@ Second quality = paid twice. Scrap = total loss.`,
             { // Click #2
                 ctaLabel: 'Ask the factory →',
                 screenText: `<cls><w:500>Affected tile → rework → second energy cycle → more CO₂.
-Quality cost and carbon cost: same root cause.<w:2500><clck>`,
+Quality cost and carbon cost: same root cause.<w:3500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
@@ -560,20 +560,20 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                ctaSteps: [
+                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Ask as CEO →',
                 slideImageUrl: '/demo/ACT-4a.png',
                 screenText: `Glaze Viscosity Drift.
 Subtle. Slow-building.<w:2000>
-The factory owner asks first.<w:1500><clck>`,
+The factory owner asks first.<w:2500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
                 ariaLocal: `<cls><w:300>SCN-003 active. Glaze viscosity slightly off.
 CWF panel open. Ask anything in plain language.
 15 years of engineering knowledge,
-accessible to anyone, any hour, any language.`,
+accessible to anyone, any hour, any language.<w:3500><clck>`,
                 ariaLocalSize: 'sm',
                 ariaApi: `The CWF panel is now open — the visitor can ask the factory anything in plainlanguage. This is 15 years of engineering knowledge accessible to anyone, at anyhour. First question, from the factory owner: 🏢 What is our quality situation?How much is glaze viscosity drift costing us — double-cost from second-qualitytiles (40-60% of production cost at rework)? Production window before critical?`,
                 ariaInputEnabled: true,
@@ -590,6 +590,7 @@ accessible to anyone, any hour, any language.`,
             { // Click #3
                 ctaLabel: 'Change a parameter →',
                 slideImageUrl: '/demo/ACT-4c.png',
+                delayMs: 3500,
                 screenText: `<cls><w:500>You don't just ask questions.
 You give instructions.<w:2000><clck>`,
                 ariaLocal: `<cls><w:300>💬 In the CWF panel, type:
@@ -654,7 +655,7 @@ The Copilot did not alert someone — it acted.
 
         openingPrompt: '',
 
-                                                                                ctaSteps: [
+                                                                                                ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the incident →',
                 slideImageUrl: '/demo/ACT-4d.png',
@@ -697,7 +698,7 @@ Recovered in 6 minutes 40 seconds.`,
                 screenText: `<cls><w:500>Not because someone was paged.
 Because the system acted first.<w:2500><cls><w:400>Conventional: detect 2–4 hrs. Fix: next shift.
 Here: detect 23 sec. Fix: 6 min 40 sec.
-Difference: 847 tiles. €12,400.<w:3000><clck>`,
+Difference: 847 tiles. €12,400.<w:4500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
@@ -754,12 +755,13 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                ctaSteps: [
+                                                                                                ctaSteps: [
             { // Click #1
-                ctaLabel: 'Show the numbers →',
+                ctaLabel: 'Show the gain',
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
-                screenText: `Factory → Line → Machine → Parameter.<w:2000>
-Every number has a cause. Every cause has a cost.<w:2000><clck>`,
+                delayMs: 2800,
+                screenText: `Factory → Line → Machine → Parameter.<w:2500>
+Every number has a cause. Every cause has a cost.<w:2500><clck>`,
                 screenTextSize: 'md',
                 ariaLocal: `<cls><w:300>€8K–€15K per 1% OEE, per line, per month.
 Typical first-quarter recovery: 3–5 points.
@@ -768,12 +770,12 @@ AND the CO₂ liability. Same intervention.
 How much of your production cost goes to losses
 you cannot currently see?`,
                 ariaLocalSize: 'sm',
-                ariaInputEnabled: true,
+                ariaInputEnabled: false,
             },
             { // Click #2
-                ctaLabel: 'End of Demo',
+                ctaLabel: 'Thank you!',
                 slideImageUrl: '/demo/SentialFactory.png',
-                screenText: `<cls><w:3500>How much waste did your factory produce last year?
+                screenText: `<cls><w:5500>How much waste did your factory produce last year?
 If you don't know — that's exactly where we start.<w:3000><clck>`,
                 screenTextSize: 'md',
                 ariaLocal: `<cls><w:300>Thank you for walking through this journey.
@@ -783,7 +785,7 @@ that instinct is worth exploring.
 ARDICTECH. Since 2008. 16 facilities. 1M+ IoT endpoints.
 → ardic.ai`,
                 ariaLocalSize: 'sm',
-                ariaInputEnabled: true,
+                ariaInputEnabled: false,
             },
         ],
     },
