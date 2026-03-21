@@ -551,6 +551,7 @@ Maximum 5 sentences per response.
                 screenTextWeight: 'bold',
                 screenTextSize: 'md',
                 ariaLocal:
+                    `<cls><w:300>` +
                     `SCN-002 active. Kiln running 14°C above spec.\n` +
                     `The Tile Passport shows every station record.\n\n` +
                     `+14°C = 18% more gas. 1.9 kg CO₂/m³.\n` +
@@ -641,6 +642,7 @@ Maximum 5 sentences per response.
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
                 ariaLocal:
+                    `<cls><w:300>` +
                     `SCN-003 active. Glaze viscosity slightly off.\n` +
                     `CWF panel open. Ask anything in plain language.\n\n` +
                     `15 years of engineering knowledge,\n` +
