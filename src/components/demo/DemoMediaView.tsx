@@ -1,39 +1,28 @@
 /**
- * DemoMediaView.tsx — Demo Central Media + ARIA Communication Screen
+ * DemoMediaView.tsx — Cinema-Mode Demo Overlay
  *
- * The primary content area of the new Demo UI. Positioned to the right of
- * DemoSidePanel, anchored below the header. Fills the upper portion of the
- * viewport, leaving the 3D factory simulation visible below.
+ * Two-zone overlay system. The 3D factory fills the entire viewport
+ * BEHIND both zones. Nothing ever fully covers the factory.
  *
- * WHAT IT RENDERS (top to bottom, in a single scrollable container):
- *   1. Welcome card  — shown when act 0 is active and messages is empty
- *   2. Slide image   — if the current act defines slideImageUrl, shown first
- *   3. ARIA messages — all messages from demoStore rendered as clean prose
- *   4. Video player  — shown below ARIA content when showMovie is true
+ * ZONE 1 — MEDIA FLOAT (slide images + charts)
+ *   Centered above the narrative strip. Fades in/out.
  *
- * The component supports two modes driven by the `showMovie` prop:
- *   - false (default): hides the video player
- *   - true:            auto-plays the ShortVideo.mp4 inline
+ * ZONE 2 — NARRATIVE STRIP (screenText + ARIA responses)
+ *   Fixed to viewport bottom. No scrolling. Gradient background.
+ *   Shows ONE piece of content at a time with smooth fade transitions.
  *
- * POSITIONING:
- *   Fixed, with left edge = sidebar width (0 when collapsed), pinned to the
- *   header bottom and sized to ~55% of viewport height.
+ * NO SCROLLING ANYWHERE. overflow: hidden everywhere.
+ * <cls> causes a 300ms fade-out (no flash/strobe).
  *
- * ARIA text messages:
- *   User messages render as soft right-aligned labels.
- *   Assistant messages render as clean left-aligned prose (no bubble frame).
- *   System messages render as centred muted pills.
- *   Image-only messages render as full-width <img> elements.
- *
- * Used by: src/components/ui/Dashboard.tsx
+ * Used by: src/components/demo/DemoLayout.tsx
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useDemoStore } from '../../store/demoStore';
 import type { DemoState, DemoMessage } from '../../store/demoStore';
 import {
     DEMO_MOVIE_PATH,
-    DEMO_SCREEN_MAX_HEIGHT_VH,
+    DEMO_SIDE_PANEL_WIDTH_PX,
 } from '../../lib/params/demoSystem/demoConfig';
 import { useUIStore } from '../../store/uiStore';
 import { DemoMediaInstructionRenderer } from './media/DemoMediaInstructionRenderer';
@@ -43,337 +32,300 @@ interface DemoMediaViewProps {
     /** Whether the presenter has requested the movie to play */
     showMovie: boolean;
     /**
-     * sidebarVisible — kept in props for future use (e.g. width transitions)
-     * but no longer drives the left offset. Left is always DEMO_SIDE_PANEL_WIDTH_PX.
-     * @deprecated for left-positioning; retained for API compatibility with DemoLayout
+     * sidebarVisible — kept in props for API compatibility with DemoLayout.
+     * @deprecated for positioning; retained for API compatibility
      */
     sidebarVisible: boolean;
 }
 
 /**
- * DemoMediaView — the unified media + ARIA response surface.
+ * DemoMediaView — cinematic two-zone overlay.
  * Returns null when the demo tab is not active.
  */
 export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
     showMovie,
-    // sidebarVisible kept in props for API compatibility but not used for positioning
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     sidebarVisible: _sidebarVisible,
 }) => {
-    /** Only visible while the demo tab is open */
+    /* ── Store selectors ───────────────────────────────────────── */
     const showDemoScreen = useUIStore((s) => s.showDemoScreen);
+    const showCWF = useUIStore((s) => s.showCWF);
+    const cwfPanelWidth = useUIStore((s) => s.cwfPanelWidth);
 
-    /** Full message list from the demo store */
     const messages = useDemoStore((s: DemoState) => s.messages);
-    /**
-     * currentSlide — set by handleCtaClick as the presenter steps through ctaSteps[].
-     * Shown as the primary visual content when non-null; cleared on every act transition.
-     * Ignored when currentMediaInstruction is set.
-     */
     const currentSlide = useDemoStore((s: DemoState) => s.currentSlide);
-    /**
-     * currentMediaInstruction — when set, a dynamic chart/viz replaces the slide image.
-     * Written by handleCtaClick (step 4b); cleared on every act transition.
-     */
     const currentMediaInstruction = useDemoStore((s: DemoState) => s.currentMediaInstruction);
-    /**
-     * currentScreenText — plain text written to the demo screen surface after delayMs.
-     * Shown below the slide as a styled caption. Cleared on every act transition.
-     */
     const currentScreenText = useDemoStore((s: DemoState) => s.currentScreenText);
-    /** Formatting for the current screenText — driven by CtaStep fields */
+
     const screenTextAlign = useDemoStore((s: DemoState) => s.currentScreenTextAlign);
     const screenTextWeight = useDemoStore((s: DemoState) => s.currentScreenTextWeight);
     const screenTextSize = useDemoStore((s: DemoState) => s.currentScreenTextSize);
-    /** Formatting for the current ariaLocal chat bubbles */
+
     const ariaLocalAlign = useDemoStore((s: DemoState) => s.currentAriaLocalAlign);
     const ariaLocalWeight = useDemoStore((s: DemoState) => s.currentAriaLocalWeight);
     const ariaLocalSize = useDemoStore((s: DemoState) => s.currentAriaLocalSize);
 
-    /** Scroll anchor ref — auto-scrolls to newest message */
-    const bottomRef = useRef<HTMLDivElement | null>(null);
-    /** Ref for the screenText element — scrolled into view when text appears */
-    const screenTextRef = useRef<HTMLDivElement | null>(null);
+    /* ── Narrative strip fade state ─────────────────────────────
+     * displayText holds the visible content DURING fade-out.
+     * When the store clears content (→ null), we don't instantly
+     * remove the DOM. Instead we fade out, THEN clear.           */
+    const [narrativeContent, setNarrativeContent] = useState<string | null>(null);
+    const [narrativeVisible, setNarrativeVisible] = useState(false);
+    const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hadContentRef = useRef(false);
 
-    /**
-     * Auto-scroll to the screenText element whenever it changes.
-     * Fires after the delayMs timer resolves (e.g. 3 seconds in Welcome stage)
-     * so the presenter never misses "Let's start" appearing on screen.
-     */
-    useEffect(() => {
-        if (currentScreenText && screenTextRef.current) {
-            screenTextRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }, [currentScreenText]);
+    /* ── Media float fade state ────────────────────────────────── */
+    const [mediaVisible, setMediaVisible] = useState(false);
 
-    /**
-     * scrollContainerRef — ref for the scrollable glass panel body.
-     * Used to scroll to top when the video player is opened, because the
-     * video is rendered at the top of the content (before the welcome card).
-     */
-    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-
-    /** Observed header height for dynamic top positioning */
-    const [headerHeight, setHeaderHeight] = useState<number>(40);
-
-
-    /**
-     * Tracks header bottom for dynamic top positioning.
-     * Measured on mount and every resize so the panel always
-     * sits exactly below the header regardless of browser height.
-     */
-    useEffect(() => {
-        const measure = () => {
-            /** Header bottom → used as the top anchor for the media panel */
-            const h = document.getElementById('header-container');
-            if (h) setHeaderHeight(h.getBoundingClientRect().bottom);
-        };
-        measure();
-        window.addEventListener('resize', measure);
-        return () => window.removeEventListener('resize', measure);
-    }, []);
-
-    /** Auto-scroll to bottom on new messages */
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    /* ── Derived content ───────────────────────────────────────── */
+    const latestAssistant = useMemo(() => {
+        const assistantMsgs = messages.filter(
+            (m: DemoMessage) => m.role === 'assistant' && m.content.trim() && !m.isStreaming
+        );
+        return assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : null;
     }, [messages]);
 
-    /**
-     * Scroll to top whenever the movie is opened so the video player
-     * (which is rendered first in the container) is immediately visible
-     * without the presenter having to manually scroll up.
-     */
-    useEffect(() => {
-        if (showMovie && scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = 0;
-        }
-    }, [showMovie]);
+    const streamingMsg = useMemo(() => {
+        return messages.find((m: DemoMessage) => m.role === 'assistant' && m.isStreaming);
+    }, [messages]);
 
-    /** Do not mount when demo tab is closed */
+    /** screenText takes priority → then streaming → then latest assistant */
+    const desiredContent = currentScreenText
+        ?? streamingMsg?.content
+        ?? latestAssistant?.content
+        ?? null;
+
+    /* ── Narrative fade transitions ─────────────────────────────
+     * null→content: fade IN   |   content→null: fade OUT then clear
+     * content→content: update text in place (no re-fade)            */
+    useEffect(() => {
+        if (fadeTimerRef.current) {
+            clearTimeout(fadeTimerRef.current);
+            fadeTimerRef.current = null;
+        }
+
+        const hasContent = desiredContent !== null && desiredContent.trim() !== '';
+
+        if (hasContent && !hadContentRef.current) {
+            // Transition: empty → content (fade IN)
+            setNarrativeContent(desiredContent);
+            requestAnimationFrame(() => setNarrativeVisible(true));
+        } else if (hasContent) {
+            // Content updating progressively — just update text
+            setNarrativeContent(desiredContent);
+        } else if (!hasContent && hadContentRef.current) {
+            // Transition: content → empty (fade OUT then clear)
+            setNarrativeVisible(false);
+            fadeTimerRef.current = setTimeout(() => setNarrativeContent(null), 300);
+        }
+
+        hadContentRef.current = hasContent;
+    }, [desiredContent]);
+
+    /* ── Media float fade transitions ──────────────────────────── */
+    const hasMedia = !!(currentSlide || currentMediaInstruction);
+
+    useEffect(() => {
+        if (hasMedia) {
+            requestAnimationFrame(() => setMediaVisible(true));
+        } else {
+            setMediaVisible(false);
+        }
+    }, [hasMedia]);
+
+    /* ── Cleanup ───────────────────────────────────────────────── */
+    useEffect(() => {
+        return () => {
+            if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+        };
+    }, []);
+
+    /* ── Gate rendering ────────────────────────────────────────── */
     if (!showDemoScreen) return null;
 
+    /* ── Panel-aware positioning ────────────────────────────────── */
+    const leftEdge = DEMO_SIDE_PANEL_WIDTH_PX;
+    const rightEdge = showCWF ? cwfPanelWidth : 0;
 
     return (
-        <div
-            id="demo-media-view"
-            className="fixed pointer-events-none z-9997"
-            style={{
-                top: headerHeight,
-                /**
-                 * Left edge anchored, expanded 15% to the right.
-                 * Original: 421px centred (left: 50%, translateX(-50%)).
-                 * New: 484px (421 × 1.15) with left edge unchanged.
-                 * translateX(-43.5%) keeps the left edge at the same
-                 * position as the original 421px centred layout.
-                 */
-                left: '50%',
-                transform: 'translateX(-43.5%)',
-                /**
-                 * Width: 484px = original 421px + 15% rightward expansion.
-                 * Falls back to 95vw on narrow viewports so it never clips.
-                 */
-                width: `min(484px, 95vw)`,
-                transition: 'top 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-        >
-            {/* Glass panel body — grows with content, scrolls if taller than max-height */}
-            <div
-                ref={scrollContainerRef}
-                className="
-                w-full
-                bg-black/45 backdrop-blur-md
-                border-b border-white/10
-                overflow-y-auto
-                pointer-events-auto
-                flex flex-col
-                scroll-smooth
-            "
-                style={{
-                    /**
-                     * Dynamic height: the panel grows freely with its content.
-                     * Caps at DEMO_SCREEN_MAX_HEIGHT_VH so it never fully
-                     * obscures the 3D factory scene below.
-                     * Smooth height transitions are handled naturally by the
-                     * browser as DOM children are added / removed.
-                     */
-                    maxHeight: `min(${DEMO_SCREEN_MAX_HEIGHT_VH}vh, calc(100vh - ${headerHeight}px - 24px))`,
-                }}
-            >
-                <div className="flex flex-col">
+        <div id="demo-cinema-root">
 
-                    {/* ── SCREEN TEXT (headline — TOP of media surface) ───────────────
-                      * Rendered FIRST so it always appears at the top of the
-                      * visible panel, above any slide or chart below it.
-                      * Font size = DEMO_SCREEN_TEXT_FONT_SIZE_PX (34px) — large
-                      * enough to read at a glance during a live presentation.
-                      * Fades in smoothly after CtaStep.delayMs resolves.
-                      * ──────────────────────────────────────────────────────── */}
-                    {currentScreenText && (
-                        <div
-                            ref={screenTextRef}
-                            className={`w-full px-8 pt-6 pb-3 ${
-                                screenTextAlign === 'left' ? 'text-left' :
-                                screenTextAlign === 'right' ? 'text-right' : 'text-center'
-                            }`}
-                            style={{ animation: 'fadeIn 0.6s ease-in' }}
-                        >
-                            <p
-                                className={`${
-                                    screenTextWeight === 'normal' ? 'font-normal' : 'font-semibold'
-                                } text-white/95 tracking-wide leading-tight whitespace-pre-wrap`}
-                                style={{
-                                    fontSize: screenTextSize === 'sm' ? 20 :
-                                             screenTextSize === 'md' ? 27 :
-                                             screenTextSize === 'xl' ? 42 : 34,
-                                }}
-                            >
-                                {currentScreenText}
-                            </p>
-                        </div>
-                    )}
-
-                    {/* ── VIDEO PLAYER ───────────────────────────────────────────
-                      * Rendered second (below any screen text) so it does not
-                      * displace text that should appear above the video.
-                      * ─────────────────────────────────────────────────── */}
-                    {showMovie && (
-                        <div className="px-5 py-4 mb-4">
-                            <div className="mx-auto w-full max-w-3xl rounded-xl overflow-hidden border border-white/10 shadow-[0_4px_32px_rgba(0,0,0,0.5)]">
-                                <video
-                                    src={DEMO_MOVIE_PATH}
-                                    controls
-                                    autoPlay
-                                    className="w-full max-h-[45vh] object-contain bg-black"
-                                    aria-label="Digital transformation overview video"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── MEDIA INSTRUCTION (dynamic chart/viz) ─────────────────────
-                      * When a CtaStep.mediaInstruction is active, render the dynamic
-                      * chart/viz renderer INSTEAD of the static slide image.
-                      * currentMediaInstruction is cleared on every act transition so
-                      * only one chart is ever shown at a time.
-                      * ─────────────────────────────────────────────────────────── */}
-                    {currentMediaInstruction && (
-                        <DemoMediaInstructionRenderer instruction={currentMediaInstruction} />
-                    )}
-
-                    {/* ── CURRENT SLIDE ───────────────────────────────────────
-                      * Shown when the presenter clicks the CTA button.
-                      * currentSlide is written by handleCtaClick stepping through
-                      * the current act's ctaSlides[]. Cleared on act transition.
-                      * Not shown when a mediaInstruction is active (the chart takes
-                      * visual priority over the static image for that step).
-                      * ─────────────────────────────────────────────────────── */}
-                    {currentSlide && !currentMediaInstruction && (
-                        <div className="w-full">
+            {/* ════════════════════════════════════════════════════════
+                ZONE 1 — MEDIA FLOAT (slide image or chart)
+                Centered above the narrative strip. Fades in/out.
+                The 3D factory is fully visible around it.
+                ════════════════════════════════════════════════════════ */}
+            {(currentSlide || currentMediaInstruction) && (
+                <div
+                    className="fixed z-[9996] pointer-events-none
+                               flex items-center justify-center"
+                    style={{
+                        top: '10vh',
+                        left: leftEdge,
+                        right: rightEdge,
+                        height: '45vh',
+                    }}
+                >
+                    <div
+                        className="pointer-events-auto rounded-xl overflow-hidden
+                                   border border-white/10 shadow-2xl"
+                        style={{
+                            maxWidth: '50%',
+                            maxHeight: '28vh',
+                            opacity: mediaVisible ? 1 : 0,
+                            transition: 'opacity 400ms ease-in-out',
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            backdropFilter: 'blur(12px)',
+                        }}
+                    >
+                        {currentMediaInstruction ? (
+                            <DemoMediaInstructionRenderer instruction={currentMediaInstruction} />
+                        ) : currentSlide ? (
                             <img
                                 src={currentSlide}
-                                alt="Presentation slide"
-                                className="w-full block"
+                                alt=""
+                                className="w-full h-full object-contain"
+                                style={{ maxHeight: '28vh' }}
                             />
-                        </div>
-                    )}
-
-                    {/* ── SCREEN TEXT block was moved to the top of this container.
-                      * Do NOT duplicate it here. This comment marks where it used to be.
-                      * ──────────────────────────────────────────────────────── */}
-
-                    {/* ── MESSAGES ───────────────────────────────────────────── */}
-                    {messages
-                        .filter((msg) => msg.role !== 'user')
-                        .map((msg: DemoMessage) => {
-                        const isUser = msg.role === 'user';
-                        const isSystem = msg.role === 'system';
-
-                        /** System notification — centred pill */
-                        if (isSystem) {
-                            return (
-                                <div key={msg.id} className="flex justify-center px-5 py-2">
-                                    <span className={`text-sm px-3 py-1 rounded-full ${
-                                        msg.error
-                                            ? 'text-red-400 bg-red-500/10 border border-red-500/20'
-                                            : 'text-white/35 bg-white/5 border border-white/10'
-                                    }`}>
-                                        {msg.content}
-                                    </span>
-                                </div>
-                            );
-                        }
-
-                        /** Image-only slide bubble — truly edge-to-edge.
-                          * No padding, no margin, no border-radius, no object-contain.
-                          * The image spans the full panel width with natural proportions. */
-                        if (msg.imageUrl) {
-                            return (
-                                <div key={msg.id} className="w-full">
-                                    <img
-                                        src={msg.imageUrl}
-                                        alt="Presentation slide"
-                                        className="w-full block"
-                                    />
-                                </div>
-                            );
-                        }
-
-                        /** User message — right-aligned compact label */
-                        if (isUser) {
-                            return (
-                                <div key={msg.id} className="flex justify-end px-5 pt-2">
-                                    <span className="
-                                        max-w-[80%] text-sm text-violet-200/80
-                                        bg-violet-500/10 border border-violet-400/15
-                                        rounded-lg px-3 py-1.5
-                                    ">
-                                        {msg.content}
-                                    </span>
-                                </div>
-                            );
-                        }
-
-                        /** Assistant message — left-aligned clean prose with formatting */
-                        return (
-                            <div key={msg.id} className={`flex px-5 py-2 ${
-                                ariaLocalAlign === 'center' ? 'justify-center' :
-                                ariaLocalAlign === 'right'  ? 'justify-end' :
-                                                              'justify-start'
-                            }`}>
-                                {msg.isStreaming ? (
-                                    /* Streaming dots placeholder */
-                                    <span className="flex items-center gap-1 py-2 px-1">
-                                        <span className="w-1.5 h-1.5 bg-white/35 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                                        <span className="w-1.5 h-1.5 bg-white/35 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                        <span className="w-1.5 h-1.5 bg-white/35 rounded-full animate-bounce" />
-                                    </span>
-                                ) : (
-                                    <pre className={`
-                                        whitespace-pre-wrap wrap-break-word font-sans
-                                        leading-relaxed max-w-[90%]
-                                        ${msg.error ? 'text-red-300' : 'text-white/85'}
-                                        ${ariaLocalWeight === 'bold' ? 'font-semibold' : 'font-normal'}
-                                        ${ariaLocalAlign === 'center' ? 'text-center' :
-                                          ariaLocalAlign === 'right'  ? 'text-right' :
-                                                                        'text-left'}
-                                    `}
-                                    style={{
-                                        fontSize: ariaLocalSize === 'sm' ? '14px' :
-                                                  ariaLocalSize === 'md' ? '16px' :
-                                                  ariaLocalSize === 'lg' ? '20px' :
-                                                  ariaLocalSize === 'xl' ? '26px' : '16px',
-                                    }}>
-                                        {msg.content}
-                                    </pre>
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {/* Scroll anchor */}
-                    <div ref={bottomRef} />
+                        ) : null}
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* ════════════════════════════════════════════════════════
+                ZONE 2 — NARRATIVE STRIP (screenText + ARIA voice)
+                Fixed to viewport bottom. No scrolling.
+                Gradient: transparent top → dark bottom.
+                ════════════════════════════════════════════════════════ */}
+            {narrativeContent && (
+                <div
+                    className="fixed z-[9997] pointer-events-auto"
+                    style={{
+                        bottom: 0,
+                        left: leftEdge,
+                        right: rightEdge,
+                        maxHeight: '28vh',
+                        overflow: 'hidden',
+                        background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 25%, rgba(0,0,0,0.85) 100%)',
+                        opacity: narrativeVisible ? 1 : 0,
+                        transition: 'opacity 300ms ease-in-out',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'flex-end',
+                    }}
+                >
+                    {/* Top gradient mask — fades old text at the top */}
+                    <div
+                        className="pointer-events-none absolute top-0 left-0 right-0"
+                        style={{
+                            height: '40px',
+                            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)',
+                            zIndex: 1,
+                        }}
+                    />
+
+                    {/* The actual text content */}
+                    <div className="px-8 py-5 relative z-0">
+                        {currentScreenText ? (
+                            /* ── screenText: cinematic subtitle style ── */
+                            <p
+                                className={`
+                                    ${screenTextWeight === 'normal' ? 'font-normal' : 'font-semibold'}
+                                    text-white/95 tracking-wide leading-relaxed
+                                    whitespace-pre-wrap
+                                    ${screenTextAlign === 'left' ? 'text-left' :
+                                      screenTextAlign === 'right' ? 'text-right' : 'text-center'}
+                                `}
+                                style={{
+                                    fontSize: screenTextSize === 'sm' ? '16px' :
+                                             screenTextSize === 'md' ? '20px' :
+                                             screenTextSize === 'xl' ? '32px' : '24px',
+                                    textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                                }}
+                            >
+                                {narrativeContent}
+                            </p>
+                        ) : (
+                            /* ── ARIA response: clean prose style ── */
+                            <pre
+                                className={`
+                                    whitespace-pre-wrap break-words font-sans
+                                    leading-relaxed text-white/85
+                                    ${ariaLocalWeight === 'bold' ? 'font-semibold' : 'font-normal'}
+                                    ${ariaLocalAlign === 'center' ? 'text-center' :
+                                      ariaLocalAlign === 'right' ? 'text-right' : 'text-left'}
+                                `}
+                                style={{
+                                    fontSize: ariaLocalSize === 'sm' ? '14px' :
+                                             ariaLocalSize === 'md' ? '15px' :
+                                             ariaLocalSize === 'lg' ? '18px' :
+                                             ariaLocalSize === 'xl' ? '22px' : '15px',
+                                    textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                                }}
+                            >
+                                {narrativeContent}
+                            </pre>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ════════════════════════════════════════════════════════
+                LOADING INDICATOR — shown while ariaApi is in-flight
+                ════════════════════════════════════════════════════════ */}
+            {messages.some((m: DemoMessage) => m.isStreaming) && !narrativeContent && (
+                <div
+                    className="fixed z-[9997] flex items-center justify-center gap-1.5"
+                    style={{
+                        bottom: '2vh',
+                        left: leftEdge,
+                        right: rightEdge,
+                    }}
+                >
+                    <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce" />
+                </div>
+            )}
+
+            {/* ════════════════════════════════════════════════════════
+                SYSTEM ERROR MESSAGES — small pill at top center
+                ════════════════════════════════════════════════════════ */}
+            {messages
+                .filter((m: DemoMessage) => m.role === 'system' && m.error)
+                .map((msg: DemoMessage) => (
+                    <div
+                        key={msg.id}
+                        className="fixed z-[9998] top-16 left-1/2 -translate-x-1/2
+                                   text-sm text-red-400 bg-red-500/10 border border-red-500/20
+                                   rounded-full px-4 py-1.5 pointer-events-auto"
+                        style={{ animation: 'demoFadeIn 0.3s ease-out' }}
+                    >
+                        {msg.content}
+                    </div>
+                ))}
+
+            {/* ════════════════════════════════════════════════════════
+                VIDEO PLAYER — centered overlay when movie is requested
+                ════════════════════════════════════════════════════════ */}
+            {showMovie && (
+                <div
+                    className="fixed z-[9999] inset-0 flex items-center justify-center
+                               bg-black/70 pointer-events-auto"
+                    style={{ left: leftEdge }}
+                >
+                    <div className="w-full max-w-3xl rounded-xl overflow-hidden
+                                   border border-white/10 shadow-2xl mx-8">
+                        <video
+                            src={DEMO_MOVIE_PATH}
+                            controls
+                            autoPlay
+                            className="w-full max-h-[70vh] object-contain bg-black"
+                            aria-label="Digital transformation overview video"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
