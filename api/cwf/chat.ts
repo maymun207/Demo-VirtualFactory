@@ -2849,6 +2849,204 @@ export default async function handler(
             }
         }
 
+        // =====================================================================
+        // SHORT-CIRCUIT: PARAMETER CHANGE AUTH (Case F)
+        //
+        // When the user sends the auth code (e.g. "airtk") for a pending
+        // parameter change, we no longer rely on Gemini to call update_parameter.
+        // Gemini is non-deterministic and ~50% of the time ignores the fast-path
+        // instruction, forcing the user to type the auth code TWICE.
+        //
+        // Instead: parse the pending parameter proposal from the last assistant
+        // message in conversation history, call executeUpdateParameter() directly,
+        // and return the result. Falls through to Gemini if parsing fails.
+        // =====================================================================
+        if (isAuthTurn && !isCopilotAuthContext) {
+            console.log('[CWF] ⚡ Parameter auth detected — attempting short-circuit');
+
+            // Find the last assistant message that contains a proposal table
+            let proposalText = '';
+            for (let i = conversationHistory.length - 1; i >= 0; i--) {
+                const msg = conversationHistory[i];
+                if (msg.role === 'assistant' && msg.content.includes('| Station |') && msg.content.includes('| Parameter |')) {
+                    proposalText = msg.content;
+                    break;
+                }
+            }
+
+            if (proposalText) {
+                // Build reverse lookup: "Cabin Pressure (bar)" → "cabin_pressure_bar"
+                // Import isn't available at runtime, so we build from the known PARAM_DISPLAY_NAMES equivalent
+                const DISPLAY_TO_DB_PARAM: Record<string, string> = {};
+                const PARAM_NAMES: Record<string, string> = {
+                    'Pressure (bar)': 'pressure_bar',
+                    'Cycle Time (sec)': 'cycle_time_sec',
+                    'Mould Temperature (°C)': 'mold_temperature_c',
+                    'Mold Temperature (°C)': 'mold_temperature_c',
+                    'Powder Moisture (%)': 'powder_moisture_pct',
+                    'Fill Amount (g)': 'fill_amount_g',
+                    'Mould Wear (%)': 'mold_wear_pct',
+                    'Mold Wear (%)': 'mold_wear_pct',
+                    'Pressure Deviation (%)': 'pressure_deviation_pct',
+                    'Fill Homogeneity (%)': 'fill_homogeneity_pct',
+                    'Inlet Temperature (°C)': 'inlet_temperature_c',
+                    'Outlet Temperature (°C)': 'outlet_temperature_c',
+                    'Belt Speed (m/min)': 'belt_speed_m_min',
+                    'Drying Time (min)': 'drying_time_min',
+                    'Exit Moisture (%)': 'exit_moisture_pct',
+                    'Fan Frequency (Hz)': 'fan_frequency_hz',
+                    'Temperature Gradient (°C/m)': 'temperature_gradient_c_m',
+                    'Drying Rate': 'drying_rate',
+                    'Moisture Homogeneity (%)': 'moisture_homogeneity_pct',
+                    'Glaze Density (g/cm³)': 'glaze_density_g_cm3',
+                    'Glaze Viscosity (sec)': 'glaze_viscosity_sec',
+                    'Application Weight (g/m²)': 'application_weight_g_m2',
+                    'Cabin Pressure (bar)': 'cabin_pressure_bar',
+                    'Nozzle Angle (°)': 'nozzle_angle_deg',
+                    'Glaze Temperature (°C)': 'glaze_temperature_c',
+                    'Weight Deviation (%)': 'weight_deviation_pct',
+                    'Nozzle Clog (%)': 'nozzle_clog_pct',
+                    'Print Head Temperature (°C)': 'head_temperature_c',
+                    'Ink Viscosity (mPa·s)': 'ink_viscosity_mpa_s',
+                    'Drop Size (pL)': 'drop_size_pl',
+                    'Resolution (dpi)': 'resolution_dpi',
+                    'Head Gap (mm)': 'head_gap_mm',
+                    'Color Channels': 'color_channels',
+                    'Active Nozzles (%)': 'active_nozzle_pct',
+                    'Temperature Deviation (°C)': 'temperature_deviation_c',
+                    'Encoder Error (%)': 'encoder_error_pct',
+                    'Ink Levels (%)': 'ink_levels_pct',
+                    'Max Temperature (°C)': 'max_temperature_c',
+                    'Firing Time (min)': 'firing_time_min',
+                    'Preheat Gradient (°C/min)': 'preheat_gradient_c_min',
+                    'Cooling Gradient (°C/min)': 'cooling_gradient_c_min',
+                    'Atmosphere Pressure (mbar)': 'atmosphere_pressure_mbar',
+                    'Zone Count': 'zone_count',
+                    'O₂ Level (%)': 'o2_level_pct',
+                    'Zone Temperatures (°C)': 'zone_temperatures_c',
+                    'Gradient Balance (%)': 'gradient_balance_pct',
+                    'Zone Variance (°C)': 'zone_variance_c',
+                    'Camera Resolution (MP)': 'camera_resolution_mp',
+                    'Scan Rate (tiles/min)': 'scan_rate_tiles_min',
+                    'Size Tolerance (mm)': 'size_tolerance_mm',
+                    'Colour Tolerance (ΔE)': 'color_tolerance_de',
+                    'Color Tolerance (ΔE)': 'color_tolerance_de',
+                    'Flatness Tolerance (mm)': 'flatness_tolerance_mm',
+                    'Defect Threshold (mm²)': 'defect_threshold_mm2',
+                    'Grade Count': 'grade_count',
+                    'Calibration Drift (%)': 'calibration_drift_pct',
+                    'Lighting Variance (%)': 'lighting_variance_pct',
+                    'Camera Cleanliness (%)': 'camera_cleanliness_pct',
+                    'Algorithm Sensitivity': 'algorithm_sensitivity',
+                    'Stack Count': 'stack_count',
+                    'Box Sealing Pressure (bar)': 'box_sealing_pressure_bar',
+                    'Pallet Capacity (m²)': 'pallet_capacity_m2',
+                    'Stretch Tension (%)': 'stretch_tension_pct',
+                    'Robot Speed (cycles/min)': 'robot_speed_cycles_min',
+                    'Label Accuracy (%)': 'label_accuracy_pct',
+                    'Stacking Error Rate (%)': 'stacking_error_rate_pct',
+                };
+                for (const [display, db] of Object.entries(PARAM_NAMES)) {
+                    DISPLAY_TO_DB_PARAM[display.toLowerCase()] = db;
+                }
+
+                // Station display name → DB station id
+                const DISPLAY_TO_DB_STATION: Record<string, string> = {
+                    'press': 'press',
+                    'dryer': 'dryer',
+                    'glaze': 'glaze',
+                    'digital printer': 'printer',
+                    'printer': 'printer',
+                    'kiln': 'kiln',
+                    'sorting': 'sorting',
+                    'packaging': 'packaging',
+                    'conveyor': 'conveyor',
+                };
+
+                // Parse table rows: "| Station | Parameter | Current | Proposed | ... |"
+                const tableRows = proposalText.split('\n').filter(line => {
+                    const trimmed = line.trim();
+                    return trimmed.startsWith('|') &&
+                           !trimmed.includes('Station') &&
+                           !trimmed.includes('---');
+                });
+
+                interface ParsedChange {
+                    station: string;
+                    parameter: string;
+                    oldValue: number;
+                    newValue: number;
+                }
+                const parsedChanges: ParsedChange[] = [];
+
+                for (const row of tableRows) {
+                    const cells = row.split('|').map(c => c.trim()).filter(c => c.length > 0);
+                    // Expected: [Station, Parameter, Current, Proposed, SafeRange, Change]
+                    if (cells.length >= 4) {
+                        const stationDisplay = cells[0].toLowerCase();
+                        const paramDisplay = cells[1].toLowerCase();
+                        const currentVal = parseFloat(cells[2]);
+                        const proposedVal = parseFloat(cells[3]);
+
+                        const stationDb = DISPLAY_TO_DB_STATION[stationDisplay];
+                        const paramDb = DISPLAY_TO_DB_PARAM[paramDisplay];
+
+                        if (stationDb && paramDb && !isNaN(currentVal) && !isNaN(proposedVal)) {
+                            parsedChanges.push({
+                                station: stationDb,
+                                parameter: paramDb,
+                                oldValue: currentVal,
+                                newValue: proposedVal,
+                            });
+                        }
+                    }
+                }
+
+                if (parsedChanges.length > 0) {
+                    console.log(`[CWF] ⚡ Short-circuit: parsed ${parsedChanges.length} parameter change(s) from proposal table`);
+
+                    const results: string[] = [];
+                    let queryCount = 0;
+
+                    for (const change of parsedChanges) {
+                        const result = await executeUpdateParameter({
+                            simulation_id: simulationId,
+                            station: change.station,
+                            parameter: change.parameter,
+                            old_value: change.oldValue,
+                            new_value: change.newValue,
+                            reason: `User requested ${change.station}.${change.parameter}: ${change.oldValue} → ${change.newValue}`,
+                            authorized_by: message.trim(),
+                        });
+                        queryCount++;
+
+                        const resultObj = result as { error?: string };
+                        if (resultObj.error) {
+                            results.push(`❌ ${change.station}.${change.parameter}: ${resultObj.error}`);
+                        } else {
+                            // Calculate percentage change
+                            const pctChange = change.oldValue !== 0
+                                ? ((change.newValue - change.oldValue) / Math.abs(change.oldValue) * 100).toFixed(1)
+                                : 'N/A';
+                            const arrow = change.newValue > change.oldValue ? '↑' : '↓';
+                            results.push(`✅ ${change.station}.${change.parameter}: ${change.oldValue} → ${change.newValue} (${arrow}${pctChange}%)`);
+                        }
+                    }
+
+                    return res.status(200).json({
+                        response: results.join('\n'),
+                        toolCallCount: queryCount,
+                        model: CWF_MODEL_NAME,
+                        copilotStateChange: null,
+                    });
+                } else {
+                    console.log('[CWF] ⚠ Could not parse proposal table — falling through to Gemini');
+                }
+            } else {
+                console.log('[CWF] ⚠ No proposal table found in history — falling through to Gemini');
+            }
+        }
+
         /** Log auth-turn detection for debugging (non-short-circuit paths only) */
         if (isAuthTurn) {
             console.log(

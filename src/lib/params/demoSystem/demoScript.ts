@@ -197,7 +197,7 @@ Maximum 3 sentences per response. Every word must earn its place.
         /** No openingPrompt — Act 0 is the entry point. */
         openingPrompt: '',
 
-                                                                                                ctaSteps: [
+                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start →',
                 scenarioCode: 'SCN-001',
@@ -217,6 +217,7 @@ The factory behind me is starting now.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 simulationAction: 'reset-start',
+                editorHeights: { screenText: 183, ariaLocal: 154 },
             },
             { // Click #2
                 ctaLabel: 'Ask the factory →',
@@ -232,6 +233,7 @@ That answer took 3 seconds. No analyst. No report.`,
                 panelActions: [
                     { panel: 'cwf', state: 'open' },
                 ],
+                editorHeights: { screenText: 186, ariaLocal: 154 },
             },
             { // Click #3
                 ctaLabel: 'Continue →',
@@ -254,6 +256,7 @@ Kiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.
                     { panel: 'cwf', state: 'close' },
                 ],
                 transitionTo: 'next',
+                editorHeights: { screenText: 184, ariaLocal: 155 },
             },
         ],
     },
@@ -313,7 +316,7 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                ctaSteps: [
+                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show me →',
                 mediaInstruction: 'chart:conveyor_speed',
@@ -333,6 +336,7 @@ No alarm. No log.
                 panelActions: [
                     { panel: 'controlPanel', state: 'open' },
                 ],
+                editorHeights: { screenText: 195, ariaLocal: 162, ariaApi: 155 },
             },
             { // Click #2
                 ctaLabel: 'Add a dashboard →',
@@ -352,6 +356,7 @@ Not a catastrophe. A slow, silent drain.
                     { panel: 'controlPanel', state: 'close' },
                 ],
                 transitionTo: 'next',
+                editorHeights: { screenText: 203, ariaLocal: 162, ariaApi: 156 },
             },
         ],
     },
@@ -398,7 +403,7 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                ctaSteps: [
+                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show dashboard →',
                 slideImageUrl: '/demo/ACT-2.png',
@@ -417,6 +422,7 @@ The dashboard cannot answer.`,
                 panelActions: [
                     { panel: 'basicPanel', state: 'open' },
                 ],
+                editorHeights: { screenText: 169, ariaLocal: 132 },
             },
             { // Click #2
                 ctaLabel: 'Go deeper →',
@@ -433,6 +439,7 @@ Not more dashboards. Traceability.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
+                editorHeights: { screenText: 169, ariaLocal: 133 },
             },
         ],
     },
@@ -481,7 +488,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                ctaSteps: [
+                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the crisis →',
                 slideImageUrl: '/demo/ACT-3.png',
@@ -497,6 +504,7 @@ Second quality = paid twice. Scrap = total loss.<w:3500><clck>`,
                 ariaLocalSize: 'sm',
                 ariaApi: `Tiles through kiln so far, how many show quality issues.CO₂ impact: kiln ~100 m³ gas/hour, +18% at 14°C overshoot,1.9 kg CO₂/m³. Give energy waste and excess CO₂ this session.Also note: second-quality tiles cost 40-60% of production cost again at rework,and carry excess embedded carbon to the rework facility.`,
                 ariaInputEnabled: true,
+                editorHeights: { screenText: 123, ariaLocal: 141, ariaApi: 125 },
             },
             { // Click #2
                 ctaLabel: 'Ask the factory →',
@@ -513,6 +521,7 @@ One fix solves both.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
+                editorHeights: { screenText: 122, ariaLocal: 142, ariaApi: 122 },
             },
         ],
     },
@@ -560,7 +569,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                ctaSteps: [
+                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Ask as CEO →',
                 slideImageUrl: '/demo/ACT-4a.png',
@@ -577,6 +586,7 @@ accessible to anyone, any hour, any language.<w:3500><clck>`,
                 ariaLocalSize: 'sm',
                 ariaApi: `The CWF panel is now open — the visitor can ask the factory anything in plainlanguage. This is 15 years of engineering knowledge accessible to anyone, at anyhour. First question, from the factory owner: 🏢 What is our quality situation?How much is glaze viscosity drift costing us — double-cost from second-qualitytiles (40-60% of production cost at rework)? Production window before critical?`,
                 ariaInputEnabled: true,
+                editorHeights: { screenText: 118, ariaLocal: 139, ariaApi: 154 },
             },
             { // Click #2
                 ctaLabel: 'Ask about CO₂ →',
@@ -586,6 +596,7 @@ accessible to anyone, any hour, any language.<w:3500><clck>`,
                 screenTextSize: 'md',
                 ariaApi: `🌿 CO₂ intensity per 1,000 tiles this session.Glaze drift contribution: direct energy + CO₂ in second-quality tiles sentto rework. Factors: 0.4 kg/kWh, 1.9 kg/m³. Compare to SCN-001 optimal.`,
                 ariaInputEnabled: true,
+                editorHeights: { screenText: 121, ariaLocal: 134, ariaApi: 153 },
             },
             { // Click #3
                 ctaLabel: 'Change a parameter →',
@@ -602,6 +613,7 @@ Intent → Auth → Action. Under 30 seconds.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
+                editorHeights: { screenText: 118, ariaLocal: 134, ariaApi: 152 },
             },
         ],
     },
@@ -655,7 +667,7 @@ The Copilot did not alert someone — it acted.
 
         openingPrompt: '',
 
-                                                                                                ctaSteps: [
+                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the incident →',
                 slideImageUrl: '/demo/ACT-4d.png',
@@ -676,6 +688,7 @@ Customer received only first-quality tiles.
 The Copilot did not alert someone — it acted.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
+                editorHeights: { screenText: 123, ariaLocal: 211, ariaApi: 52 },
             },
             { // Click #2
                 ctaLabel: 'Next',
@@ -692,6 +705,7 @@ At 10M tiles/year: €1.1M–€2.1M monthly gap.
 Recovered in 6 minutes 40 seconds.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
+                editorHeights: { screenText: 119, ariaLocal: 208, ariaApi: 52 },
             },
             { // Click #3
                 ctaLabel: 'Closing question →',
@@ -711,6 +725,7 @@ No special team. The right foundation.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
+                editorHeights: { screenText: 116, ariaLocal: 202, ariaApi: 52 },
             },
         ],
     },
@@ -755,7 +770,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                ctaSteps: [
+                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the gain',
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
@@ -771,6 +786,7 @@ How much of your production cost goes to losses
 you cannot currently see?`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
+                editorHeights: { screenText: 179, ariaLocal: 155 },
             },
             { // Click #2
                 ctaLabel: 'Thank you!',
@@ -786,6 +802,7 @@ ARDICTECH. Since 2008. 16 facilities. 1M+ IoT endpoints.
 → ardic.ai`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
+                editorHeights: { screenText: 180, ariaLocal: 157 },
             },
         ],
     },
