@@ -19,9 +19,9 @@ import { createLogger } from './logger';
 const log = createLogger('Supabase');
 
 /** Supabase project URL from environment */
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
 /** Supabase anonymous API key from environment */
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 
 // Warn in console if Supabase is not configured (non-blocking)
 if (!supabaseUrl || !supabaseAnonKey) {
