@@ -545,3 +545,55 @@ html, body {
     width: 100%;
     margin-bottom: 2px;
 }
+
+/* ─── Bilingual EN/TR Pair ─────────────────────────────────────── */
+
+.i18n-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.i18n-input-row,
+.i18n-textarea-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.i18n-input-row {
+    align-items: center;
+}
+
+.i18n-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    min-width: 26px;
+    height: 20px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.i18n-label--en {
+    background: rgba(96, 165, 250, 0.15);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: #93c5fd;
+}
+
+.i18n-label--tr {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #fcd34d;
+}
+
+/* Textarea within bilingual row should flex-grow */
+.i18n-textarea-row .c-textarea,
+.i18n-input-row .c-input {
+    flex: 1;
+}

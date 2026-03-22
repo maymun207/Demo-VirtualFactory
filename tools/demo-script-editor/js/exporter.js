@@ -47,8 +47,14 @@ function generateAllTypeScript() {
 function buildStepFields(step, editorHeights) {
     const lines = [];
 
-    if (step.ctaLabel && step.ctaLabel.trim())
-        lines.push('ctaLabel: ' + q(step.ctaLabel) + ',');
+    // ── ctaLabel (bilingual — { en, tr } object with single-quoted strings) ──
+    if (step.ctaLabel) {
+        var ctaEn = (typeof step.ctaLabel === 'object') ? (step.ctaLabel.en || '') : String(step.ctaLabel);
+        var ctaTr = (typeof step.ctaLabel === 'object') ? (step.ctaLabel.tr || '') : '';
+        if (ctaEn.trim() || ctaTr.trim()) {
+            lines.push('ctaLabel: { en: ' + q(ctaEn) + ', tr: ' + q(ctaTr) + ' },');
+        }
+    }
 
     if (step.slideImageUrl && !step.mediaInstruction)
         lines.push('slideImageUrl: ' + q(step.slideImageUrl) + ',');
@@ -66,8 +72,17 @@ function buildStepFields(step, editorHeights) {
     if (step.delayMs !== '' && step.delayMs !== null && step.delayMs !== undefined)
         lines.push('delayMs: ' + Number(step.delayMs) + ',');
 
-    if (step.screenText && step.screenText.trim())
-        lines.push('screenText: ' + bt(step.screenText.trim()) + ',');
+    // ── screenText (bilingual — { en, tr } object with backtick strings) ──
+    if (step.screenText) {
+        var stEn = (typeof step.screenText === 'object') ? (step.screenText.en || '') : String(step.screenText);
+        var stTr = (typeof step.screenText === 'object') ? (step.screenText.tr || '') : '';
+        if (stEn.trim() || stTr.trim()) {
+            lines.push('screenText: {');
+            lines.push('    en: ' + bt(stEn.trim()) + ',');
+            lines.push('    tr: ' + bt(stTr.trim()) + ',');
+            lines.push('},');
+        }
+    }
 
     // Formatting fields — only emit when they differ from defaults
     if (step.screenTextAlign && step.screenTextAlign !== 'center')
@@ -77,8 +92,17 @@ function buildStepFields(step, editorHeights) {
     if (step.screenTextSize && step.screenTextSize !== 'lg')
         lines.push("screenTextSize: '" + step.screenTextSize + "',");
 
-    if (step.ariaLocal && step.ariaLocal.trim())
-        lines.push('ariaLocal: ' + bt(step.ariaLocal.trim()) + ',');
+    // ── ariaLocal (bilingual — { en, tr } object with backtick strings) ──
+    if (step.ariaLocal) {
+        var alEn = (typeof step.ariaLocal === 'object') ? (step.ariaLocal.en || '') : String(step.ariaLocal);
+        var alTr = (typeof step.ariaLocal === 'object') ? (step.ariaLocal.tr || '') : '';
+        if (alEn.trim() || alTr.trim()) {
+            lines.push('ariaLocal: {');
+            lines.push('    en: ' + bt(alEn.trim()) + ',');
+            lines.push('    tr: ' + bt(alTr.trim()) + ',');
+            lines.push('},');
+        }
+    }
 
     // ariaLocal formatting — only emit non-defaults (left/normal/md)
     if (step.ariaLocalAlign && step.ariaLocalAlign !== 'left')
@@ -88,6 +112,7 @@ function buildStepFields(step, editorHeights) {
     if (step.ariaLocalSize && step.ariaLocalSize !== 'md')
         lines.push("ariaLocalSize: '" + step.ariaLocalSize + "',");
 
+    // ── ariaApi (stays as plain backtick string — never bilingual) ──
     if (step.ariaApi && step.ariaApi.trim())
         lines.push('ariaApi: ' + bt(step.ariaApi.trim()) + ',');
 

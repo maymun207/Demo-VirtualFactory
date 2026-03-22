@@ -137,11 +137,28 @@ function mapToEditorStep(parsed) {
     // Start with a blank step (all defaults)
     var step = createEmptyStep();
 
-    // Map simple string/number/boolean fields
+    // ── Bilingual fields (I18nText objects) ─────────────────────────────────
+    // These fields may be plain strings (legacy) or { en, tr } objects (bilingual).
+    // The editor always stores them as { en: string, tr: string }.
+    var bilingualFields = ['ctaLabel', 'screenText', 'ariaLocal'];
+    bilingualFields.forEach(function (field) {
+        if (parsed[field] !== undefined && parsed[field] !== null) {
+            var val = parsed[field];
+            if (typeof val === 'object' && val.en !== undefined) {
+                // I18nText object — store both languages
+                step[field] = { en: String(val.en || ''), tr: String(val.tr || '') };
+            } else {
+                // Plain string (legacy format) — put in EN, leave TR empty
+                step[field] = { en: String(val), tr: '' };
+            }
+        }
+    });
+
+    // ── Simple string fields (always plain strings) ──────────────────────────
     var simpleFields = [
-        'ctaLabel', 'slideImageUrl', 'mediaInstruction', 'scenarioCode',
-        'workOrderId', 'screenText', 'screenTextAlign', 'screenTextWeight',
-        'screenTextSize', 'ariaLocal', 'ariaLocalAlign', 'ariaLocalWeight',
+        'slideImageUrl', 'mediaInstruction', 'scenarioCode',
+        'workOrderId', 'screenTextAlign', 'screenTextWeight',
+        'screenTextSize', 'ariaLocalAlign', 'ariaLocalWeight',
         'ariaLocalSize', 'ariaApi', 'ariaApiAlign', 'ariaApiWeight',
         'ariaApiSize', 'simulationAction', 'transitionTo',
     ];

@@ -258,18 +258,18 @@ window.createEmptyStep = function () {
     /** Initialise every known panel to '' (no change) */
     PANELS.forEach(p => panelActions[p.id] = '');
     return {
-        ctaLabel:          '',
+        ctaLabel:          { en: '', tr: '' },
         slideImageUrl:     '',
         /** mediaInstruction: dynamic chart/viz key (or '' for static slide). */
         mediaInstruction:  '',
         scenarioCode:      '',
         workOrderId:       '',
         delayMs:           '',
-        screenText:        '',
+        screenText:        { en: '', tr: '' },
         screenTextAlign:   'center',   /* 'left' | 'center' | 'right' */
         screenTextWeight:  'bold',     /* 'normal' | 'bold' */
         screenTextSize:    'lg',       /* 'sm' | 'md' | 'lg' | 'xl' */
-        ariaLocal:         '',
+        ariaLocal:         { en: '', tr: '' },
         ariaLocalAlign:    'left',
         ariaLocalWeight:   'normal',
         ariaLocalSize:     'md',

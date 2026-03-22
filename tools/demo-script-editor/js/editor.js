@@ -126,16 +126,16 @@ function renderStage() {
     const tbody = document.createElement('tbody');
     table.appendChild(tbody);
 
-    addInputRow(tbody, steps, stageId, 'CTA Label',        'ctaLabel',        'text', '▶ Start / Next ›');
+    addBilingualInputRow(tbody, steps, stageId, 'CTA Label',  'ctaLabel', '▶ Start / Next ›');
     addSelectRow(tbody, steps, stageId, 'Demo Screen',      'slideImageUrl',   SLIDES);
     addSelectRow(tbody, steps, stageId, 'Media Instruction','mediaInstruction', MEDIA_INSTRUCTIONS);
     addSelectRow(tbody, steps, stageId, 'Scenario',         'scenarioCode',    SCENARIOS);
     addSelectRow(tbody, steps, stageId, 'Work Order',       'workOrderId',     WORK_ORDERS);
     addNumberRow(tbody, steps, stageId, 'Delay (ms)',  'delayMs');
-    addTextareaRow(tbody, steps, stageId, 'Screen Text', 'screenText',
+    addBilingualTextareaRow(tbody, steps, stageId, 'Screen Text', 'screenText',
                    'Text shown on the demo screen surface');
     addFormattingToolbar(tbody, steps, stageId);
-    addTextareaRow(tbody, steps, stageId, 'ARIA Local',  'ariaLocal',
+    addBilingualTextareaRow(tbody, steps, stageId, 'ARIA Local',  'ariaLocal',
                    'Scripted bubble — injected locally, no API call');
     addTextareaRow(tbody, steps, stageId, 'ARIA API',    'ariaApi',
                    'Prompt sent to CWF — ARIA generates a dynamic reply');
@@ -218,6 +218,133 @@ function addNumberRow(tbody, steps, stageId, label, field) {
             save();
         });
         td.appendChild(el);
+    });
+}
+
+/**
+ * addBilingualInputRow — renders two stacked text inputs (EN + TR) for
+ * a bilingual field stored as { en: string, tr: string }.
+ */
+function addBilingualInputRow(tbody, steps, stageId, label, field, placeholder) {
+    var tr = tbody.insertRow();
+    tr.appendChild(labelCell(label));
+    steps.forEach(function (step, i) {
+        var td = tr.insertCell();
+        td.className = 'td-cell';
+        var wrap = document.createElement('div');
+        wrap.className = 'i18n-pair';
+
+        ['en', 'tr'].forEach(function (lang) {
+            var row = document.createElement('div');
+            row.className = 'i18n-input-row';
+            var badge = document.createElement('span');
+            badge.className = 'i18n-label i18n-label--' + lang;
+            badge.textContent = lang.toUpperCase();
+            var el = document.createElement('input');
+            el.type = 'text';
+            el.className = 'c-input';
+            el.value = (step[field] && step[field][lang]) || '';
+            el.placeholder = placeholder || '';
+            el.addEventListener('input', function () {
+                if (!state.stages[stageId].steps[i][field]) {
+                    state.stages[stageId].steps[i][field] = { en: '', tr: '' };
+                }
+                state.stages[stageId].steps[i][field][lang] = el.value;
+                save();
+            });
+            row.appendChild(badge);
+            row.appendChild(el);
+            wrap.appendChild(row);
+        });
+        td.appendChild(wrap);
+    });
+}
+
+/**
+ * addBilingualTextareaRow — renders two stacked textareas (EN + TR) for
+ * a bilingual field stored as { en: string, tr: string }.
+ * Both textareas participate in height persistence. EN textarea drives
+ * the formatting toolbar.
+ */
+function addBilingualTextareaRow(tbody, steps, stageId, label, field, desc) {
+    var tr = tbody.insertRow();
+    tr.appendChild(labelCell(label, desc));
+
+    if (!state.textareaHeights) state.textareaHeights = {};
+
+    steps.forEach(function (step, i) {
+        var td = tr.insertCell();
+        td.className = 'td-cell';
+        var wrap = document.createElement('div');
+        wrap.className = 'i18n-pair';
+
+        ['en', 'tr'].forEach(function (lang) {
+            var langWrap = document.createElement('div');
+            langWrap.className = 'i18n-textarea-row';
+            var badge = document.createElement('span');
+            badge.className = 'i18n-label i18n-label--' + lang;
+            badge.textContent = lang.toUpperCase();
+            langWrap.appendChild(badge);
+
+            var ta = document.createElement('textarea');
+            ta.className = 'c-textarea';
+            ta.rows = 3;
+            ta.placeholder = '—';
+            ta.value = (step[field] && step[field][lang]) || '';
+
+            /* Restore saved height */
+            var htKey = stageId + '-' + i + '-' + field + '-' + lang;
+            var savedH = state.textareaHeights[htKey];
+            if (savedH) ta.style.height = savedH + 'px';
+
+            ta.addEventListener('input', function () {
+                if (!state.stages[stageId].steps[i][field]) {
+                    state.stages[stageId].steps[i][field] = { en: '', tr: '' };
+                }
+                state.stages[stageId].steps[i][field][lang] = ta.value;
+                save();
+            });
+
+            /* Persist height on resize */
+            if (typeof ResizeObserver !== 'undefined') {
+                var skipFirst = true;
+                var ro = new ResizeObserver(function (entries) {
+                    if (skipFirst) { skipFirst = false; return; }
+                    var h = Math.round(entries[0].contentRect.height);
+                    if (h > 0) {
+                        state.textareaHeights[htKey] = h;
+                        save();
+                    }
+                });
+                ro.observe(ta);
+            }
+
+            /* Toolbar activation on focus (only EN textarea drives the toolbar) */
+            if (FMT_FIELDS[field] && lang === 'en') {
+                ta.addEventListener('focus', function () {
+                    var tb = fmtToolbars[i];
+                    if (!tb) return;
+                    tb.activeField = field;
+                    tb.wrap.classList.remove('fmt-toolbar-dim');
+                    tb.label.textContent = FMT_FIELDS[field];
+                    tb.label.style.display = '';
+                    tb.refresh(field);
+                });
+                ta.addEventListener('blur', function () {
+                    setTimeout(function () {
+                        var tb = fmtToolbars[i];
+                        if (tb && tb.activeField === field) {
+                            tb.wrap.classList.add('fmt-toolbar-dim');
+                            tb.activeField = null;
+                        }
+                    }, 200);
+                });
+            }
+
+            langWrap.appendChild(ta);
+            wrap.appendChild(langWrap);
+        });
+        td.appendChild(wrap);
     });
 }
 

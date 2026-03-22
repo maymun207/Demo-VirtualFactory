@@ -32,17 +32,17 @@ function createEmptyStep() {
     const panelActions: Record<string, string> = {};
     PANELS.forEach(p => { panelActions[p.id] = ''; });
     return {
-        ctaLabel:         '',
+        ctaLabel:         { en: '', tr: '' },
         slideImageUrl:    '',
         mediaInstruction: '',
         scenarioCode:     '',
         workOrderId:      '',
         delayMs:          '',
-        screenText:       '',
+        screenText:       { en: '', tr: '' },
         screenTextAlign:  'center',
         screenTextWeight: 'bold',
         screenTextSize:   'lg',
-        ariaLocal:        '',
+        ariaLocal:        { en: '', tr: '' },
         ariaLocalAlign:   'left',
         ariaLocalWeight:  'normal',
         ariaLocalSize:    'md',
@@ -88,10 +88,23 @@ function parseCtaStepsArray(innerSource: string): Array<Record<string, unknown>>
 function mapToEditorStep(parsed: Record<string, unknown>) {
     const step = createEmptyStep();
 
+    // ── Bilingual fields ─────────────────────────────────────────────────
+    const bilingualFields = ['ctaLabel', 'screenText', 'ariaLocal'];
+    bilingualFields.forEach(field => {
+        if (parsed[field] !== undefined && parsed[field] !== null) {
+            const val = parsed[field];
+            if (typeof val === 'object' && (val as Record<string, unknown>).en !== undefined) {
+                (step as Record<string, unknown>)[field] = { en: String((val as Record<string, unknown>).en || ''), tr: String((val as Record<string, unknown>).tr || '') };
+            } else {
+                (step as Record<string, unknown>)[field] = { en: String(val), tr: '' };
+            }
+        }
+    });
+
     const simpleFields = [
-        'ctaLabel', 'slideImageUrl', 'mediaInstruction', 'scenarioCode',
-        'workOrderId', 'screenText', 'screenTextAlign', 'screenTextWeight',
-        'screenTextSize', 'ariaLocal', 'ariaLocalAlign', 'ariaLocalWeight',
+        'slideImageUrl', 'mediaInstruction', 'scenarioCode',
+        'workOrderId', 'screenTextAlign', 'screenTextWeight',
+        'screenTextSize', 'ariaLocalAlign', 'ariaLocalWeight',
         'ariaLocalSize', 'ariaApi', 'ariaApiAlign', 'ariaApiWeight',
         'ariaApiSize', 'simulationAction', 'transitionTo',
     ];
@@ -133,12 +146,16 @@ function bt(str: string): string {
     return '`' + escaped + '`';
 }
 
-/** buildStepFields — mirrors exporter.js */
+/** buildStepFields — mirrors exporter.js (bilingual version) */
 function buildStepFields(step: ReturnType<typeof createEmptyStep>): string[] {
     const lines: string[] = [];
 
-    if (step.ctaLabel && step.ctaLabel.trim())
-        lines.push('ctaLabel: ' + q(step.ctaLabel) + ',');
+    if (step.ctaLabel) {
+        const ctaEn = (typeof step.ctaLabel === 'object') ? (step.ctaLabel.en || '') : String(step.ctaLabel);
+        const ctaTr = (typeof step.ctaLabel === 'object') ? (step.ctaLabel.tr || '') : '';
+        if (ctaEn.trim() || ctaTr.trim())
+            lines.push('ctaLabel: { en: ' + q(ctaEn) + ', tr: ' + q(ctaTr) + ' },');
+    }
 
     if (step.slideImageUrl && !step.mediaInstruction)
         lines.push('slideImageUrl: ' + q(step.slideImageUrl) + ',');
@@ -155,8 +172,16 @@ function buildStepFields(step: ReturnType<typeof createEmptyStep>): string[] {
     if (step.delayMs !== '' && step.delayMs !== null && step.delayMs !== undefined)
         lines.push('delayMs: ' + Number(step.delayMs) + ',');
 
-    if (step.screenText && step.screenText.trim())
-        lines.push('screenText: ' + bt(step.screenText.trim()) + ',');
+    if (step.screenText) {
+        const stEn = (typeof step.screenText === 'object') ? (step.screenText.en || '') : String(step.screenText);
+        const stTr = (typeof step.screenText === 'object') ? (step.screenText.tr || '') : '';
+        if (stEn.trim() || stTr.trim()) {
+            lines.push('screenText: {');
+            lines.push('    en: ' + bt(stEn.trim()) + ',');
+            lines.push('    tr: ' + bt(stTr.trim()) + ',');
+            lines.push('},');
+        }
+    }
 
     // Formatting fields — only emit when non-default
     if (step.screenTextAlign && step.screenTextAlign !== 'center')
@@ -166,8 +191,16 @@ function buildStepFields(step: ReturnType<typeof createEmptyStep>): string[] {
     if (step.screenTextSize && step.screenTextSize !== 'lg')
         lines.push("screenTextSize: '" + step.screenTextSize + "',");
 
-    if (step.ariaLocal && step.ariaLocal.trim())
-        lines.push('ariaLocal: ' + bt(step.ariaLocal.trim()) + ',');
+    if (step.ariaLocal) {
+        const alEn = (typeof step.ariaLocal === 'object') ? (step.ariaLocal.en || '') : String(step.ariaLocal);
+        const alTr = (typeof step.ariaLocal === 'object') ? (step.ariaLocal.tr || '') : '';
+        if (alEn.trim() || alTr.trim()) {
+            lines.push('ariaLocal: {');
+            lines.push('    en: ' + bt(alEn.trim()) + ',');
+            lines.push('    tr: ' + bt(alTr.trim()) + ',');
+            lines.push('},');
+        }
+    }
 
     if (step.ariaLocalAlign && step.ariaLocalAlign !== 'left')
         lines.push("ariaLocalAlign: '" + step.ariaLocalAlign + "',");
@@ -438,9 +471,9 @@ describe('DemoScript Editor — mapToEditorStep', () => {
             delayMs: 1500,
         };
         const step = mapToEditorStep(parsed);
-        expect(step.ctaLabel).toBe('Start');
+        expect(step.ctaLabel).toEqual({ en: 'Start', tr: '' });
         expect(step.slideImageUrl).toBe('/demo/img.png');
-        expect(step.screenText).toBe('Hello\nWorld');
+        expect(step.screenText).toEqual({ en: 'Hello\nWorld', tr: '' });
         expect(step.ariaInputEnabled).toBe(false);
         expect(step.delayMs).toBe('1500');
     });
@@ -448,8 +481,8 @@ describe('DemoScript Editor — mapToEditorStep', () => {
     it('preserves newlines in mapped screenText', () => {
         const parsed = { screenText: 'Line 1.\nLine 2.\nLine 3.' };
         const step = mapToEditorStep(parsed);
-        expect(step.screenText).toContain('\n');
-        expect(step.screenText.split('\n')).toHaveLength(3);
+        expect(step.screenText.en).toContain('\n');
+        expect(step.screenText.en.split('\n')).toHaveLength(3);
     });
 
     it('maps panelActions array to object format', () => {
@@ -467,7 +500,7 @@ describe('DemoScript Editor — mapToEditorStep', () => {
 
     it('fills defaults for missing fields', () => {
         const step = mapToEditorStep({});
-        expect(step.ctaLabel).toBe('');
+        expect(step.ctaLabel).toEqual({ en: '', tr: '' });
         expect(step.ariaInputEnabled).toBe(true);
         expect(step.panelActions.cwf).toBe('');
     });
@@ -476,9 +509,9 @@ describe('DemoScript Editor — mapToEditorStep', () => {
 describe('DemoScript Editor — buildStepFields', () => {
     it('emits ctaLabel when present', () => {
         const step = createEmptyStep();
-        step.ctaLabel = 'Next >';
+        step.ctaLabel = { en: 'Next >', tr: '' };
         const lines = buildStepFields(step);
-        expect(lines.some(l => l.includes("ctaLabel: 'Next >'"))).toBe(true);
+        expect(lines.some(l => l.includes("en: 'Next >')")||l.includes("Next >"))).toBe(true);
     });
 
     it('omits empty ctaLabel', () => {
@@ -489,16 +522,16 @@ describe('DemoScript Editor — buildStepFields', () => {
 
     it('emits screenText as backtick template literal', () => {
         const step = createEmptyStep();
-        step.screenText = 'Hello world';
+        step.screenText = { en: 'Hello world', tr: '' };
         const lines = buildStepFields(step);
-        expect(lines.some(l => l.includes('screenText: `Hello world`'))).toBe(true);
+        expect(lines.some(l => l.includes('`Hello world`'))).toBe(true);
     });
 
     it('emits ariaLocal as backtick template literal with newlines', () => {
         const step = createEmptyStep();
-        step.ariaLocal = 'Line 1.\nLine 2.';
+        step.ariaLocal = { en: 'Line 1.\nLine 2.', tr: '' };
         const lines = buildStepFields(step);
-        const ariaLine = lines.find(l => l.startsWith('ariaLocal:'));
+        const ariaLine = lines.find(l => l.includes('en: `'));
         expect(ariaLine).toBeDefined();
         // The backtick wrapper should preserve the actual newline
         expect(ariaLine).toContain('\n');
@@ -537,7 +570,7 @@ describe('DemoScript Editor — buildStepFields', () => {
 
     it('omits formatting fields when default (center/bold/lg)', () => {
         const step = createEmptyStep();
-        step.screenText = 'some text';
+        step.screenText = { en: 'some text', tr: '' };
         const lines = buildStepFields(step);
         expect(lines.some(l => l.includes('screenTextAlign'))).toBe(false);
         expect(lines.some(l => l.includes('screenTextWeight'))).toBe(false);
@@ -546,7 +579,7 @@ describe('DemoScript Editor — buildStepFields', () => {
 
     it('emits screenTextAlign when non-default', () => {
         const step = createEmptyStep();
-        step.screenText = 'some text';
+        step.screenText = { en: 'some text', tr: '' };
         step.screenTextAlign = 'left';
         const lines = buildStepFields(step);
         expect(lines.some(l => l.includes("screenTextAlign: 'left'"))).toBe(true);
@@ -554,7 +587,7 @@ describe('DemoScript Editor — buildStepFields', () => {
 
     it('emits screenTextWeight when non-default', () => {
         const step = createEmptyStep();
-        step.screenText = 'some text';
+        step.screenText = { en: 'some text', tr: '' };
         step.screenTextWeight = 'normal';
         const lines = buildStepFields(step);
         expect(lines.some(l => l.includes("screenTextWeight: 'normal'"))).toBe(true);
@@ -562,7 +595,7 @@ describe('DemoScript Editor — buildStepFields', () => {
 
     it('emits screenTextSize when non-default', () => {
         const step = createEmptyStep();
-        step.screenText = 'some text';
+        step.screenText = { en: 'some text', tr: '' };
         step.screenTextSize = 'xl';
         const lines = buildStepFields(step);
         expect(lines.some(l => l.includes("screenTextSize: 'xl'"))).toBe(true);
@@ -574,8 +607,8 @@ describe('DemoScript Editor — Step Add / Remove', () => {
 
     beforeEach(() => {
         steps = [createEmptyStep(), createEmptyStep()];
-        steps[0].ctaLabel = 'Step A';
-        steps[1].ctaLabel = 'Step B';
+        steps[0].ctaLabel = { en: 'Step A', tr: '' };
+        steps[1].ctaLabel = { en: 'Step B', tr: '' };
     });
 
     it('addStep increases array length', () => {
@@ -604,23 +637,23 @@ describe('DemoScript Editor — Step Add / Remove', () => {
     it('removeStep at index 0 removes the correct step', () => {
         if (steps.length > 1) steps.splice(0, 1);
         expect(steps).toHaveLength(1);
-        expect(steps[0].ctaLabel).toBe('Step B');
+        expect(steps[0].ctaLabel).toEqual({ en: 'Step B', tr: '' });
     });
 
     it('removeStep at last index removes the correct step', () => {
         if (steps.length > 1) steps.splice(steps.length - 1, 1);
         expect(steps).toHaveLength(1);
-        expect(steps[0].ctaLabel).toBe('Step A');
+        expect(steps[0].ctaLabel).toEqual({ en: 'Step A', tr: '' });
     });
 
     it('removeStep from middle removes the correct step', () => {
         steps.push(createEmptyStep());
-        steps[2].ctaLabel = 'Step C';
+        steps[2].ctaLabel = { en: 'Step C', tr: '' };
 
         if (steps.length > 1) steps.splice(1, 1);
         expect(steps).toHaveLength(2);
-        expect(steps[0].ctaLabel).toBe('Step A');
-        expect(steps[1].ctaLabel).toBe('Step C');
+        expect(steps[0].ctaLabel).toEqual({ en: 'Step A', tr: '' });
+        expect(steps[1].ctaLabel).toEqual({ en: 'Step C', tr: '' });
     });
 
     it('removeStep is blocked when only 1 step remains', () => {
@@ -755,7 +788,7 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
     it('round-trips simple fields through export → import', () => {
         // 1. Create step with data
         const original = createEmptyStep();
-        original.ctaLabel = 'Start the journey →';
+        original.ctaLabel = { en: 'Start the journey →', tr: '' };
         original.slideImageUrl = '/demo/Welcome.png';
         original.delayMs = '1500';
         original.ariaInputEnabled = false;
@@ -776,7 +809,7 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
         const reimported = mapToEditorStep(parsed![0]);
 
         // 5. Compare
-        expect(reimported.ctaLabel).toBe(original.ctaLabel);
+        expect(reimported.ctaLabel).toEqual(original.ctaLabel);
         expect(reimported.slideImageUrl).toBe(original.slideImageUrl);
         expect(reimported.delayMs).toBe(original.delayMs);
         expect(reimported.ariaInputEnabled).toBe(original.ariaInputEnabled);
@@ -785,7 +818,7 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
 
     it('round-trips multi-line screenText with newlines preserved', () => {
         const original = createEmptyStep();
-        original.screenText = 'A ceramic tile factory — live, right now.\nEvery tile.\nEvery machine.\nEvery gram of CO₂.';
+        original.screenText = { en: 'A ceramic tile factory — live, right now.\nEvery tile.\nEvery machine.\nEvery gram of CO₂.', tr: '' };
 
         // Export
         const lines = buildStepFields(original);
@@ -797,15 +830,15 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
         const reimported = mapToEditorStep(parsed![0]);
 
         // Newlines must survive
-        expect(reimported.screenText).toContain('\n');
-        expect(reimported.screenText.split('\n')).toHaveLength(4);
-        expect(reimported.screenText).toContain('Every tile.');
-        expect(reimported.screenText).toContain('Every gram of CO₂.');
+        expect(reimported.screenText.en).toContain('\n');
+        expect(reimported.screenText.en.split('\n')).toHaveLength(4);
+        expect(reimported.screenText.en).toContain('Every tile.');
+        expect(reimported.screenText.en).toContain('Every gram of CO₂.');
     });
 
     it('round-trips ariaLocal with embedded commands and newlines', () => {
         const original = createEmptyStep();
-        original.ariaLocal = '<cls> Welcome to the factory.\n\nIn the next few minutes, I will take you through four stages.\n\n→ Click to begin.';
+        original.ariaLocal = { en: '<cls> Welcome to the factory.\n\nIn the next few minutes, I will take you through four stages.\n\n→ Click to begin.', tr: '' };
 
         // Export
         const lines = buildStepFields(original);
@@ -816,9 +849,9 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
         expect(parsed).not.toBeNull();
         const reimported = mapToEditorStep(parsed![0]);
 
-        expect(reimported.ariaLocal).toContain('<cls>');
-        expect(reimported.ariaLocal).toContain('\n');
-        expect(reimported.ariaLocal).toContain('→ Click to begin.');
+        expect(reimported.ariaLocal.en).toContain('<cls>');
+        expect(reimported.ariaLocal.en).toContain('\n');
+        expect(reimported.ariaLocal.en).toContain('→ Click to begin.');
     });
 
     it('round-trips panelActions correctly', () => {
@@ -842,9 +875,9 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
     it('round-trips after deleting middle step — only remaining steps exported', () => {
         // 3 steps
         const steps = [createEmptyStep(), createEmptyStep(), createEmptyStep()];
-        steps[0].ctaLabel = 'First';
-        steps[1].ctaLabel = 'Second (to delete)';
-        steps[2].ctaLabel = 'Third';
+        steps[0].ctaLabel = { en: 'First', tr: '' };
+        steps[1].ctaLabel = { en: 'Second (to delete)', tr: '' };
+        steps[2].ctaLabel = { en: 'Third', tr: '' };
 
         // Delete middle step
         steps.splice(1, 1);
@@ -862,8 +895,8 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
         const parsed = parseCtaStepsArray(combinedSource);
         expect(parsed).not.toBeNull();
         expect(parsed).toHaveLength(2);
-        expect((parsed![0] as Record<string, unknown>).ctaLabel).toBe('First');
-        expect((parsed![1] as Record<string, unknown>).ctaLabel).toBe('Third');
+        expect((parsed![0] as Record<string, unknown>).ctaLabel).toEqual({ en: 'First', tr: '' });
+        expect((parsed![1] as Record<string, unknown>).ctaLabel).toEqual({ en: 'Third', tr: '' });
         // 'Second' must not appear
         expect(combinedSource).not.toContain('Second');
     });
