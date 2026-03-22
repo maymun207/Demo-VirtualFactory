@@ -55,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             simulation_id: simulationId,
             cwf_state: 'copilot_active',
             auth_attempts: 0,
-            activated_by: activatedBy || 'airtk',
+            activated_by: activatedBy || 'ardic',
             /** Set generous initial poll/cooldown values */
             poll_interval_sec: 6,
             cooldown_sec: 30,

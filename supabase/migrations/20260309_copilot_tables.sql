@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS copilot_config (
         auto-disengages (browser is gone). */
     last_heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    /** The authorization code used to activate copilot ('airtk'). Stored for
+    /** The authorization code used to activate copilot ('ardic'). Stored for
         audit purposes so we know who authorized autonomous operation. */
     activated_by   TEXT,
 

@@ -112,7 +112,7 @@ The user has just provided their authorization response. This is the execution s
 4. Do NOT generate any text before the tool call — just call the tool.
 5. After the tool returns, report the result in one line.
 
-Example: if the user typed "airtk", call update_parameter with authorized_by="airtk" immediately.
+Example: if the user typed "ardic", call update_parameter with authorized_by="ardic" immediately.
 `;
 
 const CWF_AUTH_FAST_PATH_PROMPT_TR = `
@@ -129,7 +129,7 @@ Kullanıcı yetkisini az önce sağladı. Bu bekleyen makine parametre değişik
 4. Araç çağrısından önce herhangi bir metin oluşturmayın — sadece aracı çağırın.
 5. Araç döndükten sonra sonucu tek satırda raporlayın.
 
-Örnek: kullanıcı "airtk" yazdıysa, hemen authorized_by="airtk" ile update_parameter'ı çağırın.
+Örnek: kullanıcı "ardic" yazdıysa, hemen authorized_by="ardic" ile update_parameter'ı çağırın.
 `;
 
 // =============================================================================
@@ -140,7 +140,7 @@ Kullanıcı yetkisini az önce sağladı. Bu bekleyen makine parametre değişik
 // =============================================================================
 
 /** Authorization code for CWF parameter changes (human-in-the-loop) */
-const CWF_AUTH_CODE = 'airtk';
+const CWF_AUTH_CODE = 'ardic';
 
 /**
  * Sentinel value written to cwf_commands.authorized_by for UI actions
@@ -706,7 +706,7 @@ const tools: FunctionDeclaration[] = [
     {
         /**
          * enable_copilot — Activate autonomous CWF Copilot mode.
-         * Requires human-in-the-loop authorization (auth code 'airtk').
+         * Requires human-in-the-loop authorization (auth code 'ardic').
          * Once enabled, the server-side Copilot engine polls the simulation
          * state and takes corrective actions autonomously.
          */
@@ -1060,7 +1060,7 @@ async function executeUpdateParameter(args: {
     authorized_by: string;
 }): Promise<object> {
     /** Step 1: Validate authorization ID.
-     * Accept either the human-entered auth code ('airtk') or the copilot
+     * Accept either the human-entered auth code ('ardic') or the copilot
      * sentinel ('system:copilot_auto') for autonomous actions dispatched
      * by the CWF Copilot engine. */
     const COPILOT_AUTH_SENTINEL = 'system:copilot_auto';
@@ -2192,7 +2192,7 @@ When the machine health analysis reveals ⚠️ out-of-range parameters, you SHO
 - When the user approves (says "yes", "proceed", "fix it", "go ahead", etc.), respond EXACTLY:
   "Please enter your authorization ID to confirm. You have 20 seconds.
 
-  *For demo purposes, use \"airtk\" as the authorization code.*"
+  *For demo purposes, use \"ardic\" as the authorization code.*"
 - Then WAIT. The next user message will be their authorization code.
 
 ### Step 3 — EXECUTE (immediately after the user sends any text in response to Step 2)
@@ -2852,7 +2852,7 @@ export default async function handler(
         // =====================================================================
         // SHORT-CIRCUIT: PARAMETER CHANGE AUTH (Case F)
         //
-        // When the user sends the auth code (e.g. "airtk") for a pending
+        // When the user sends the auth code (e.g. "ardic") for a pending
         // parameter change, we no longer rely on Gemini to call update_parameter.
         // Gemini is non-deterministic and ~50% of the time ignores the fast-path
         // instruction, forcing the user to type the auth code TWICE.

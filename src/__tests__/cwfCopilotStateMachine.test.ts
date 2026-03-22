@@ -32,7 +32,7 @@ type CwfState = 'normal' | 'copilot_pending_auth' | 'copilot_active';
 const COPILOT_MAX_AUTH_ATTEMPTS = 3;
 
 /** The known authorisation code (test uses same value as production). */
-const TEST_AUTH_CODE = 'airtk';
+const TEST_AUTH_CODE = 'ardic';
 
 // =============================================================================
 // STATE TRANSITION FUNCTIONS (pure logic, no side-effects)
@@ -174,14 +174,14 @@ describe('CWF State Machine: Authorisation — Correct Code', () => {
 
     it('should be case-insensitive for auth code comparison', () => {
         /**
-         * Auth codes should be case-insensitive. 'AIRTK', 'Airtk', and 'airtk'
+         * Auth codes should be case-insensitive. 'ARDIC', 'Ardic', and 'ardic'
          * should all be accepted as valid codes.
          */
-        const upperResult = computeAuthTransition('copilot_pending_auth', 0, 'AIRTK', TEST_AUTH_CODE);
+        const upperResult = computeAuthTransition('copilot_pending_auth', 0, 'ARDIC', TEST_AUTH_CODE);
         expect(upperResult.success).toBe(true);
         expect(upperResult.nextState).toBe('copilot_active');
 
-        const mixedResult = computeAuthTransition('copilot_pending_auth', 0, 'AirTK', TEST_AUTH_CODE);
+        const mixedResult = computeAuthTransition('copilot_pending_auth', 0, 'Ardic', TEST_AUTH_CODE);
         expect(mixedResult.success).toBe(true);
     });
 
@@ -353,8 +353,8 @@ describe('CWF State Machine: Simulation End Auto-Disengage', () => {
 
 describe('CWF State Machine: Auth-Code Recognition Heuristic', () => {
     it('should recognise a short single word as an auth code', () => {
-        /** 'airtk' — typical auth code format */
-        expect(looksLikeAuthCode('airtk')).toBe(true);
+        /** 'ardic' — typical auth code format */
+        expect(looksLikeAuthCode('ardic')).toBe(true);
     });
 
     it('should recognise a short alphanumeric as an auth code', () => {
@@ -598,7 +598,7 @@ function isReRequestInPendingAuth(message: string, cwfState: CwfState): boolean 
 describe('CWF State Machine: Re-Request in copilot_pending_auth Guard', () => {
     it('detects "go into copilot mode" as a re-request in pending_auth', () => {
         /**
-         * This is the exact scenario that caused the airtk rejection bug:
+         * This is the exact scenario that caused the ardic rejection bug:
          * User types "go into copilot mode" but DB is still in pending_auth
          * from a previous session. Without the guard, this would be treated
          * as a failed auth attempt.
@@ -612,10 +612,10 @@ describe('CWF State Machine: Re-Request in copilot_pending_auth Guard', () => {
 
     it('does NOT treat a short auth code as a re-request', () => {
         /**
-         * The auth code "airtk" is not a copilot-enable keyword phrase.
+         * The auth code "ardic" is not a copilot-enable keyword phrase.
          * It must be treated as an auth attempt, not a re-request.
          */
-        expect(isReRequestInPendingAuth('airtk', 'copilot_pending_auth')).toBe(false);
+        expect(isReRequestInPendingAuth('ardic', 'copilot_pending_auth')).toBe(false);
     });
 
     it('does NOT flag a re-request in normal state (would be new request)', () => {
@@ -630,15 +630,15 @@ describe('CWF State Machine: Re-Request in copilot_pending_auth Guard', () => {
         expect(isReRequestInPendingAuth('enable copilot', 'copilot_active')).toBe(false);
     });
 
-    it('the auth code "airtk" in pending_auth goes through normal auth check', () => {
+    it('the auth code "ardic" in pending_auth goes through normal auth check', () => {
         /**
-         * When user sends "airtk" in pending_auth state, isReRequestInPendingAuth=false
+         * When user sends "ardic" in pending_auth state, isReRequestInPendingAuth=false
          * and isStateMachinePendingAuth=true → auth check runs → success.
          * This ensures the auth code path is not blocked by the re-request guard.
          */
-        expect(isReRequestInPendingAuth('airtk', 'copilot_pending_auth')).toBe(false);
+        expect(isReRequestInPendingAuth('ardic', 'copilot_pending_auth')).toBe(false);
         // Then the normal auth transition succeeds:
-        const authResult = computeAuthTransition('copilot_pending_auth', 0, 'airtk', TEST_AUTH_CODE);
+        const authResult = computeAuthTransition('copilot_pending_auth', 0, 'ardic', TEST_AUTH_CODE);
         expect(authResult.success).toBe(true);
         expect(authResult.nextState).toBe('copilot_active');
     });

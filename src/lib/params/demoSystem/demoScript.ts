@@ -199,7 +199,7 @@ Maximum 3 sentences per response. Every word must earn its place.
         /** No openingPrompt — Act 0 is the entry point. */
         openingPrompt: '',
 
-                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Start →',
                 scenarioCode: 'SCN-001',
@@ -219,11 +219,12 @@ The factory behind me is starting now.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 simulationAction: 'reset-start',
-                editorHeights: { screenText: 183, ariaLocal: 154 },
+                editorHeights: { screenText: 141, ariaLocal: 112, ariaApi: 42 },
             },
             { // Click #2
                 ctaLabel: 'Ask the factory →',
                 screenText: `<cls><w:400>What if you could just ask?<w:2500><clck>`,
+                screenTextAlign: 'left',
                 ariaLocal: `<cls><w:3000>📊 Throughput: 3,840 tiles/hour — 8.6% below plan.
 Conveyor drift averaging 0.91x nominal.
 Kiln and Dryer burning energy during every speed dip.
@@ -235,7 +236,7 @@ That answer took 3 seconds. No analyst. No report.`,
                 panelActions: [
                     { panel: 'cwf', state: 'open' },
                 ],
-                editorHeights: { screenText: 186, ariaLocal: 154 },
+                editorHeights: { screenText: 144, ariaLocal: 112, ariaApi: 42 },
             },
             { // Click #3
                 ctaLabel: 'Continue →',
@@ -243,7 +244,7 @@ That answer took 3 seconds. No analyst. No report.`,
 Kiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.
 03:48 — Root cause found.
 03:49 — Corrected. Automatically.<w:2500><cls><w:400>No one woke up.
-~1,900 kg CO₂ prevented.<w:2000><clck>`,
+~1,900 kg CO₂ prevented.<w:3000><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
@@ -258,7 +259,7 @@ Kiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.
                     { panel: 'cwf', state: 'close' },
                 ],
                 transitionTo: 'next',
-                editorHeights: { screenText: 184, ariaLocal: 155 },
+                editorHeights: { screenText: 142, ariaLocal: 113, ariaApi: 42 },
             },
         ],
     },
@@ -318,12 +319,14 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show me →',
                 mediaInstruction: 'chart:conveyor_speed',
                 delayMs: 1000,
-                screenText: `<w:600>Conveyor speed. Real time.<MI><w:5000>Every dip: energy in. Zero output. No record.<w:2500><clck>`,
+                screenText: `<w:600>
+Conveyor speed. Real time.<MI><w:5000>
+Every dip: energy in. Zero output. No record.<w:5000><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
@@ -338,7 +341,7 @@ No alarm. No log.
                 panelActions: [
                     { panel: 'controlPanel', state: 'open' },
                 ],
-                editorHeights: { screenText: 195, ariaLocal: 162, ariaApi: 155 },
+                editorHeights: { screenText: 167, ariaLocal: 134, ariaApi: 127 },
             },
             { // Click #2
                 ctaLabel: 'Add a dashboard →',
@@ -358,7 +361,7 @@ Not a catastrophe. A slow, silent drain.
                     { panel: 'controlPanel', state: 'close' },
                 ],
                 transitionTo: 'next',
-                editorHeights: { screenText: 203, ariaLocal: 162, ariaApi: 156 },
+                editorHeights: { screenText: 175, ariaLocal: 134, ariaApi: 128 },
             },
         ],
     },
@@ -405,10 +408,11 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show dashboard →',
                 slideImageUrl: '/demo/ACT-2.png',
+                delayMs: 1000,
                 screenText: `OEE. Throughput. Energy.
 All visible now.<w:3500>
 But can we explain any of them?<w:3000><clck>`,
@@ -424,12 +428,15 @@ The dashboard cannot answer.`,
                 panelActions: [
                     { panel: 'basicPanel', state: 'open' },
                 ],
-                editorHeights: { screenText: 169, ariaLocal: 132 },
+                editorHeights: { screenText: 155, ariaLocal: 118, ariaApi: 52 },
             },
             { // Click #2
                 ctaLabel: 'Go deeper →',
-                screenText: `<cls><w:500>OEE 87%. Good? Bad? Getting worse?
-Which machine? Since when?
+                screenText: `<cls><w:500>OEE 87%. 
+Good? Bad? 
+Getting worse?
+Which machine?
+Since when?
 The dashboard is silent.<w:5000><clck>`,
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
@@ -441,7 +448,7 @@ Not more dashboards. Traceability.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
-                editorHeights: { screenText: 169, ariaLocal: 133 },
+                editorHeights: { screenText: 155, ariaLocal: 119, ariaApi: 52 },
             },
         ],
     },
@@ -490,7 +497,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the crisis →',
                 slideImageUrl: '/demo/ACT-3.png',
@@ -571,7 +578,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Ask as CEO →',
                 slideImageUrl: '/demo/ACT-4a.png',
@@ -584,38 +591,39 @@ The factory owner asks first.<w:2500><clck>`,
                 ariaLocal: `<cls><w:300>SCN-003 active. Glaze viscosity slightly off.
 CWF panel open. Ask anything in plain language.
 15 years of engineering knowledge,
-accessible to anyone, any hour, any language.<w:3500><clck>`,
+accessible to anyone, any hour, any language.<w:4500><clck>`,
                 ariaLocalSize: 'sm',
                 ariaApi: `The CWF panel is now open — the visitor can ask the factory anything in plainlanguage. This is 15 years of engineering knowledge accessible to anyone, at anyhour. First question, from the factory owner: 🏢 What is our quality situation?How much is glaze viscosity drift costing us — double-cost from second-qualitytiles (40-60% of production cost at rework)? Production window before critical?`,
                 ariaInputEnabled: true,
-                editorHeights: { screenText: 118, ariaLocal: 139, ariaApi: 154 },
+                editorHeights: { screenText: 104, ariaLocal: 125, ariaApi: 140 },
             },
             { // Click #2
                 ctaLabel: 'Ask about CO₂ →',
                 slideImageUrl: '/demo/ACT-4b.png',
+                delayMs: 2000,
                 screenText: `<cls><w:500>Different role. Same factory. Same data.<w:1500><clck>`,
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
                 ariaApi: `🌿 CO₂ intensity per 1,000 tiles this session.Glaze drift contribution: direct energy + CO₂ in second-quality tiles sentto rework. Factors: 0.4 kg/kWh, 1.9 kg/m³. Compare to SCN-001 optimal.`,
                 ariaInputEnabled: true,
-                editorHeights: { screenText: 121, ariaLocal: 134, ariaApi: 153 },
+                editorHeights: { screenText: 107, ariaLocal: 120, ariaApi: 139 },
             },
             { // Click #3
                 ctaLabel: 'Change a parameter →',
                 slideImageUrl: '/demo/ACT-4c.png',
-                delayMs: 3500,
+                delayMs: 5500,
                 screenText: `<cls><w:500>You don't just ask questions.
-You give instructions.<w:2000><clck>`,
+You give instructions.<w:4000><clck>`,
                 ariaLocal: `<cls><w:300>💬 In the CWF panel, type:
 "Increase glaze cabin pressure to 0.9 bar"
-Auth code: airtk
+Auth code: ardic
 Parameter changes live. No shutdown. No phone call.
 Intent → Auth → Action. Under 30 seconds.
 → Now watch it do this itself.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
-                editorHeights: { screenText: 118, ariaLocal: 134, ariaApi: 152 },
+                editorHeights: { screenText: 104, ariaLocal: 120, ariaApi: 138 },
             },
         ],
     },
@@ -669,12 +677,12 @@ The Copilot did not alert someone — it acted.
 
         openingPrompt: '',
 
-                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the incident →',
                 slideImageUrl: '/demo/ACT-4d.png',
                 screenText: `Cascade Failure. Press + Kiln.<w:2000>
-Copilot active. Watch.<w:1500><clck>`,
+Copilot active. Watch.<w:2500><clck>`,
                 screenTextAlign: 'left',
                 screenTextSize: 'md',
                 ariaLocal: `<cls><w:500>📋 INCIDENT LOG
@@ -690,12 +698,12 @@ Customer received only first-quality tiles.
 The Copilot did not alert someone — it acted.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
-                editorHeights: { screenText: 123, ariaLocal: 211, ariaApi: 52 },
+                editorHeights: { screenText: 93, ariaLocal: 205, ariaApi: 42 },
             },
             { // Click #2
                 ctaLabel: 'Next',
                 screenText: `OEE Hierarchy: the cascade impact.<w:2000>
-Watch the numbers.<w:1500><clck>`,
+Watch the numbers.<w:2500><clck>`,
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
@@ -707,12 +715,12 @@ At 10M tiles/year: €1.1M–€2.1M monthly gap.
 Recovered in 6 minutes 40 seconds.`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
-                editorHeights: { screenText: 119, ariaLocal: 208, ariaApi: 52 },
+                editorHeights: { screenText: 94, ariaLocal: 180, ariaApi: 42 },
             },
             { // Click #3
                 ctaLabel: 'Closing question →',
                 screenText: `<cls><w:500>Not because someone was paged.
-Because the system acted first.<w:2500><cls><w:400>Conventional: detect 2–4 hrs. Fix: next shift.
+Because the system acted first.<w:3500><cls><w:400>Conventional: detect 2–4 hrs. Fix: next shift.
 Here: detect 23 sec. Fix: 6 min 40 sec.
 Difference: 847 tiles. €12,400.<w:4500><clck>`,
                 screenTextAlign: 'left',
@@ -727,7 +735,7 @@ No special team. The right foundation.
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
-                editorHeights: { screenText: 116, ariaLocal: 202, ariaApi: 52 },
+                editorHeights: { screenText: 95, ariaLocal: 174, ariaApi: 42 },
             },
         ],
     },
@@ -772,7 +780,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                        ctaSteps: [
+                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: 'Show the gain',
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
@@ -788,11 +796,16 @@ How much of your production cost goes to losses
 you cannot currently see?`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
+                panelActions: [
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                ],
                 editorHeights: { screenText: 179, ariaLocal: 155 },
             },
             { // Click #2
                 ctaLabel: 'Thank you!',
                 slideImageUrl: '/demo/SentialFactory.png',
+                delayMs: 1000,
                 screenText: `<cls><w:5500>How much waste did your factory produce last year?
 If you don't know — that's exactly where we start.<w:3000><clck>`,
                 screenTextSize: 'md',
@@ -804,6 +817,10 @@ ARDICTECH. Since 2008. 16 facilities. 1M+ IoT endpoints.
 → ardic.ai`,
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
+                panelActions: [
+                    { panel: 'cwf', state: 'close' },
+                    { panel: 'oeeHierarchy', state: 'close' },
+                ],
                 editorHeights: { screenText: 180, ariaLocal: 157 },
             },
         ],

@@ -30,7 +30,7 @@ import {
 describe('CWF_AUTH_CODE', () => {
     it('should be the expected authorization code', () => {
         /** The auth code must match the known human-in-the-loop credential */
-        expect(CWF_AUTH_CODE).toBe('airtk');
+        expect(CWF_AUTH_CODE).toBe('ardic');
     });
 
     it('should be a non-empty string', () => {

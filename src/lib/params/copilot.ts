@@ -401,7 +401,7 @@ export interface CopilotConfig {
     quality_alarm_threshold: number;
     /** Most recent browser heartbeat timestamp (ISO 8601) */
     last_heartbeat_at: string;
-    /** Auth code used to activate ('airtk') */
+    /** Auth code used to activate ('ardic') */
     activated_by: string | null;
     /** Row timestamps */
     created_at: string;

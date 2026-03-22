@@ -21,7 +21,7 @@
  * CWF must prompt the user for this code before executing any parameter change.
  * If the user provides an incorrect code, the action is immediately terminated.
  */
-export const CWF_AUTH_CODE = 'airtk';
+export const CWF_AUTH_CODE = 'ardic';
 
 /**
  * Timeout in milliseconds for the user to provide the authorisation code.

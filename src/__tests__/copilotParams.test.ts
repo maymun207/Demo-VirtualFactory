@@ -52,8 +52,8 @@ describe('CWF Copilot Configuration Constants', () => {
     });
 
     test('COPILOT_AUTH_SENTINEL is not the human auth code', () => {
-        /** Must never equal 'airtk' — that's the human auth code */
-        expect(COPILOT_AUTH_SENTINEL).not.toBe('airtk');
+        /** Must never equal 'ardic' — that's the human auth code */
+        expect(COPILOT_AUTH_SENTINEL).not.toBe('ardic');
     });
 
     // ─── Timing: Poll Interval ───────────────────────────────────────────────

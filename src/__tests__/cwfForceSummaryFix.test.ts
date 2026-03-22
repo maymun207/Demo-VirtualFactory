@@ -201,7 +201,7 @@ describe('CWF force-summary fix — Part 2: sanitizeConversationHistory()', () =
          * The fingerprint scanner catches these.
          */
         const history = [
-            { role: 'user', content: 'airtk' },
+            { role: 'user', content: 'ardic' },
             {
                 role: 'assistant',
                 content: `as per your instruction to '${CWF_FORCE_SUMMARY_FINGERPRINT} call any tools', the change was not applied.`,
@@ -211,7 +211,7 @@ describe('CWF force-summary fix — Part 2: sanitizeConversationHistory()', () =
         /** The contaminated assistant turn should be removed; the user turn stays */
         expect(result).toHaveLength(1);
         expect(result[0].role).toBe('user');
-        expect(result[0].content).toBe('airtk');
+        expect(result[0].content).toBe('ardic');
     });
 
     it('should remove assistant turns containing the retry prompt fingerprint', () => {
@@ -327,7 +327,7 @@ describe('CWF force-summary fix — Part 3: auth-turn fast-path prompts', () => 
          *
          * Tests: correct code, wrong code, extra spaces, uppercase variation.
          */
-        const CWF_AUTH_CODE = 'airtk'; // Mirror of chat.ts constant
+        const CWF_AUTH_CODE = 'ardic'; // Mirror of chat.ts constant
 
         /** Simulate the detection function */
         function isAuthTurn(message: string): boolean {
@@ -335,11 +335,11 @@ describe('CWF force-summary fix — Part 3: auth-turn fast-path prompts', () => 
         }
 
         /** Exact match */
-        expect(isAuthTurn('airtk')).toBe(true);
+        expect(isAuthTurn('ardic')).toBe(true);
         /** Case insensitive */
-        expect(isAuthTurn('AIRTK')).toBe(true);
+        expect(isAuthTurn('ARDIC')).toBe(true);
         /** Leading/trailing whitespace trimmed */
-        expect(isAuthTurn('  airtk  ')).toBe(true);
+        expect(isAuthTurn('  ardic  ')).toBe(true);
         /** Wrong code must not match */
         expect(isAuthTurn('wrongcode')).toBe(false);
         /** Partial match must not match */

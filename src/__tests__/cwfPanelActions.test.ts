@@ -42,7 +42,7 @@ describe('CWF UI action params constants', () => {
          *  It must be non-empty (the DB column is NOT NULL) and distinct from any
          *  real auth code so audit queries can distinguish UI-action rows. */
         expect(CWF_UI_ACTION_BYPASS_AUTH).toBeTruthy();
-        expect(CWF_UI_ACTION_BYPASS_AUTH).not.toBe('airtk'); // must differ from user auth code
+        expect(CWF_UI_ACTION_BYPASS_AUTH).not.toBe('ardic'); // must differ from user auth code
         expect(CWF_UI_ACTION_BYPASS_AUTH.startsWith('system:')).toBe(true);
     });
 });
@@ -157,7 +157,7 @@ describe('Idempotency covers all 11 panel action types', () => {
 // 4. Auth bypass sentinel contract
 // ─────────────────────────────────────────────────────────────────────────────
 describe('CWF_UI_ACTION_BYPASS_AUTH contract', () => {
-    const REAL_AUTH_CODE = 'airtk';
+    const REAL_AUTH_CODE = 'ardic';
 
     it('is never equal to the real user auth code', () => {
         /** The audit trail must be able to distinguish UI-action rows from

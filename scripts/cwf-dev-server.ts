@@ -299,7 +299,7 @@ const server = http.createServer(async (req, res) => {
                 poll_interval_sec: 6,
                 max_actions_per_minute: 20,
                 cooldown_sec: 30,
-                activated_by: body?.activatedBy || 'airtk',
+                activated_by: body?.activatedBy || 'ardic',
                 last_heartbeat_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'simulation_id' });

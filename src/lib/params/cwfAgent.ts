@@ -243,7 +243,7 @@ export const CWF_RETRY_PROMPT_FINGERPRINT = 'Answer NOW using all the data';
  * PURPOSE:
  *   Without this, Gemini re-queries the simulation state (burning 3-5 tool
  *   loops) before calling update_parameter or execute_ui_action. During a
- *   simple "airtk" auth-confirmation turn, those queries are wasted — all
+ *   simple "ardic" auth-confirmation turn, those queries are wasted — all
  *   necessary data was gathered in the PREVIOUS turn where the proposal
  *   was presented.
  *

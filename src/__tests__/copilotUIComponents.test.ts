@@ -189,8 +189,8 @@ describe('COPILOT_AUTH_SENTINEL — Cross-Module Consistency', () => {
         expect(COPILOT_AUTH_SENTINEL_COMMANDS).toMatch(/^system:/);
     });
 
-    test('sentinel is not the human auth code airtk', () => {
-        expect(COPILOT_AUTH_SENTINEL_COMMANDS).not.toBe('airtk');
+    test('sentinel is not the human auth code ardic', () => {
+        expect(COPILOT_AUTH_SENTINEL_COMMANDS).not.toBe('ardic');
     });
 });
 
