@@ -182,7 +182,7 @@ export const DEMO_ACTS: DemoAct[] = [
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'mirror',
-        eraLabel: 'The Mirror',
+        eraLabel: { en: 'The Mirror', tr: 'Ayna' },
         eraEmoji: '🪞',
         targetHeightKey: 'tall',
         scenarioCode: 'SCN-001',
@@ -225,36 +225,37 @@ Maximum 3 sentences per response. Every word must earn its place.
 
                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                ctaLabel: 'Start →',
+                ctaLabel: { en: 'Start →', tr: 'Başlat →' },
                 scenarioCode: 'SCN-001',
                 workOrderId: 'WorkID#3',
                 delayMs: 800,
-                screenText: `4,200 tiles per shift.
-Seven stations. One line.<w:2500><cls><w:500>This factory loses €47 every 20 seconds.
-No alarm. No report. No one notices.<w:2500><cls><w:500>Every shift. Every day. Silently.<w:2000><clck>`,
+                screenText: {
+                    en: `4,200 tiles per shift.\nSeven stations. One line.<w:2500><cls><w:500>This factory loses €47 every 20 seconds.\nNo alarm. No report. No one notices.<w:2500><cls><w:500>Every shift. Every day. Silently.<w:2000><clck>`,
+                    tr: `Vardiyada 4.200 karo üretiliyor.\nYedi istasyon. Tek hat.<w:2500><cls><w:500>Bu fabrika her 20 saniyede €47 kaybediyor.\nAlarm yok. Rapor yok. Fark eden yok.<w:3000><cls><w:500>Her vardiya. Her gün. Sessizce.<w:2000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>I am ARIA — this factory's intelligence layer.
-What you just read is not a worst case.
-It is the everyday reality of factories running blind.
-The factory behind me is starting now.
-→ Click to ask it a question.`,
+                ariaLocal: {
+                    en: `<cls><w:300>I am ARIA — this factory's intelligence layer.\n\nWhat you just read is not a worst case.\nIt is the everyday reality of factories running blind.\n\nThe factory behind me is starting now.\n→ Click to ask it a question.`,
+                    tr: `<cls><w:300>Ben ARIA — bu fabrikanın zeka katmanı.\n\nAz önce okuduğunuz en kötü senaryo değil.\nGörünürlüğü olmayan fabrikaların günlük gerçeği.\n\nArkamdaki fabrika şimdi başlıyor.\n→ Fabrikaya bir soru sormak için tıklayın.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 simulationAction: 'reset-start',
                 editorHeights: { screenText: 141, ariaLocal: 112, ariaApi: 42 },
             },
             { // Click #2
-                ctaLabel: 'Ask the factory →',
-                screenText: `<cls><w:400>What if you could just ask?<w:2500><clck>`,
+                ctaLabel: { en: 'Ask the factory →', tr: 'Fabrikaya sor →' },
+                screenText: {
+                    en: `<cls><w:400>What if you could just ask?<w:1500><clck>`,
+                    tr: `<cls><w:400>Ya sadece sorabilseydiniz?<w:1500><clck>`,
+                },
                 screenTextAlign: 'left',
-                ariaLocal: `<cls><w:3000>📊 Throughput: 3,840 tiles/hour — 8.6% below plan.
-Conveyor drift averaging 0.91x nominal.
-Kiln and Dryer burning energy during every speed dip.
-Session loss so far: ~€94.
-Annual projection: ~€206,000.
-That answer took 3 seconds. No analyst. No report.`,
+                ariaLocal: {
+                    en: `<cls><w:300>📊 Throughput: 3,840 tiles/hour — 8.6% below plan.\nConveyor drift averaging 0.91x nominal.\n\nKiln and Dryer burning energy during every speed dip.\nSession loss so far: ~€94.\nAnnual projection: ~€206,000.\n\nThat answer took 3 seconds. No analyst. No report.`,
+                    tr: `<cls><w:300>📊 Üretim hızı: 3.840 karo/saat — plandan %8,6 düşük.\nKonveyör sapması ortalama 0,91x nominal.\n\nHer hız düşüşünde Fırın ve Kurutucu enerji yakıyor.\nBu oturumdaki kayıp: ~€94.\nYıllık projeksiyon: ~€206.000.\n\nBu cevap 3 saniye sürdü. Analist yok. Rapor yok.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 panelActions: [
@@ -263,20 +264,18 @@ That answer took 3 seconds. No analyst. No report.`,
                 editorHeights: { screenText: 144, ariaLocal: 112, ariaApi: 42 },
             },
             { // Click #3
-                ctaLabel: 'Continue →',
-                screenText: `<cls><w:500>That answer came from live data.<w:2000><cls><w:400>03:47 AM. Night shift.
-Kiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.
-03:48 — Root cause found.
-03:49 — Corrected. Automatically.<w:2500><cls><w:400>No one woke up.
-~1,900 kg CO₂ prevented.<w:3000><clck>`,
+                ctaLabel: { en: 'Continue →', tr: 'Devam →' },
+                screenText: {
+                    en: `<cls><w:500>That answer came from live data.<w:2000><cls><w:400>03:47 AM. Night shift.\nKiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.\n03:48 — Root cause found.\n03:49 — Corrected. Automatically.<w:2500><cls><w:400>No one woke up.\n~1,900 kg CO₂ prevented.<w:3000><clck>`,
+                    tr: `<cls><w:500>Bu cevap canlı veriden geldi.<w:2000><cls><w:400>03:47. Gece vardiyası.\nFırın spesifikasyonun üstüne çıkıyor. Fark eden yok.<w:3000><cls><w:400>03:48 — Tespit edildi.\n03:48 — Kök neden bulundu.\n03:49 — Otomatik düzeltildi.<w:2500><cls><w:400>Kimse uyanmadı.\n~1.900 kg CO₂ önlendi.<w:2000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>Three things most factory owners never see:
-1. The silent cost of running blind
-2. A factory that answers in plain language
-3. A system that corrects before humans notice
-→ Click to walk through the full journey.`,
+                ariaLocal: {
+                    en: `<cls><w:300>Three things most factory owners never see:\n\n1. The silent cost of running blind\n2. A factory that answers in plain language\n3. A system that corrects before humans notice\n\n→ Click to walk through the full journey.`,
+                    tr: `<cls><w:300>Fabrika sahiplerinin çoğunun hiç görmediği üç şey:\n\n1. Kör çalışmanın sessiz maliyeti\n2. Düz bir dille cevap veren fabrika\n3. İnsan fark etmeden düzelten sistem\n\n→ Tam yolculuk için tıklayın.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -303,7 +302,7 @@ Kiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'no-management',
-        eraLabel: 'No System',
+        eraLabel: { en: 'No System', tr: 'Sistem Yok' },
         eraEmoji: '🏭',
         targetHeightKey: 'medium',
         scenarioCode: null,   // SCN-001 already loaded from Act 0
@@ -317,7 +316,7 @@ Kiln drifts above spec. No one notices.<w:2500><cls><w:400>03:48 — Detected.
             { panel: 'controlPanel', state: 'close' },
         ],
 
-        sidebarLabel: 'No System',
+        sidebarLabel: { en: 'No System', tr: 'Sistem Yok' },
 
         systemContext: `
 TIER 2, Act 1. The visitor chose the full journey. They have already seen the
@@ -345,21 +344,20 @@ Maximum 4 sentences per response.
 
                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                ctaLabel: 'Show me →',
+                ctaLabel: { en: 'Show me →', tr: 'Göster →' },
                 mediaInstruction: 'chart:conveyor_speed',
                 delayMs: 1000,
-                screenText: `<w:600>
-Conveyor speed. Real time.<MI><w:5000>
-Every dip: energy in. Zero output. No record.<w:5000><clck>`,
+                screenText: {
+                    en: `<w:300>Conveyor speed. Real time.<MI><w:4000>Every dip: energy in. Zero output. No record.<w:2500><clck>`,
+                    tr: `<w:300>Konveyör hızı. Gerçek zamanlı.<MI><w:4000>Her düşüş: enerji giriyor. Sıfır çıktı. Kayıt yok.<w:3000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal: `<cls><w:300>Speed: 0.87x nominal.
-Output: 3,650 tiles/hr vs 4,200 theoretical.
-Gap: 550 tiles/hr — 13.1% below plan.
-Last dip (12s at 0.6x): €0.93 energy, 14 tiles lost.
-No alarm. No log.
-→ What if we had a dashboard?`,
+                ariaLocal: {
+                    en: `<cls><w:300>Speed: 0.87x nominal.\nOutput: 3,650 tiles/hr vs 4,200 theoretical.\nGap: 550 tiles/hr — 13.1% below plan.\n\nLast dip (12s at 0.6x): €0.93 energy, 14 tiles lost.\nNo alarm. No log.\n→ What if we had a dashboard?`,
+                    tr: `<cls><w:300>Hız: 0,87x nominal.\nÇıktı: 3.650 karo/saat vs 4.200 teorik.\nFark: 550 karo/saat — plandan %13,1 düşük.\n\nSon düşüş (0,6x'te 12 sn): €0,93 enerji, 14 karo kaybı.\nAlarm yok. Kayıt yok.\n→ Ya bir panomuz olsaydı?`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -368,17 +366,18 @@ No alarm. No log.
                 editorHeights: { screenText: 167, ariaLocal: 134, ariaApi: 127 },
             },
             { // Click #2
-                ctaLabel: 'Add a dashboard →',
-                screenText: `<cls><clmi><w:500>10 million tiles/year.
-3% drift = €180K–€240K lost annually.
-Before counting wasted energy.<w:4000><clck>`,
+                ctaLabel: { en: 'Add a dashboard →', tr: 'Pano ekle →' },
+                screenText: {
+                    en: `<cls><clmi><w:500>10 million tiles/year.\n3% drift = €180K–€240K lost annually.\nBefore counting wasted energy.<w:2500><clck>`,
+                    tr: `<cls><clmi><w:500>Yılda 10 milyon karo.\n%3 sapma = yılda €180K–€240K kayıp.\nBoşa harcanan enerji hariç.<w:3000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>No report filed. No alarm triggered.
-It happened. Cost money. Disappeared.
-Not a catastrophe. A slow, silent drain.
-→ Add a dashboard.`,
+                ariaLocal: {
+                    en: `<cls><w:300>No report filed. No alarm triggered.\nIt happened. Cost money. Disappeared.\n\nNot a catastrophe. A slow, silent drain.\n→ Add a dashboard.`,
+                    tr: `<cls><w:300>Rapor yok. Alarm yok.\nOldu. Para kaybettirdi. Kayboldu.\n\nFelaket değil. Yavaş, sessiz bir erime.\n→ Pano ekleyelim.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 panelActions: [
@@ -399,7 +398,7 @@ Not a catastrophe. A slow, silent drain.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'basic-system',
-        eraLabel: 'Basic System',
+        eraLabel: { en: 'Basic System', tr: 'Temel Sistem' },
         eraEmoji: '📊',
         targetHeightKey: 'medium',
         scenarioCode: 'SCN-001',
@@ -412,7 +411,7 @@ Not a catastrophe. A slow, silent drain.
             { panel: 'controlPanel', state: 'close' },
         ],
 
-        sidebarLabel: 'Basic Management',
+        sidebarLabel: { en: 'Basic Management', tr: 'Temel Yönetim' },
 
         systemContext: `
 TIER 2, Act 2. Basic Panel is about to open.
@@ -434,19 +433,18 @@ Maximum 4 sentences per response.
 
                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                ctaLabel: 'Show dashboard →',
+                ctaLabel: { en: 'Show dashboard →', tr: 'Panoyu göster →' },
                 slideImageUrl: '/demo/ACT-2.png',
                 delayMs: 1000,
-                screenText: `OEE. Throughput. Energy.
-All visible now.<w:3500>
-But can we explain any of them?<w:3000><clck>`,
+                screenText: {
+                    en: `OEE. Throughput. Energy.\nAll visible now.<w:2000>\nBut can we explain any of them?<w:1500><clck>`,
+                    tr: `OEE. Verimlilik. Enerji.\nArtık hepsi görünür.<w:2000>\nAma herhangi birini açıklayabilir miyiz?<w:2000><clck>`,
+                },
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>OEE: 87.3%. Throughput: 3,814/hr.
-Energy: 142.7 kWh this session.
-Looks reasonable. But:
-When did the belt slow? Is it trending worse?
-Which station? What caused it?
-The dashboard cannot answer.`,
+                ariaLocal: {
+                    en: `<cls><w:300>OEE: 87.3%. Throughput: 3,814/hr.\nEnergy: 142.7 kWh this session.\n\nLooks reasonable. But:\nWhen did the belt slow? Is it trending worse?\nWhich station? What caused it?\nThe dashboard cannot answer.`,
+                    tr: `<cls><w:300>OEE: %87,3. Üretim: 3.814/saat.\nEnerji: 142,7 kWh bu oturum.\n\nMakul görünüyor. Ama:\nKayış ne zaman yavaşladı? Kötüleşiyor mu?\nHangi istasyon? Nedeni ne?\nPano cevaplayamaz.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 panelActions: [
@@ -455,20 +453,17 @@ The dashboard cannot answer.`,
                 editorHeights: { screenText: 155, ariaLocal: 118, ariaApi: 52 },
             },
             { // Click #2
-                ctaLabel: 'Go deeper →',
-                screenText: `<cls><w:500>OEE 87%. 
-Good? Bad? 
-Getting worse?
-Which machine?
-Since when?
-The dashboard is silent.<w:5000><clck>`,
+                ctaLabel: { en: 'Go deeper →', tr: 'Derine in →' },
+                screenText: {
+                    en: `<cls><w:500>OEE 87%. Good? Bad? Getting worse?\nWhich machine? Since when?\n\nThe dashboard is silent.<w:2000><clck>`,
+                    tr: `<cls><w:500>OEE %87. İyi mi? Kötü mü? Kötüleşiyor mu?\nHangi makine? Ne zamandan beri?\n\nPano sessiz.<w:2500><clck>`,
+                },
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>They see the score. Not the game.
-No root cause. No trend. No breakdown by station.
-The answer needs something fundamentally different.
-Not more dashboards. Traceability.
-→ Continue`,
+                ariaLocal: {
+                    en: `<cls><w:300>They see the score. Not the game.\n\nNo root cause. No trend. No breakdown by station.\nThe answer needs something fundamentally different.\nNot more dashboards. Traceability.\n→ Continue`,
+                    tr: `<cls><w:300>Skoru görüyorlar. Oyunu değil.\n\nKök neden yok. Trend yok. İstasyon bazlı analiz yok.\nCevap temelden farklı bir şey gerektiriyor.\nDaha fazla pano değil. İzlenebilirlik.\n→ Devam`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -487,7 +482,7 @@ Not more dashboards. Traceability.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'digital-twin',
-        eraLabel: 'Digital Twin',
+        eraLabel: { en: 'Digital Twin', tr: 'Dijital İkiz' },
         eraEmoji: '🔗',
         targetHeightKey: 'tall',
         scenarioCode: 'SCN-002',
@@ -497,7 +492,7 @@ Not more dashboards. Traceability.
             { panel: 'dtxfr',      state: 'open' },
         ],
 
-        sidebarLabel: 'Digital Twin',
+        sidebarLabel: { en: 'Digital Twin', tr: 'Dijital İkiz' },
 
         systemContext: `
 TIER 2, Act 3. SCN-002 (Kiln Temperature Crisis) just loaded.
@@ -523,34 +518,36 @@ Maximum 5 sentences per response.
 
                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                ctaLabel: 'Show the crisis →',
+                ctaLabel: { en: 'Show the crisis →', tr: 'Krizi göster →' },
                 slideImageUrl: '/demo/ACT-3.png',
-                screenText: `Kiln: +14°C above spec.<w:2000>
-Every tile has a digital passport.<w:1500><clck>`,
+                screenText: {
+                    en: `Kiln: +14°C above spec.<w:2000>\nEvery tile has a digital passport.<w:1500><clck>`,
+                    tr: `Fırın: spesifikasyonun +14°C üstünde.<w:2000>\nHer karonun dijital pasaportu var.<w:2000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>SCN-002 active. Kiln running 14°C above spec.
-The Tile Passport shows every station record.
-+14°C = 18% more gas. 1.9 kg CO₂/m³.
-Every affected tile carries excess carbon.
-Second quality = paid twice. Scrap = total loss.<w:3500><clck>`,
+                ariaLocal: {
+                    en: `<cls><w:300>SCN-002 active. Kiln running 14°C above spec.\nThe Tile Passport shows every station record.\n\n+14°C = 18% more gas. 1.9 kg CO₂/m³.\nEvery affected tile carries excess carbon.\nSecond quality = paid twice. Scrap = total loss.`,
+                    tr: `<cls><w:300>SCN-002 aktif. Fırın spesifikasyonun 14°C üstünde.\nKaro Pasaportu her istasyonun kaydını gösteriyor.\n\n+14°C = %18 daha fazla gaz. 1,9 kg CO₂/m³.\nEtkilenen her karo fazla karbon taşıyor.\nİkinci kalite = iki kez ödeme. Hurda = tam kayıp.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaApi: `Tiles through kiln so far, how many show quality issues.CO₂ impact: kiln ~100 m³ gas/hour, +18% at 14°C overshoot,1.9 kg CO₂/m³. Give energy waste and excess CO₂ this session.Also note: second-quality tiles cost 40-60% of production cost again at rework,and carry excess embedded carbon to the rework facility.`,
                 ariaInputEnabled: true,
                 editorHeights: { screenText: 123, ariaLocal: 141, ariaApi: 125 },
             },
             { // Click #2
-                ctaLabel: 'Ask the factory →',
-                screenText: `<cls><w:500>Affected tile → rework → second energy cycle → more CO₂.
-Quality cost and carbon cost: same root cause.<w:3500><clck>`,
+                ctaLabel: { en: 'Ask the factory →', tr: 'Fabrikaya sor →' },
+                screenText: {
+                    en: `<cls><w:500>Affected tile → rework → second energy cycle → more CO₂.\nQuality cost and carbon cost: same root cause.<w:2500><clck>`,
+                    tr: `<cls><w:500>Etkilenen karo → yeniden işleme → ikinci enerji döngüsü → daha fazla CO₂.\nKalite maliyeti ve karbon maliyeti: aynı kök neden.<w:3000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal: `<cls><w:300>Second quality: 40–60% of production cost paid again.
-Some recovered. Some scrapped at rework. Either way: paid twice.
-Same tile carries excess carbon to rework.
-One fix solves both.
-→ What if you could ask the factory?`,
+                ariaLocal: {
+                    en: `<cls><w:300>Second quality: 40–60% of production cost paid again.\nSome recovered. Some scrapped at rework. Either way: paid twice.\n\nSame tile carries excess carbon to rework.\nOne fix solves both.\n→ What if you could ask the factory?`,
+                    tr: `<cls><w:300>İkinci kalite: üretim maliyetinin %40–60'ı tekrar ödenir.\nBazıları kurtarılır. Bazıları hurdaya gider. Her iki durumda: iki kez ödeme.\n\nAynı karo fazla karbonu yeniden işlemeye taşır.\nTek düzeltme ikisini de çözer.\n→ Ya fabrikaya sorabilseydiniz?`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -569,7 +566,7 @@ One fix solves both.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'chat-with-factory',
-        eraLabel: 'CWF',
+        eraLabel: { en: 'CWF', tr: 'CWF' },
         eraEmoji: '💬',
         targetHeightKey: 'tall',
         scenarioCode: 'SCN-003',
@@ -579,8 +576,8 @@ One fix solves both.
             { panel: 'cwf',   state: 'open' },
         ],
 
-        sidebarLabel: 'CWF',
-        sidebarSubLabel: 'Chat With Factory',
+        sidebarLabel: { en: 'CWF', tr: 'CWF' },
+        sidebarSubLabel: { en: 'Chat With Factory', tr: 'Fabrikanla Konuş' },
 
         systemContext: `
 TIER 2, Act 4. SCN-003 (Glaze Viscosity Drift) is active. Subtle defect —
@@ -604,28 +601,32 @@ Maximum 5 sentences per response.
 
                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                ctaLabel: 'Ask as CEO →',
+                ctaLabel: { en: 'Ask as CEO →', tr: 'CEO olarak sor →' },
                 slideImageUrl: '/demo/ACT-4a.png',
-                screenText: `Glaze Viscosity Drift.
-Subtle. Slow-building.<w:2000>
-The factory owner asks first.<w:2500><clck>`,
+                screenText: {
+                    en: `Glaze Viscosity Drift.\nSubtle. Slow-building.<w:2000>\nThe factory owner asks first.<w:1500><clck>`,
+                    tr: `Sır Viskozite Sapması.\nİnce. Yavaş gelişen.<w:2000>\nFabrika sahibi ilk soruyu soruyor.<w:2000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>SCN-003 active. Glaze viscosity slightly off.
-CWF panel open. Ask anything in plain language.
-15 years of engineering knowledge,
-accessible to anyone, any hour, any language.<w:4500><clck>`,
+                ariaLocal: {
+                    en: `<cls><w:300>SCN-003 active. Glaze viscosity slightly off.\nCWF panel open. Ask anything in plain language.\n\n15 years of engineering knowledge,\naccessible to anyone, any hour, any language.`,
+                    tr: `<cls><w:300>SCN-003 aktif. Sır viskozitesi hafif sapmalı.\nCWF paneli açık. Düz bir dille her şeyi sorun.\n\n15 yıllık mühendislik bilgisi,\nherkesin erişimine açık, her saat, her dilde.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaApi: `The CWF panel is now open — the visitor can ask the factory anything in plainlanguage. This is 15 years of engineering knowledge accessible to anyone, at anyhour. First question, from the factory owner: 🏢 What is our quality situation?How much is glaze viscosity drift costing us — double-cost from second-qualitytiles (40-60% of production cost at rework)? Production window before critical?`,
                 ariaInputEnabled: true,
                 editorHeights: { screenText: 104, ariaLocal: 125, ariaApi: 140 },
             },
             { // Click #2
-                ctaLabel: 'Ask about CO₂ →',
+                ctaLabel: { en: 'Ask about CO₂ →', tr: 'CO₂ sor →' },
                 slideImageUrl: '/demo/ACT-4b.png',
                 delayMs: 2000,
-                screenText: `<cls><w:500>Different role. Same factory. Same data.<w:1500><clck>`,
+                screenText: {
+                    en: `<cls><w:500>Different role. Same factory. Same data.<w:1500><clck>`,
+                    tr: `<cls><w:500>Farklı rol. Aynı fabrika. Aynı veri.<w:1500><clck>`,
+                },
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
                 ariaApi: `🌿 CO₂ intensity per 1,000 tiles this session.Glaze drift contribution: direct energy + CO₂ in second-quality tiles sentto rework. Factors: 0.4 kg/kWh, 1.9 kg/m³. Compare to SCN-001 optimal.`,
@@ -633,17 +634,17 @@ accessible to anyone, any hour, any language.<w:4500><clck>`,
                 editorHeights: { screenText: 107, ariaLocal: 120, ariaApi: 139 },
             },
             { // Click #3
-                ctaLabel: 'Change a parameter →',
+                ctaLabel: { en: 'Change a parameter →', tr: 'Parametre değiştir →' },
                 slideImageUrl: '/demo/ACT-4c.png',
                 delayMs: 5500,
-                screenText: `<cls><w:500>You don't just ask questions.
-You give instructions.<w:4000><clck>`,
-                ariaLocal: `<cls><w:300>💬 In the CWF panel, type:
-"Increase glaze cabin pressure to 0.9 bar"
-Auth code: ardic
-Parameter changes live. No shutdown. No phone call.
-Intent → Auth → Action. Under 30 seconds.
-→ Now watch it do this itself.`,
+                screenText: {
+                    en: `<cls><w:500>You don't just ask questions.\nYou give instructions.<w:2000><clck>`,
+                    tr: `<cls><w:500>Sadece soru sormuyorsunuz.\nTalimat veriyorsunuz.<w:2000><clck>`,
+                },
+                ariaLocal: {
+                    en: `<cls><w:300>💬 In the CWF panel, type:\n"Increase glaze cabin pressure to 0.9 bar"\n\nAuth code: ardic\n\nParameter changes live. No shutdown. No phone call.\nIntent → Auth → Action. Under 30 seconds.\n→ Now watch it do this itself.`,
+                    tr: `<cls><w:300>💬 CWF panelinde şunu yazın:\n"Sır kabin basıncını 0.9 bar'a yükselt"\n\nYetki kodu: ardic\n\nParametre canlı değişir. Duruş yok. Telefon yok.\nNiyet → Yetki → Aksiyon. 30 saniyenin altında.\n→ Şimdi bunu kendi kendine yapmasını izleyin.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -662,7 +663,7 @@ Intent → Auth → Action. Under 30 seconds.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'autonomous-ai',
-        eraLabel: 'Autonomous AI',
+        eraLabel: { en: 'Autonomous AI', tr: 'Otonom Yapay Zeka' },
         eraEmoji: '🤖',
         targetHeightKey: 'large',
         scenarioCode: 'SCN-004',
@@ -674,8 +675,8 @@ Intent → Auth → Action. Under 30 seconds.
 
         enableCopilot: true,
 
-        sidebarLabel: 'Autonomous AI',
-        sidebarSubLabel: 'Copilot',
+        sidebarLabel: { en: 'Autonomous AI', tr: 'Otonom Yapay Zeka' },
+        sidebarSubLabel: { en: 'Copilot', tr: 'Copilot' },
 
         systemContext: `
 TIER 2, Act 5. SCN-004 (Multi-Station Cascade Failure) is active.
@@ -703,59 +704,52 @@ The Copilot did not alert someone — it acted.
 
                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                ctaLabel: 'Show the incident →',
+                ctaLabel: { en: 'Show the incident →', tr: 'Olayı göster →' },
                 slideImageUrl: '/demo/ACT-4d.png',
-                screenText: `Cascade Failure. Press + Kiln.<w:2000>
-Copilot active. Watch.<w:2500><clck>`,
+                screenText: {
+                    en: `Cascade Failure. Press + Kiln.<w:2000>\nCopilot active. Watch.<w:1500><clck>`,
+                    tr: `Kaskad Arıza. Pres + Fırın.<w:2000>\nCopilot aktif. İzleyin.<w:1500><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:500>📋 INCIDENT LOG
-03:47:00 — Press: 296 bar (+12% above spec)
-03:47:23 — ANOMALY DETECTED
-03:48:01 — Root cause: press → kiln cascade
-03:48:45 — CORRECTED. Press 296→284, kiln −8°C
-03:51:12 — Recovery confirmed
-03:53:40 — ALL WITHIN SPEC
-61 tiles affected. ~1,900 kg CO₂ prevented.
-Duration: 6 min 40 sec. Filed automatically.
-Customer received only first-quality tiles.
-The Copilot did not alert someone — it acted.`,
+                ariaLocal: {
+                    en: `<cls><w:500>📋 INCIDENT LOG\n\n03:47:00 — Press: 296 bar (+12% above spec)\n03:47:23 — ANOMALY DETECTED\n03:48:01 — Root cause: press → kiln cascade\n03:48:45 — CORRECTED. Press 296→284, kiln −8°C\n03:51:12 — Recovery confirmed\n03:53:40 — ALL WITHIN SPEC\n\n61 tiles affected. ~1,900 kg CO₂ prevented.\nDuration: 6 min 40 sec. Filed automatically.\n\nCustomer received only first-quality tiles.\nThe Copilot did not alert someone — it acted.`,
+                    tr: `<cls><w:500>📋 OLAY KAYDI\n\n03:47:00 — Pres: 296 bar (spesifikasyonun %12 üstü)\n03:47:23 — ANOMALİ TESPİT EDİLDİ\n03:48:01 — Kök neden: pres → fırın kaskadı\n03:48:45 — DÜZELTİLDİ. Pres 296→284, fırın −8°C\n03:51:12 — Toparlanma onaylandı\n03:53:40 — TÜM PARAMETRELER SPESDE\n\n61 karo etkilendi. ~1.900 kg CO₂ önlendi.\nSüre: 6 dk 40 sn. Otomatik arşivlendi.\n\nMüşteri yalnızca birinci kalite karo aldı.\nCopilot birini uyarmadı — kendisi müdahale etti.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 editorHeights: { screenText: 93, ariaLocal: 205, ariaApi: 42 },
             },
             { // Click #2
-                ctaLabel: 'Next',
-                screenText: `OEE Hierarchy: the cascade impact.<w:2000>
-Watch the numbers.<w:2500><clck>`,
+                ctaLabel: { en: 'Next', tr: 'İleri' },
+                screenText: {
+                    en: `OEE Hierarchy: the cascade impact.<w:2000>\nWatch the numbers.<w:1500><clck>`,
+                    tr: `OEE Hiyerarşisi: kaskad etkisi.<w:2000>\nRakamlara bakın.<w:1500><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'sm',
-                ariaLocal: `<cls><w:300>Factory OEE during cascade: 38.2%
-Line 1 (Press→Printer): 41.3%
-Line 3 (Kiln→Packaging): 33.7%
-Line 2 (Conveyor): 52.1%
-At 10M tiles/year: €1.1M–€2.1M monthly gap.
-Recovered in 6 minutes 40 seconds.`,
+                ariaLocal: {
+                    en: `<cls><w:300>Factory OEE during cascade: 38.2%\n\nLine 1 (Press→Printer): 41.3%\nLine 3 (Kiln→Packaging): 33.7%\nLine 2 (Conveyor): 52.1%\n\nAt 10M tiles/year: €1.1M–€2.1M monthly gap.\nRecovered in 6 minutes 40 seconds.`,
+                    tr: `<cls><w:300>Kaskad sırasında fabrika OEE: %38,2\n\nHat 1 (Pres→Baskı): %41,3\nHat 3 (Fırın→Paketleme): %33,7\nHat 2 (Konveyör): %52,1\n\nYılda 10M karo üretimde: aylık €1,1M–€2,1M fark.\n6 dakika 40 saniyede toparlama.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 editorHeights: { screenText: 94, ariaLocal: 180, ariaApi: 42 },
             },
             { // Click #3
-                ctaLabel: 'Closing question →',
-                screenText: `<cls><w:500>Not because someone was paged.
-Because the system acted first.<w:3500><cls><w:400>Conventional: detect 2–4 hrs. Fix: next shift.
-Here: detect 23 sec. Fix: 6 min 40 sec.
-Difference: 847 tiles. €12,400.<w:4500><clck>`,
+                ctaLabel: { en: 'Closing question →', tr: 'Kapanış sorusu →' },
+                screenText: {
+                    en: `<cls><w:500>Not because someone was paged.\nBecause the system acted first.<w:2500><cls><w:400>Conventional: detect 2–4 hrs. Fix: next shift.\nHere: detect 23 sec. Fix: 6 min 40 sec.\n\nDifference: 847 tiles. €12,400.<w:3000><clck>`,
+                    tr: `<cls><w:500>Biri çağrıldığı için değil.\nSistem ilk harekete geçtiği için.<w:2500><cls><w:400>Geleneksel: tespit 2–4 saat. Düzeltme: sonraki vardiya.\nBurada: tespit 23 sn. Düzeltme: 6 dk 40 sn.\n\nFark: 847 karo. €12.400.<w:3000><clck>`,
+                },
                 screenTextAlign: 'left',
                 screenTextWeight: 'normal',
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>At 03:47, every operator was elsewhere.
-23 seconds to detect. 38 seconds to trace.
-6 minutes 40 seconds to full recovery.
-~1,900 kg CO₂ not emitted. 61 tiles recovered.
-No special team. The right foundation.
-→ One final question.`,
+                ariaLocal: {
+                    en: `<cls><w:300>At 03:47, every operator was elsewhere.\n23 seconds to detect. 38 seconds to trace.\n6 minutes 40 seconds to full recovery.\n\n~1,900 kg CO₂ not emitted. 61 tiles recovered.\nNo special team. The right foundation.\n→ One final question.`,
+                    tr: `<cls><w:300>03:47'de her operatör başka bir yerdeydi.\nTespit: 23 saniye. İzleme: 38 saniye.\nTam toparlanma: 6 dakika 40 saniye.\n\n~1.900 kg CO₂ salınmadı. 61 karo kurtarıldı.\nÖzel ekip gerekmedi. Doğru altyapı yetti.\n→ Son bir soru.`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: true,
                 transitionTo: 'next',
@@ -775,7 +769,7 @@ No special team. The right foundation.
     // ══════════════════════════════════════════════════════════════════════
     {
         id: 'close',
-        eraLabel: 'Close',
+        eraLabel: { en: 'Close', tr: 'Kapanış' },
         eraEmoji: '💰',
         targetHeightKey: 'tall',
         scenarioCode: null,
@@ -784,7 +778,7 @@ No special team. The right foundation.
             { panel: 'oeeHierarchy', state: 'open' },
         ],
 
-        sidebarLabel: 'Close',
+        sidebarLabel: { en: 'Close', tr: 'Kapanış' },
 
         systemContext: `
 Financial close. OEE Hierarchy shows post-Copilot recovered OEE.
@@ -806,18 +800,18 @@ Maximum 5 sentences per response.
 
                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                ctaLabel: 'Show the gain',
+                ctaLabel: { en: 'Show the gain', tr: 'Kazancı göster' },
                 slideImageUrl: '/demo/AiPoweredCF-3.png',
                 delayMs: 2800,
-                screenText: `Factory → Line → Machine → Parameter.<w:2500>
-Every number has a cause. Every cause has a cost.<w:2500><clck>`,
+                screenText: {
+                    en: `Factory → Line → Machine → Parameter.<w:2000>\nEvery number has a cause. Every cause has a cost.<w:2000><clck>`,
+                    tr: `Fabrika → Hat → Makine → Parametre.<w:2000>\nHer rakamın bir nedeni var. Her nedenin bir maliyeti.<w:2500><clck>`,
+                },
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>€8K–€15K per 1% OEE, per line, per month.
-Typical first-quarter recovery: 3–5 points.
-Eliminating second quality removes the double cost
-AND the CO₂ liability. Same intervention.
-How much of your production cost goes to losses
-you cannot currently see?`,
+                ariaLocal: {
+                    en: `<cls><w:300>€8K–€15K per 1% OEE, per line, per month.\nTypical first-quarter recovery: 3–5 points.\n\nEliminating second quality removes the double cost\nAND the CO₂ liability. Same intervention.\n\nHow much of your production cost goes to losses\nyou cannot currently see?`,
+                    tr: `<cls><w:300>Hat başına, ayda, %1 OEE iyileştirme = €8K–€15K.\nİlk çeyrekte tipik toparlanma: 3–5 puan.\n\nİkinci kaliteyi ortadan kaldırmak çifte maliyeti\nVE CO₂ yükümlülüğünü aynı anda siler.\n\nÜretim maliyetinizin ne kadarı\nşu an göremediğiniz kayıplara gidiyor?`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 panelActions: [
@@ -827,18 +821,18 @@ you cannot currently see?`,
                 editorHeights: { screenText: 179, ariaLocal: 155 },
             },
             { // Click #2
-                ctaLabel: 'Thank you!',
+                ctaLabel: { en: 'Thank you!', tr: 'Teşekkürler!' },
                 slideImageUrl: '/demo/SentialFactory.png',
                 delayMs: 1000,
-                screenText: `<cls><w:5500>How much waste did your factory produce last year?
-If you don't know — that's exactly where we start.<w:3000><clck>`,
+                screenText: {
+                    en: `<cls><w:500>How much waste did your factory produce last year?\n\nIf you don't know — that's exactly where we start.<w:3000><clck>`,
+                    tr: `<cls><w:500>Fabrikanız geçen yıl ne kadar fire üretti?\n\nBilmiyorsanız — tam olarak buradan başlıyoruz.<w:3000><clck>`,
+                },
                 screenTextSize: 'md',
-                ariaLocal: `<cls><w:300>Thank you for walking through this journey.
-If something resonated — the invisible loss,
-the double cost, the CO₂, or the 03:47 incident —
-that instinct is worth exploring.
-ARDICTECH. Since 2008. 16 facilities. 1M+ IoT endpoints.
-→ ardic.ai`,
+                ariaLocal: {
+                    en: `<cls><w:300>Thank you for walking through this journey.\n\nIf something resonated — the invisible loss,\nthe double cost, the CO₂, or the 03:47 incident —\nthat instinct is worth exploring.\n\nARDICTECH. Since 2008. 16 facilities. 1M+ IoT endpoints.\n→ ardic.ai`,
+                    tr: `<cls><w:300>Bu yolculuğa zaman ayırdığınız için teşekkürler.\n\nBir şey yankı uyandırdıysa — görünmeyen kayıp,\nçifte maliyet, CO₂ veya 03:47 olayı —\no his keşfetmeye değer.\n\nARDICTECH. 2008'den bu yana. 16 tesis. 1M+ IoT uç noktası.\n→ ardic.ai`,
+                },
                 ariaLocalSize: 'sm',
                 ariaInputEnabled: false,
                 panelActions: [
