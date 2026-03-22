@@ -153,7 +153,12 @@ async function batchUpsertWithCircuitBreaker(
 
   // Attempt upsert with exponential backoff
   for (let attempt = 0; attempt < TELEMETRY_MAX_RETRIES; attempt++) {
-    const { error } = await supabase.from(table).upsert(rows);
+    const { error } = await supabase
+      .from(table)
+      .upsert(rows, {
+        onConflict: 'machine_id,simulation_id,s_clock',
+        ignoreDuplicates: true,
+      });
 
     if (!error) {
       // SUCCESS — reset consecutive failure counter and return
