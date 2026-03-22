@@ -72,6 +72,8 @@ vi.mock('./uiStore', () => ({
             showAlarmLog: false,
             isSimConfigured: true,
             simulationEnded: false,
+            /** Interface language — defaults to English in tests */
+            currentLang: 'en',
             toggleBasicPanel: vi.fn(),
             toggleDTXFR: vi.fn(),
             toggleCWF: vi.fn(),

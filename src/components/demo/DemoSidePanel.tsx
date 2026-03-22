@@ -29,6 +29,7 @@ import { ChevronLeft, ChevronRight, Send, RotateCcw, Film } from 'lucide-react';
 import { useDemoStore } from '../../store/demoStore';
 import type { DemoState } from '../../store/demoStore';
 import { DEMO_ACTS } from '../../lib/params/demoSystem/demoScript';
+import { resolveText } from '../../lib/params/demoSystem/demoScript';
 import {
     DEMO_SIDE_PANEL_WIDTH_PX,
 } from '../../lib/params/demoSystem/demoConfig';
@@ -64,6 +65,8 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
 }) => {
     /** Only visible while demo tab is open */
     const showDemoScreen = useUIStore((s) => s.showDemoScreen);
+    /** Current interface language */
+    const currentLang = useUIStore((s) => s.currentLang);
 
     /** Current act index — drives LED highlights and stage label */
     const currentActIndex = useDemoStore((s: DemoState) => s.currentActIndex);
@@ -150,7 +153,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
      */
     /** Derive active step for the CTA button label */
     const currentStep = currentAct?.ctaSteps?.[currentStepIndex];
-    const ctaButtonLabel = deriveCtaButtonLabel({ isLastAct, ctaStepIndex: currentStepIndex, currentStep });
+    const ctaButtonLabel = deriveCtaButtonLabel({ isLastAct, ctaStepIndex: currentStepIndex, currentStep, lang: currentLang });
 
     /**
      * isCTADisabled — the button should only be clickable when the user
@@ -172,7 +175,9 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
      * ctaDisplayLabel — shows 'ARIA responding…' during the aria phase
      * (when isLoading is set by postToCWF), otherwise shows the script's ctaLabel.
      */
-    const ctaDisplayLabel = isLoading ? 'ARIA responding…' : ctaButtonLabel;
+    const ctaDisplayLabel = isLoading
+        ? (currentLang === 'tr' ? 'ARIA yanıtlıyor…' : 'ARIA responding…')
+        : ctaButtonLabel;
 
     /** The 5 narrative acts that have a sidebarLabel defined */
     const sidebarActs = DEMO_ACTS.map((act, idx) => ({ act, idx }))
@@ -207,7 +212,9 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
             <button
                 id="demo-sidebar-toggle"
                 onClick={handleToggle}
-                title={collapsed ? 'Show demo controls' : 'Hide demo controls'}
+                title={collapsed
+                    ? (currentLang === 'tr' ? 'Demo kontrollerini göster' : 'Show demo controls')
+                    : (currentLang === 'tr' ? 'Demo kontrollerini gizle' : 'Hide demo controls')}
                 className="
                     absolute top-14 pointer-events-auto
                     w-5 h-10 flex items-center justify-center
@@ -248,13 +255,13 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                 <div className="px-3 pt-3 pb-2 border-b border-white/8">
                     <div className="flex items-center justify-between">
                         <span className="text-white text-[11px] font-bold uppercase tracking-widest leading-tight">
-                            Demo Status &amp; Control
+                            {currentLang === 'tr' ? 'Demo Durum ve Kontrol' : 'Demo Status & Control'}
                         </span>
                     </div>
 
                     {/* Scenario badge */}
                     <div className="mt-2 flex items-center gap-1.5">
-                        <span className="text-white/40 text-[10px] font-medium">Scenario:</span>
+                        <span className="text-white/40 text-[10px] font-medium">{currentLang === 'tr' ? 'Senaryo:' : 'Scenario:'}</span>
                         <span className="text-white/80 text-[10px] font-mono font-bold tracking-wider">
                             {activeScenarioCode ?? '—'}
                         </span>
@@ -262,9 +269,9 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
 
                     {/* Stage label */}
                     <div className="mt-0.5 flex items-center gap-1.5">
-                        <span className="text-white/40 text-[10px] font-medium">Stage:</span>
+                        <span className="text-white/40 text-[10px] font-medium">{currentLang === 'tr' ? 'Aşama:' : 'Stage:'}</span>
                         <span className="text-white/80 text-[10px] font-semibold">
-                            {currentAct?.eraLabel ?? '—'}
+                            {resolveText(currentAct?.eraLabel, currentLang) ?? '—'}
                         </span>
                     </div>
                 </div>
@@ -276,7 +283,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                         id="demo-sidebar-reset"
                         onClick={() => void restartDemo()}
                         disabled={isLoading}
-                        title="Restart demo from beginning"
+                        title={currentLang === 'tr' ? 'Demoyu yeniden başlat' : 'Restart demo from beginning'}
                         className="
                             flex-1 py-1.5 rounded-md text-[11px] font-semibold
                             bg-white/5 hover:bg-white/12
@@ -286,7 +293,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                             disabled:opacity-30 disabled:cursor-not-allowed
                         "
                     >
-                        Reset
+                        {currentLang === 'tr' ? 'Sıfırla' : 'Reset'}
                     </button>
 
                     {/* Start / Next / Next Stage button — with CTA glow */}
@@ -298,8 +305,8 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                         disabled={isCTADisabled}
                         title={
                             isLastAct
-                                ? 'Restart demo'
-                                : `Step ${currentStepIndex + 1}`
+                                ? (currentLang === 'tr' ? 'Demoyu yeniden başlat' : 'Restart demo')
+                                : `${currentLang === 'tr' ? 'Adım' : 'Step'} ${currentStepIndex + 1}`
                         }
                         className={`
                             flex-2 py-1.5 rounded-md text-[11px] font-bold
@@ -336,7 +343,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                                 id={`demo-led-act-${idx}`}
                                 onClick={() => void jumpToAct(idx)}
                                 disabled={isLoading}
-                                title={`Jump to: ${act.eraLabel}`}
+                                title={`${currentLang === 'tr' ? 'Şuraya atla:' : 'Jump to:'} ${resolveText(act.eraLabel, currentLang)}`}
                                 className="
                                     flex items-start gap-2 text-left w-full
                                     px-2 py-1.5 rounded-md
@@ -354,11 +361,11 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                                 `} />
                                 <div className="min-w-0 leading-tight">
                                     <div className={`text-[11px] font-semibold ${isActive ? 'text-white' : 'text-white/55 group-hover:text-white/75'}`}>
-                                        {act.sidebarLabel}
+                                        {resolveText(act.sidebarLabel, currentLang)}
                                     </div>
-                                    {act.sidebarSubLabel && (
+                                    {resolveText(act.sidebarSubLabel, currentLang) && (
                                         <div className={`text-[10px] italic ${isActive ? 'text-white/60' : 'text-white/30 group-hover:text-white/45'}`}>
-                                            {act.sidebarSubLabel}
+                                            {resolveText(act.sidebarSubLabel, currentLang)}
                                         </div>
                                     )}
                                 </div>
@@ -371,7 +378,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                 <div className="mt-[30px]">
                     <div className="px-3 pt-3 pb-1 border-t border-white/8">
                         <span className="text-white/30 text-[9px] font-medium uppercase tracking-widest">
-                            Ask ARIA
+                            {currentLang === 'tr' ? "ARIA'ya Sor" : 'Ask ARIA'}
                         </span>
                     </div>
                     <div className="px-3 pb-3 flex flex-col gap-2">
@@ -382,7 +389,9 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={simHasSession ? 'Ask ARIA a question...' : 'Start simulation to chat...'}
+                        placeholder={simHasSession
+                            ? (currentLang === 'tr' ? "ARIA'ya bir soru sorun..." : 'Ask ARIA a question...')
+                            : (currentLang === 'tr' ? 'Sohbet için simülasyonu başlatın...' : 'Start simulation to chat...')}
                         disabled={isLoading || !simHasSession}
                         className="
                             w-full bg-white/5 border border-white/12
@@ -410,7 +419,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                             "
                         >
                             <RotateCcw size={10} />
-                            Reset
+                            {currentLang === 'tr' ? 'Sıfırla' : 'Reset'}
                         </button>
                         <button
                             id="demo-sidebar-send"
@@ -427,7 +436,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                             "
                         >
                             <Send size={10} />
-                            Send
+                            {currentLang === 'tr' ? 'Gönder' : 'Send'}
                         </button>
                     </div>
                     </div>
@@ -436,7 +445,7 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                 {/* ── 5. WATCH MOVIE (below ARIA, pushed to bottom) ──────── */}
                 <div className="px-3 py-2 border-t border-white/8 mt-auto mb-[110px]">
                     <div className="text-white/75 text-[12px] font-medium mb-[20px] leading-tight truncate">
-                        Why Digital Transformation?
+                        {currentLang === 'tr' ? 'Neden Dijital Dönüşüm?' : 'Why Digital Transformation?'}
                     </div>
                     <button
                         id="demo-sidebar-movie"
@@ -466,12 +475,12 @@ export const DemoSidePanel: React.FC<DemoSidePanelProps> = ({
                         {isMoviePlaying ? (
                             <>
                                 <span className="text-[10px]">✕</span>
-                                Dismiss movie
+                                {currentLang === 'tr' ? 'Videoyu kapat' : 'Dismiss movie'}
                             </>
                         ) : (
                             <>
                                 <Film size={12} />
-                                Watch movie
+                                {currentLang === 'tr' ? 'Videoyu izle' : 'Watch movie'}
                             </>
                         )}
                     </button>

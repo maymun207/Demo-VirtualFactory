@@ -59,6 +59,30 @@
  */
 
 import type { DemoHeightKey } from './demoConfig';
+import type { Language } from '../../../store/uiStore';
+
+// ─── Bilingual Text Types ───────────────────────────────────────────────────
+
+/**
+ * I18nText — bilingual text field.
+ * All visitor-facing strings in the demo use this type.
+ * A plain string is treated as English-only (backward compatible).
+ */
+export type I18nText = { en: string; tr: string };
+
+/**
+ * resolveText — resolves an I18nText or plain string to the correct language.
+ * Plain strings return as-is (English fallback).
+ * undefined/null returns undefined.
+ */
+export function resolveText(
+    text: I18nText | string | undefined | null,
+    lang: Language
+): string | undefined {
+    if (text == null) return undefined;
+    if (typeof text === 'string') return text;
+    return text[lang] || text.en;
+}
 
 // ─── Panel Action Types ─────────────────────────────────────────────────────
 
@@ -90,21 +114,21 @@ export type ScreenTextSize = 'sm' | 'md' | 'lg' | 'xl';
 // ─── CTA Step ────────────────────────────────────────────────────────────────
 
 export interface CtaStep {
-    ctaLabel?: string;
+    ctaLabel?: I18nText | string;
     slideImageUrl?: string;
     mediaInstruction?: MediaInstruction;
     scenarioCode?: string | null;
     workOrderId?: string | null;
     delayMs?: number;
-    screenText?: string;
+    screenText?: I18nText | string;
     screenTextAlign?: ScreenTextAlign;
     screenTextWeight?: ScreenTextWeight;
     screenTextSize?: ScreenTextSize;
-    ariaLocal?: string;
+    ariaLocal?: I18nText | string;
     ariaLocalAlign?: ScreenTextAlign;
     ariaLocalWeight?: ScreenTextWeight;
     ariaLocalSize?: ScreenTextSize;
-    ariaApi?: string;
+    ariaApi?: string;                // stays plain string — English only
     ariaInputEnabled?: boolean;
     panelActions?: PanelAction[];
     simulationAction?: 'start' | 'stop' | 'reset' | 'reset-start';
@@ -117,17 +141,17 @@ export interface CtaStep {
 
 export interface DemoAct {
     id: string;
-    eraLabel: string;
+    eraLabel: I18nText | string;
     eraEmoji: string;
     targetHeightKey: DemoHeightKey;
     scenarioCode: string | null;
     panelActions: PanelAction[];
     enableCopilot?: boolean;
     ctaSteps?: CtaStep[];
-    sidebarLabel?: string;
-    sidebarSubLabel?: string;
-    systemContext: string;
-    openingPrompt?: string;
+    sidebarLabel?: I18nText | string;
+    sidebarSubLabel?: I18nText | string;
+    systemContext: string;            // stays plain string — English only
+    openingPrompt?: string;           // stays plain string
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

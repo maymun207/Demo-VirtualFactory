@@ -9,16 +9,19 @@
  *  2. Reused across different UI components if needed.
  *
  * Priority order:
- *   1. isLastAct   → '↺ Restart'  (always override on final act)
- *   2. ctaLabel    → the step's configured label (if non-empty)
- *   3. ctaStepIndex === 0 → '▶ Start' (first click ever in the act)
- *   4. default → 'Next ›' (subsequent clicks)
+ *   1. isLastAct   → '↺ Restart' / '↺ Yeniden Başlat'
+ *   2. ctaLabel    → the step's configured label (if non-empty, resolved to lang)
+ *   3. ctaStepIndex === 0 → '▶ Start' / '▶ Başla'
+ *   4. default → 'Next ›' / 'İleri ›'
  *
  * Used by: DemoSidePanel.tsx
  * Tested in: src/tests/demoCtaLabel.test.ts
  */
 
 import type { CtaStep } from '../params/demoSystem/demoScript';
+import { resolveText } from '../params/demoSystem/demoScript';
+import type { I18nText } from '../params/demoSystem/demoScript';
+import type { Language } from '../../store/uiStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +39,8 @@ export interface CtaLabelArgs {
      * Undefined when no more steps remain in this act.
      */
     currentStep?: Pick<CtaStep, 'ctaLabel'>;
+    /** Current interface language */
+    lang: Language;
 }
 
 // ─── Function ────────────────────────────────────────────────────────────────
@@ -46,16 +51,17 @@ export interface CtaLabelArgs {
  * @param args - Current act/step context
  * @returns  The string to show on the CTA button
  */
-export function deriveCtaButtonLabel({ isLastAct, ctaStepIndex, currentStep }: CtaLabelArgs): string {
+export function deriveCtaButtonLabel({ isLastAct, ctaStepIndex, currentStep, lang }: CtaLabelArgs): string {
     /** Final act overrides everything — presenter can only restart */
-    if (isLastAct) return '\u21ba Restart';
+    if (isLastAct) return lang === 'tr' ? '\u21ba Yeniden Başlat' : '\u21ba Restart';
 
-    /** Step has an explicit custom label configured */
-    if (currentStep?.ctaLabel) return currentStep.ctaLabel;
+    /** Step has an explicit custom label configured — resolve to current language */
+    const resolved = resolveText(currentStep?.ctaLabel as I18nText | string | undefined, lang);
+    if (resolved) return resolved;
 
     /** First click of the act — show Start to signal demo can begin */
-    if (ctaStepIndex === 0) return '\u25b6 Start';
+    if (ctaStepIndex === 0) return lang === 'tr' ? '\u25b6 Başla' : '\u25b6 Start';
 
     /** Subsequent clicks — advance through the act steps */
-    return 'Next \u203a';
+    return lang === 'tr' ? 'İleri \u203a' : 'Next \u203a';
 }

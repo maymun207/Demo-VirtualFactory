@@ -57,6 +57,7 @@ import { parseCommands, executeTokens } from '../lib/utils/commandParser';
 
 /** Declarative act config — the "sheet music" for the engine */
 import { DEMO_ACTS } from '../lib/params/demoSystem/demoScript';
+import { resolveText } from '../lib/params/demoSystem/demoScript';
 import type { DemoAct, UIPanel, CtaStep, MediaInstruction, ScreenTextAlign, ScreenTextWeight, ScreenTextSize } from '../lib/params/demoSystem/demoScript';
 
 /** Read-only simulation session data and scenario loader */
@@ -559,7 +560,7 @@ async function postToCWF(
             },
             /** Interface config snapshot */
             config: {
-                language: 'en' as const,
+                language: useUIStore.getState().currentLang,
                 isSimConfigured: uiState.isSimConfigured,
             },
         };
@@ -575,7 +576,7 @@ async function postToCWF(
                 simulationId,
                 sessionCode,
                 conversationHistory,
-                language: 'en',
+                language: useUIStore.getState().currentLang,
                 narrativeContext: systemContext || '',
                 uiContext,
             }),
@@ -747,7 +748,10 @@ export const useDemoStore = create<DemoState>((set, get) => ({
 
             // ── Phase 2: ScreenText token processing ──────────────────────────
 
-            if (!step.screenText) {
+            const lang = useUIStore.getState().currentLang;
+            const resolvedScreenText = resolveText(step.screenText, lang);
+
+            if (!resolvedScreenText) {
                 /** No screenText → proceed directly to ARIA phase (Phase 3) */
                 set({ isCtaExecuting: false });
                 /** Call enterAriaPhase via the concrete store instance — not in DemoState type */
@@ -756,7 +760,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             }
 
             /** Parse the screenText into typed tokens */
-            const tokens = parseCommands(sanitizeScreenText(step.screenText));
+            const tokens = parseCommands(sanitizeScreenText(resolvedScreenText));
 
             /** Walk the tokens, updating screen state for each one */
             const { hitClick } = await executeTokens(tokens, {
@@ -830,8 +834,11 @@ export const useDemoStore = create<DemoState>((set, get) => ({
         try {
             // ── Phase 3a: ARIA Local ──────────────────────────────────────────
 
-            if (step.ariaLocal?.trim()) {
-                const localTokens = parseCommands(sanitizeScreenText(step.ariaLocal));
+            const ariaLang = useUIStore.getState().currentLang;
+            const resolvedAriaLocal = resolveText(step.ariaLocal, ariaLang);
+
+            if (resolvedAriaLocal?.trim()) {
+                const localTokens = parseCommands(sanitizeScreenText(resolvedAriaLocal));
                 let localTextAcc = '';
                 const msgId = generateDemoMessageId();
 
