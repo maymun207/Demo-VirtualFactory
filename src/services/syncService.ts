@@ -360,7 +360,8 @@ class SyncService {
 
       // Alarm Logs (upsert with conflict on simulation_id + sim_tick + alarm_type)
       if (unsynced.alarmLogs.length > 0) {
-        const cleanAlarms = stripFields(unsynced.alarmLogs);
+        const cleanAlarms = stripFields(unsynced.alarmLogs)
+          .filter((r) => r.simulation_id && r.simulation_id !== ''); // Skip records with no session
         phase2.push(
           supabase
             .from(ALARM_LOG_TABLE_NAME)

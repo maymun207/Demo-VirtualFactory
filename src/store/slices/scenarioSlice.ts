@@ -212,6 +212,12 @@ export const createScenarioSlice = (
     /** Read the current S-Clock tick for timing records. */
     const simTick = masterState.sClockCount;
 
+    /** Guard: session must exist to create sync-able records. */
+    const sessionId = state.session?.id;
+    if (!sessionId) {
+      log.warn('loadScenario called without active session — skipping activation/alarm records');
+    }
+
     /** 1. Apply all parameter overrides using existing store actions. */
     for (const override of scenario.parameterOverrides) {
       /** Apply the parameter value (records change automatically if session). */
@@ -253,7 +259,7 @@ export const createScenarioSlice = (
     const activationId = generateUUID();
     const activation: ScenarioActivationRecord = {
       id: activationId,
-      simulation_id: state.session?.id ?? '',
+      simulation_id: sessionId ?? '',
       scenario_id: scenario.id,
       scenario_code: scenario.code,
       activated_at_sim_tick: simTick,
@@ -268,7 +274,7 @@ export const createScenarioSlice = (
     const alarmId = generateUUID();
     const alarmRecord: AlarmLogRecord = {
       id: alarmId,
-      simulation_id: state.session?.id ?? '',
+      simulation_id: sessionId ?? '',
       sim_tick: simTick,
       alarm_type: 'system_info',
       severity: 'info',
