@@ -629,13 +629,15 @@ describe('Zustand ↔ Supabase Table Sync Consistency', () => {
             // 2026-03-09: CWF Copilot state machine (copilot_config) + action log (copilot_actions)
             '20260309_copilot_state_machine.sql',
             '20260309_copilot_tables.sql',
+            // 2026-03-22: Allow machine_state_id to be NULL in tile_station_snapshots
+            '20260322_make_machine_state_id_nullable.sql',
         ];
 
         it('should have exactly the expected number of migration files', () => {
             /**
              * Ensures no migration files are accidentally added or deleted
              * without updating this test.
-             * COUNT: 15 (was 13 before copilot state machine migrations were added 2026-03-09)
+             * COUNT: 16 (was 15 before machine_state_id nullable migration 2026-03-22)
              */
             const files = getMigrationFileNames();
             expect(
