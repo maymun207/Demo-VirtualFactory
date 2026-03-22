@@ -24,6 +24,7 @@ import {
     DEMO_MOVIE_PATH,
     DEMO_SIDE_PANEL_WIDTH_PX,
 } from '../../lib/params/demoSystem/demoConfig';
+import { resolveAssetPath } from '../../lib/assetPath';
 import { useUIStore } from '../../store/uiStore';
 import { DemoMediaInstructionRenderer } from './media/DemoMediaInstructionRenderer';
 
@@ -182,7 +183,7 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                             <DemoMediaInstructionRenderer instruction={currentMediaInstruction} />
                         ) : currentSlide ? (
                             <img
-                                src={currentSlide}
+                                src={resolveAssetPath(currentSlide)}
                                 alt=""
                                 className="w-full h-full object-contain"
                                 style={{ maxHeight: '28vh' }}
@@ -317,7 +318,7 @@ export const DemoMediaView: React.FC<DemoMediaViewProps> = ({
                     <div className="w-full max-w-3xl rounded-xl overflow-hidden
                                    border border-white/10 shadow-2xl mx-8">
                         <video
-                            src={DEMO_MOVIE_PATH}
+                            src={resolveAssetPath(DEMO_MOVIE_PATH)}
                             controls
                             autoPlay
                             className="w-full max-h-[70vh] object-contain bg-black"
