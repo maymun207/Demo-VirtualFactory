@@ -45,6 +45,19 @@ export async function logSimulationEvent(
         /** Skip logging if Supabase client is not configured (env vars missing) */
         if (!supabase) return;
 
+        /**
+         * Guard: verify the session exists in Supabase before inserting.
+         * The simulation may be local-only (not yet synced), in which case
+         * the FK constraint on simulation_id would fail. Since event logging
+         * is advisory, we silently skip rather than producing console warnings.
+         */
+        const { data: session } = await supabase
+            .from('simulation_sessions')
+            .select('id')
+            .eq('id', simulationId)
+            .maybeSingle();
+        if (!session) return;
+
         /** Insert the event row — fire-and-forget pattern */
         const { error } = await supabase
             .from(SIMULATION_EVENTS_TABLE)
