@@ -67,6 +67,41 @@ function stripFields<T extends object>(
 }
 
 /**
+ * DB integer columns that can drift to floats via the parameter drift system.
+ * These MUST be rounded before upserting to Supabase, otherwise PostgreSQL
+ * rejects the value with: "invalid input syntax for type integer".
+ *
+ * Covers all 5 integer columns across machine_*_states tables:
+ *   machine_kiln_states.zone_count
+ *   machine_packaging_states.stack_count
+ *   machine_printer_states.resolution_dpi
+ *   machine_printer_states.color_channels
+ *   machine_sorting_states.grade_count
+ */
+const DB_INTEGER_FIELDS = new Set([
+  'zone_count',
+  'stack_count',
+  'resolution_dpi',
+  'color_channels',
+  'grade_count',
+]);
+
+/** Round known integer fields to prevent DB type errors from drifted floats. */
+function roundIntegerFields(
+  records: Record<string, unknown>[]
+): Record<string, unknown>[] {
+  return records.map((record) => {
+    const rounded = { ...record };
+    for (const field of DB_INTEGER_FIELDS) {
+      if (typeof rounded[field] === 'number') {
+        rounded[field] = Math.round(rounded[field] as number);
+      }
+    }
+    return rounded;
+  });
+}
+
+/**
  * Remove duplicate records by `id`, keeping the LAST occurrence
  * (which represents the most recent state of the record).
  *
@@ -231,7 +266,7 @@ class SyncService {
           // Clean the records — strip 'synced' (local-only) AND 'station' (routing-only,
           // not a DB column). All machine state tables share the same base fields;
           // the station field only exists on the local AnyMachineStateRecord union.
-          const cleanRecords = stripFields(records, ['station']);
+          const cleanRecords = roundIntegerFields(stripFields(records, ['station']));
 
           phase2.push(
             supabase
