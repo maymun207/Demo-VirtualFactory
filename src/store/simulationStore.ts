@@ -39,6 +39,7 @@ import {
 import type { JamLocation } from '../lib/params';
 import { eventBus } from '../lib/eventBus';
 import { logSimulationEvent } from '../services/simulationEventLogger';
+import type { SimulationEventType } from '../lib/params/cwfCommands';
 // Import the session ID accessor from the NEUTRAL bridge module (sessionAccessor.ts).
 // This avoids a circular static import:
 //   simulationStore → simulationDataStore → simulationStore (getState)
@@ -331,6 +332,34 @@ function appendToAlarmLog(
 
 // ─── Store Implementation ────────────────────────────────────────────────────
 
+/**
+ * Safely log a simulation event inside a queueMicrotask callback.
+ * Wraps the call in try-catch to prevent unhandled microtask rejections.
+ *
+ * @param eventType - The event name ('started', 'stopped', 'drain_completed', etc.)
+ * @param tickOverrides - Optional pre-captured tick values (e.g. for reset, where
+ *   the store is already zeroed by the time the microtask runs).
+ * @param extraData - Additional data merged into the event payload.
+ */
+function safeLogEvent(
+  eventType: SimulationEventType,
+  tickOverrides?: { sClockCount: number; pClockCount: number },
+  extraData?: Record<string, unknown>,
+): void {
+  queueMicrotask(() => {
+    try {
+      const state = useSimulationStore.getState();
+      const sClock = tickOverrides?.sClockCount ?? state.sClockCount;
+      const pClock = tickOverrides?.pClockCount ?? state.pClockCount;
+      const simId = getActiveSessionId();
+      if (!simId) return;
+      logSimulationEvent(simId, sClock, eventType, { pClockCount: pClock, ...extraData });
+    } catch (err) {
+      console.warn(`[SimStore] Failed to log '${eventType}' event:`, err);
+    }
+  });
+}
+
 export const useSimulationStore = create<SimulationState>()(
   subscribeWithSelector((set) => ({
     // ── Initial State ──────────────────────────────────────────────
@@ -426,30 +455,17 @@ export const useSimulationStore = create<SimulationState>()(
         };
       });
 
-      /** Fire-and-forget event log AFTER synchronous state update.
-       *  queueMicrotask guarantees both stores are fully initialised before
-       *  getActiveSessionIdSync() is called — no async/await needed. */
-      queueMicrotask(() => {
-        const next = useSimulationStore.getState();
-        // getActiveSessionIdSync is safe here: called after module init.
-        const simId = getActiveSessionId();
-        if (!simId) return; /** No active session — skip logging */
-        const tick = next.sClockCount;
-
-        if (!prev.isDataFlowing && next.isDataFlowing) {
-          /** Stopped → Started */
-          logSimulationEvent(simId, tick, 'started', { pClockCount: next.pClockCount });
-        } else if (prev.isDraining && !next.isDataFlowing) {
-          /** Draining → Force Stopped */
-          logSimulationEvent(simId, tick, 'force_stopped', { pClockCount: next.pClockCount });
-        } else if (prev.isDataFlowing && !prev.isDraining && next.isDraining) {
-          /** Running → Drain Started */
-          logSimulationEvent(simId, tick, 'drain_started', { pClockCount: next.pClockCount });
-        } else if (prev.isDataFlowing && !next.isDataFlowing && !prev.isDraining) {
-          /** Running → Stopped (belt was empty) */
-          logSimulationEvent(simId, tick, 'stopped', { pClockCount: next.pClockCount });
-        }
-      });
+      /** Determine transition type and log via safeLogEvent (replaces raw queueMicrotask). */
+      const next = useSimulationStore.getState();
+      if (!prev.isDataFlowing && next.isDataFlowing) {
+        safeLogEvent('started');
+      } else if (prev.isDraining && !next.isDataFlowing) {
+        safeLogEvent('force_stopped');
+      } else if (prev.isDataFlowing && !prev.isDraining && next.isDraining) {
+        safeLogEvent('drain_started');
+      } else if (prev.isDataFlowing && !next.isDataFlowing && !prev.isDraining) {
+        safeLogEvent('stopped');
+      }
     },
 
     /**
@@ -472,15 +488,9 @@ export const useSimulationStore = create<SimulationState>()(
         };
       });
 
-      /** Log 'stopped' event only if we actually transitioned.
-       *  queueMicrotask ensures the store is settled before reading session ID. */
+      /** Log 'stopped' event only if we actually transitioned. */
       if (!wasStopped) {
-        queueMicrotask(() => {
-          const { sClockCount, pClockCount } = useSimulationStore.getState();
-          // Synchronous call — safe inside queueMicrotask.
-          const simId = getActiveSessionId();
-          if (simId) logSimulationEvent(simId, sClockCount, 'stopped', { pClockCount });
-        });
+        safeLogEvent('stopped');
       }
     },
 
@@ -497,14 +507,8 @@ export const useSimulationStore = create<SimulationState>()(
         conveyorStatus: 'stopped',
       }));
 
-      /** Log drain completion event.
-       *  queueMicrotask ensures the store is settled before reading session ID. */
-      queueMicrotask(() => {
-        const { sClockCount, pClockCount } = useSimulationStore.getState();
-        // Synchronous call — safe inside queueMicrotask.
-        const simId = getActiveSessionId();
-        if (simId) logSimulationEvent(simId, sClockCount, 'drain_completed', { pClockCount });
-      });
+      /** Log drain completion event. */
+      safeLogEvent('drain_completed');
     },
 
     setSClockPeriod: (period) => set({
@@ -778,13 +782,8 @@ export const useSimulationStore = create<SimulationState>()(
         sessionId: generateSessionId(),
       }));
 
-      /** Log reset event using pre-reset tick values.
-       *  queueMicrotask ensures the store is settled before reading session ID. */
-      queueMicrotask(() => {
-        // Synchronous call — safe inside queueMicrotask.
-        const simId = getActiveSessionId();
-        if (simId) logSimulationEvent(simId, sClockCount, 'reset', { pClockCount });
-      });
+      /** Log reset event using pre-reset tick values (store is already zeroed). */
+      safeLogEvent('reset', { sClockCount, pClockCount });
     },
 
     addAlarm: (entry) =>
