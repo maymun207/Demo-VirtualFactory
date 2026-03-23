@@ -50,6 +50,10 @@ import {
     DEMO_FIRST_ACT_INDEX,
     DEMO_ARIA_LOADING_TIMEOUT_MS,
 } from '../lib/params/demoSystem/demoConfig';
+import { createLogger } from '../lib/logger';
+
+/** Module-level logger for demo store operations. */
+const log = createLogger('Demo');
 
 /** Inline command parser — tokenises screenText and ARIA Local fields */
 import { parseCommands, executeTokens } from '../lib/utils/commandParser';
@@ -393,7 +397,7 @@ async function applyCopilotEnable(): Promise<void> {
 
     /** Only make the server call if we have a valid session UUID */
     if (!simulationId) {
-        console.warn('[Demo] applyCopilotEnable: no simulation session — skipping server call');
+        log.warn('applyCopilotEnable: no simulation session — skipping server call');
         return;
     }
 
@@ -404,7 +408,7 @@ async function applyCopilotEnable(): Promise<void> {
         body: JSON.stringify({ simulationId }),
     }).catch((err) => {
         /** Log but do not throw — demo must continue even if the server is slow */
-        console.error('[Demo] applyCopilotEnable: server call failed', err);
+        log.error('applyCopilotEnable: server call failed', err);
     });
 }
 
@@ -524,7 +528,7 @@ async function postToCWF(
     const safetyTimerId = setTimeout(() => {
         if (get().isLoading) {
             set({ isLoading: false });
-            console.warn('[Demo] postToCWF: safety timeout — CTA re-enabled');
+            log.warn('postToCWF: safety timeout — CTA re-enabled');
         }
     }, DEMO_ARIA_LOADING_TIMEOUT_MS);
 
@@ -801,7 +805,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             }
 
         } catch (err) {
-            console.error('[Demo] enterStep error:', err);
+            log.error('enterStep error:', err);
             set({ demoPhase: 'idle' as DemoPhase, isCtaExecuting: false });
         }
     },
@@ -936,7 +940,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                         .trim();
                     await postToCWF(cleanPrompt, act.id, act.systemContext, get, set);
                 } else {
-                    console.info('[Demo] ariaApi skipped — no simulation session running (step scripted call).');
+                    log.info('ariaApi skipped — no simulation session running (step scripted call).');
                 }
             }
 
@@ -965,7 +969,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
             set({ demoPhase: 'awaiting-transition' as DemoPhase, isCtaExecuting: false });
 
         } catch (err) {
-            console.error('[Demo] enterAriaPhase error:', err);
+            log.error('enterAriaPhase error:', err);
             set({ demoPhase: 'idle' as DemoPhase, isCtaExecuting: false });
         }
     },
@@ -1170,7 +1174,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ simulationId }),
                 }).catch((err) => {
-                    console.error('[Demo] restartDemo: copilot disable server call failed', err);
+                    log.error('restartDemo: copilot disable server call failed', err);
                 });
             }
         }
