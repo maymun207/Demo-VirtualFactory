@@ -122,6 +122,30 @@ function deduplicateById(records: Record<string, unknown>[]): Record<string, unk
   return [...seen.values()];
 }
 
+/**
+ * Remove duplicate records by a compound key, keeping the LAST occurrence.
+ *
+ * Used for tables with compound unique constraints (e.g., alarm_logs with
+ * `simulation_id + sim_tick + alarm_type`). PostgreSQL rejects
+ * `ON CONFLICT DO UPDATE` when the same compound key appears in multiple
+ * rows of a single INSERT statement.
+ *
+ * @param records - Array of record objects
+ * @param keyFields - Field names that form the compound key
+ * @returns New array with unique compound keys, last-write-wins
+ */
+function deduplicateByCompoundKey(
+  records: Record<string, unknown>[],
+  keyFields: string[]
+): Record<string, unknown>[] {
+  const seen = new Map<string, Record<string, unknown>>();
+  for (const record of records) {
+    const key = keyFields.map((f) => String(record[f] ?? '')).join('|');
+    seen.set(key, record);
+  }
+  return [...seen.values()];
+}
+
 // =============================================================================
 // SYNC SERVICE CLASS
 // =============================================================================
@@ -359,13 +383,20 @@ class SyncService {
       }
 
       // Alarm Logs (upsert with conflict on simulation_id + sim_tick + alarm_type)
+      // deduplicateByCompoundKey() is critical here: the simulation can generate
+      // multiple alarm logs with the same (sim_id, tick, type) within one sync
+      // interval. PostgreSQL rejects ON CONFLICT DO UPDATE when the same compound
+      // key appears twice in a single INSERT statement (HTTP 500).
       if (unsynced.alarmLogs.length > 0) {
-        const cleanAlarms = stripFields(unsynced.alarmLogs)
-          .filter((r) => r.simulation_id && r.simulation_id !== ''); // Skip records with no session
+        const cleanAlarms = deduplicateByCompoundKey(
+          stripFields(unsynced.alarmLogs)
+            .filter((r) => r.simulation_id && r.simulation_id !== ''),
+          ['simulation_id', 'sim_tick', 'alarm_type']
+        );
         phase2.push(
           supabase
             .from(ALARM_LOG_TABLE_NAME)
-            .upsert(cleanAlarms, { onConflict: 'simulation_id,sim_tick,alarm_type' })
+            .upsert(cleanAlarms, { onConflict: 'simulation_id,sim_tick,alarm_type', ignoreDuplicates: true })
             .then(({ error }) => {
               if (error) {
                 log.warn('alarm logs upsert failed:', error.message);
