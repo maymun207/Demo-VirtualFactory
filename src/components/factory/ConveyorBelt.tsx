@@ -161,6 +161,26 @@ const releaseVec3 = (v: THREE.Vector3) => {
   _vec3Pool.push(v);
 };
 
+/** Pre-allocated fallback for safeGetPointAt — returned when getPointAt fails. */
+const _fallbackPoint = new THREE.Vector3(0, 0, 0);
+
+/**
+ * safeGetPointAt — guards against NaN/out-of-bounds t values that crash
+ * CatmullRomCurve3.getPointAt with "Cannot read properties of undefined (reading 'x')".
+ *
+ * Clamps t to [0, 1], returns a fallback Vector3 if t is NaN or getPointAt
+ * returns undefined (which can happen with degenerate curve control points).
+ */
+function safeGetPointAt(
+  curve: THREE.CatmullRomCurve3,
+  t: number,
+): THREE.Vector3 {
+  const safeT = Math.max(0, Math.min(1, t));
+  if (!Number.isFinite(safeT)) return _fallbackPoint;
+  const point = curve.getPointAt(safeT);
+  return point ?? _fallbackPoint;
+}
+
 // PartData type imported from ./conveyorHelpers/types
 
 /**
@@ -374,13 +394,11 @@ function Part({
         meshRef.current.scale.set(1, 1, 1);
       }
     } else {
-      /** Guard: clamp t to [0,1] and skip if NaN — prevents CatmullRomCurve3
-       *  crash when the tile's parameter drifts out of bounds. */
+      const point = safeGetPointAt(curve, data.t);
       const safeT = Math.max(0, Math.min(1, data.t));
       if (!Number.isFinite(safeT)) return;
-      const point = curve.getPointAt(safeT);
       const tangent = curve.getTangentAt(safeT);
-      if (!point || !tangent) return;
+      if (!tangent) return;
       meshRef.current.position.copy(point);
       meshRef.current.position.y += TILE_Y_OFFSET;
       // Yaw-only rotation: keeps tile FLAT on the belt (no X/Z tilt)
@@ -585,7 +603,7 @@ function PartSpawner({
             tile.isQueued = false;
             tile.isScrapped = true;
             tile.scrapProgress = 0;
-            tile.originalPos.copy(curve.getPointAt(JAM_LOCATION_T_POSITIONS.dryer));
+            tile.originalPos.copy(safeGetPointAt(curve, JAM_LOCATION_T_POSITIONS.dryer));
             tile.t = JAM_LOCATION_T_POSITIONS.dryer;
             useSimulationStore.getState().incrementScrapCount();
             useSimulationStore.getState().incrementWasteCount();
@@ -604,7 +622,7 @@ function PartSpawner({
             tile.isKilnQueued = false;
             tile.isScrapped = true;
             tile.scrapProgress = 0;
-            tile.originalPos.copy(curve.getPointAt(JAM_LOCATION_T_POSITIONS.kiln));
+            tile.originalPos.copy(safeGetPointAt(curve, JAM_LOCATION_T_POSITIONS.kiln));
             tile.t = JAM_LOCATION_T_POSITIONS.kiln;
             useSimulationStore.getState().incrementScrapCount();
             useSimulationStore.getState().incrementWasteCount();
@@ -938,7 +956,7 @@ function PartSpawner({
             /** Scrap this tile — 100% certainty during Phase 1 */
             p.isScrapped = true;
             p.scrapProgress = 0;
-            p.originalPos.copy(curve.getPointAt(Math.min(p.t, 0.5)));
+            p.originalPos.copy(safeGetPointAt(curve, Math.min(p.t, 0.5)));
             /** Jam scrap counters — direct store calls for visual jam animation */
             useSimulationStore.getState().incrementScrapCount();
             useSimulationStore.getState().incrementWasteCount();
@@ -1014,7 +1032,7 @@ function PartSpawner({
           ) {
             if (route?.destination === "secondQuality") {
               p.isSecondQualitySorted = true;
-              p.originalPos.copy(curve.getPointAt(p.t));
+              p.originalPos.copy(safeGetPointAt(curve, p.t));
               /** Increment visual counter for 3D SecondQualityBox display */
               useSimulationStore.getState().incrementSecondQualityCount();
               /** Clean up routeMap entry */
@@ -1033,11 +1051,11 @@ function PartSpawner({
               if (Math.random() < scrapProb / 100) {
                 /** Scrap probability HIT — tumble animation to recycle bin */
                 p.isScrapped = true;
-                p.originalPos.copy(curve.getPointAt(p.t));
+                p.originalPos.copy(safeGetPointAt(curve, p.t));
               } else {
                 /** Scrap probability MISS — arc animation to waste bin */
                 p.isSorted = true;
-                p.originalPos.copy(curve.getPointAt(p.t));
+                p.originalPos.copy(safeGetPointAt(curve, p.t));
               }
               /** Increment visual counter for 3D TrashBin display (both paths) */
               useSimulationStore.getState().incrementWasteCount();
@@ -1061,7 +1079,7 @@ function PartSpawner({
             if (!route || route.destination === "shipment") {
               p.isCollected = true;
               p.originalPos.copy(
-                curve.getPointAt(Math.min(p.t, COLLECT_CLAMP_T)),
+                safeGetPointAt(curve, Math.min(p.t, COLLECT_CLAMP_T)),
               );
               const stackIndex =
                 useSimulationStore.getState().shipmentCount %
@@ -1095,20 +1113,20 @@ function PartSpawner({
           if (route?.destination === "secondQuality") {
             /** Route to 2Q at end of line */
             p.isSecondQualitySorted = true;
-            p.originalPos.copy(curve.getPointAt(p.t));
+            p.originalPos.copy(safeGetPointAt(curve, p.t));
             /** Increment visual counter for 3D SecondQualityBox display */
             useSimulationStore.getState().incrementSecondQualityCount();
           } else if (route?.destination === "wasteBin") {
             /** Route to waste at end of line */
             p.isSorted = true;
-            p.originalPos.copy(curve.getPointAt(p.t));
+            p.originalPos.copy(safeGetPointAt(curve, p.t));
             /** Increment visual counter for 3D TrashBin display */
             useSimulationStore.getState().incrementWasteCount();
           } else {
             /** Default to collection (first quality) */
             p.isCollected = true;
             p.originalPos.copy(
-              curve.getPointAt(Math.min(p.t, COLLECT_CLAMP_T)),
+              safeGetPointAt(curve, Math.min(p.t, COLLECT_CLAMP_T)),
             );
             const stackIndex =
               useSimulationStore.getState().shipmentCount %
@@ -1521,8 +1539,9 @@ export const ConveyorBelt = () => {
 
     for (let i = 0; i < SLAT_COUNT; i++) {
       const t = offsets.current[i];
-      const point = curve.getPointAt(t);
-      const tangent = curve.getTangentAt(t);
+      const point = safeGetPointAt(curve, t);
+      const tangent = curve.getTangentAt(Math.max(0, Math.min(1, t)));
+      if (!tangent) continue;
       dummy.position.copy(point);
       _lookAtPos.copy(point).add(tangent);
       dummy.lookAt(_lookAtPos);
