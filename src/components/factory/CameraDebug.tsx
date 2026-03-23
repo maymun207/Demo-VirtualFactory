@@ -18,6 +18,7 @@ import { useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
+import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 import {
   SCENE_ELEVATION,
   FACTORY_X_OFFSET,
@@ -35,7 +36,7 @@ export const CameraDebug = () => {
     /** Live camera world-space position — updates as user orbits */
     const pos = camera.position;
     /** OrbitControls look-at target — updates as user pans */
-    const target = (controls as any)?.target || new THREE.Vector3(0, 0, 0);
+    const target = (controls as OrbitControlsType)?.target ?? new THREE.Vector3(0, 0, 0);
     /** Current camera field of view in degrees — updates with CWF panel */
     const fov = (camera as THREE.PerspectiveCamera).fov;
 

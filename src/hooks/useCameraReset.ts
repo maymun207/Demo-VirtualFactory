@@ -25,10 +25,10 @@
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { CAMERA_POSITION, ORBIT_TARGET } from '../lib/params';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 /** Type alias for the OrbitControls imperative handle exposed by @react-three/drei */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OrbitControlsRef = React.RefObject<any>;
+type OrbitControlsRef = React.RefObject<OrbitControlsImpl | null>;
 
 /**
  * useCameraReset — Listens for 'camera-reset' DOM events and restores

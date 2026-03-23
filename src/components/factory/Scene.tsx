@@ -21,6 +21,7 @@
  */
 import { Suspense, useRef } from "react";
 import * as THREE from "three";
+import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Grid, Environment } from "@react-three/drei";
 import { useSimulationStore } from "../../store/simulationStore";
@@ -122,8 +123,7 @@ const CameraFOVController = () => {
  *
  * @param controlsRef - Ref to the OrbitControls instance
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CameraResetHandler = ({ controlsRef }: { controlsRef: React.RefObject<any> }) => {
+const CameraResetHandler = ({ controlsRef }: { controlsRef: React.RefObject<OrbitControlsType | null> }) => {
   /** Mount the reset listener — zero render output */
   useCameraReset(controlsRef);
   return null;
@@ -141,8 +141,7 @@ export const Scene = () => {
   const resetVersion = useSimulationStore((s) => s.resetVersion);
 
   /** Ref to the OrbitControls instance — used by CameraResetHandler to restore the view */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orbitControlsRef = useRef<any>(null);
+  const orbitControlsRef = useRef<OrbitControlsType | null>(null);
 
   // Central Station Ref Management
   const stationRefs = useRef<(THREE.Group | null)[]>(
