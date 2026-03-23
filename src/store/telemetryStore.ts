@@ -181,6 +181,17 @@ async function batchUpsertWithCircuitBreaker(
       return false;
     }
 
+    // ── FK violation: session row not yet created in Supabase ────────────
+    // During optimistic session start, the local UUID is used before the
+    // Supabase INSERT completes. This FK violation is transient — the next
+    // cycle will succeed once the session row exists. Skip silently without
+    // retries or circuit breaker increment.
+    const isFKViolation = error.message?.includes('foreign key constraint');
+    if (isFKViolation) {
+      log.info('Session not yet confirmed in Supabase — skipping telemetry cycle.');
+      return false;
+    }
+
     // ── Transient error — log and schedule retry ───────────────────────────
     log.warn(
       `Upsert attempt ${attempt + 1}/${TELEMETRY_MAX_RETRIES} failed: ${error.message}`,
