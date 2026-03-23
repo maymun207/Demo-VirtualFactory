@@ -36,6 +36,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { createLogger } from '../lib/logger';
 import { useCopilotStore } from '../store/copilotStore';
 /** SINGLE SOURCE OF TRUTH: session UUID lives in simulationDataStore */
 import { useSimulationDataStore } from '../store/simulationDataStore';
@@ -44,6 +45,9 @@ import {
     COPILOT_FEATURE_ENABLED,
     COPILOT_VERCEL_POLL_INTERVAL_MS,
 } from '../lib/params/copilot';
+
+/** Module-level logger for copilot heartbeat */
+const log = createLogger('CopilotHeartbeat');
 
 // =============================================================================
 // ENVIRONMENT DETECTION
@@ -153,7 +157,7 @@ export function useCopilotHeartbeat(): void {
             const triggerEvaluation = async () => {
                 /** Skip if a previous evaluation is still in-flight */
                 if (evaluateInFlightRef.current) {
-                    console.log('[CopilotHeartbeat] ⏳ Skipping evaluate — previous call still in-flight');
+                    log.debug('Skipping evaluate — previous call still in-flight');
                     return;
                 }
 
@@ -170,7 +174,7 @@ export function useCopilotHeartbeat(): void {
                         const data = await response.json();
                         /** Log evaluation result for debugging (visible in browser console) */
                         if (data.decision && data.decision !== 'skip') {
-                            console.log(`[CopilotHeartbeat] 📊 Evaluation: ${data.decision} | FOEE: ${data.foee}% | Tick: ${data.simTick} | ${data.latencyMs}ms`);
+                            log.debug(`Evaluation: ${data.decision} | FOEE: ${data.foee}% | Tick: ${data.simTick} | ${data.latencyMs}ms`);
                         }
 
                         /**
@@ -188,7 +192,7 @@ export function useCopilotHeartbeat(): void {
                          * during brief data-flow interruptions.
                          */
                         if (data.decision === 'disengaged' || data.decision === 'disabled') {
-                            console.log(`[CopilotHeartbeat] ℹ️ Evaluate returned '${data.decision}' — Realtime will sync state`);
+                            log.debug(`Evaluate returned '${data.decision}' — Realtime will sync state`);
                         }
                     } else {
                         console.warn('[CopilotHeartbeat] ⚠️ Evaluate endpoint returned:', response.status);

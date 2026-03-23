@@ -35,6 +35,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { createLogger } from '../lib/logger';
 import { supabase } from '../lib/supabaseClient';
 import { useCopilotStore } from '../store/copilotStore';
 import { useSimulationStore } from '../store/simulationStore';
@@ -47,6 +48,9 @@ import {
     COPILOT_DISENGAGE_GRACE_PERIOD_MS,
 } from '../lib/params/copilot';
 import type { CwfState } from '../lib/params/copilot';
+
+/** Module-level logger for copilot lifecycle events */
+const log = createLogger('CopilotLifecycle');
 
 // =============================================================================
 // HOOK
@@ -121,10 +125,7 @@ export function useCopilotLifecycle(): void {
              * the timer is cancelled and copilot continues uninterrupted.
              */
             if (!graceTimerRef.current) {
-                console.log(
-                    `[Copilot UI] ⏳ Data flow stopped — grace period started ` +
-                    `(${COPILOT_DISENGAGE_GRACE_PERIOD_MS / 1000}s before disengage)`
-                );
+                log.info(`Data flow stopped — grace period started (${COPILOT_DISENGAGE_GRACE_PERIOD_MS / 1000}s before disengage)`);
 
                 graceTimerRef.current = setTimeout(() => {
                     graceTimerRef.current = null;
@@ -146,11 +147,7 @@ export function useCopilotLifecycle(): void {
                     const isStillRunning = dataStoreState.isRunning;
 
                     if (isStillRunning || sessionStatus === 'running') {
-                        console.log(
-                            `[Copilot UI] ✅ Grace period expired but simulation is still ` +
-                            `running (isRunning=${isStillRunning}, status=${sessionStatus}) ` +
-                            `— skipping disengage, isDataFlowing was a false negative`
-                        );
+                        log.info(`Grace period expired but simulation still running (isRunning=${isStillRunning}, status=${sessionStatus}) — skipping disengage`);
                         return;
                     }
 
@@ -175,10 +172,7 @@ export function useCopilotLifecycle(): void {
                         });
                     }
 
-                    console.log(
-                        `[Copilot UI] 🔴 Auto-disengaged: simulation stopped ` +
-                        `(status=${sessionStatus}, grace period expired)`
-                    );
+                    log.info(`Auto-disengaged: simulation stopped (status=${sessionStatus}, grace period expired)`);
                 }, COPILOT_DISENGAGE_GRACE_PERIOD_MS);
             }
         }
@@ -186,7 +180,7 @@ export function useCopilotLifecycle(): void {
         if (isDataFlowing) {
             /** Data flow resumed — cancel grace timer and reset the guard */
             if (graceTimerRef.current) {
-                console.log('[Copilot UI] ✅ Data flow resumed — grace timer cancelled');
+                log.info('Data flow resumed — grace timer cancelled');
                 clearTimeout(graceTimerRef.current);
                 graceTimerRef.current = null;
             }
@@ -249,10 +243,7 @@ export function useCopilotLifecycle(): void {
                             newRow.cwf_state as CwfState,
                             (newRow.auth_attempts as number) ?? 0,
                         );
-                        console.log(
-                            `[Copilot UI] 🔄 State synced from cloud: ${newRow.cwf_state} ` +
-                            `(sim=${simulationId.slice(0, 8)}..., auth_attempts=${newRow.auth_attempts ?? 0})`
-                        );
+                        log.debug(`State synced from cloud: ${newRow.cwf_state} (sim=${simulationId.slice(0, 8)}..., auth_attempts=${newRow.auth_attempts ?? 0})`);
                     } else {
                         /**
                          * Rows without cwf_state should not exist in production.

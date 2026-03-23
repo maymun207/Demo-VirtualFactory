@@ -39,6 +39,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
+import { createLogger } from '../lib/logger';
 import { supabase } from '../lib/supabaseClient';
 import { validateCWFParamValue } from '../lib/params/cwfCommands';
 import { useSimulationDataStore } from '../store/simulationDataStore';
@@ -97,6 +98,9 @@ import { getScenarioByCode, REFERENCE_SCENARIO } from '../lib/scenarios';
  * All other conveyor params are applied as numeric values directly.
  */
 const CONVEYOR_BOOL_PARAMS = new Set(['speed_change', 'jammed_events']);
+
+/** Module-level logger for CWF command listener */
+const log = createLogger('CWFListener');
 
 // =============================================================================
 // UI ACTION DISPATCHER  (module-level — does NOT need React context)
@@ -561,7 +565,7 @@ async function processUIActionCommand(command: {
                     `(Open Demo Settings to view the full Work Order details.)`,
                 );
 
-                console.log(`[CWF Listener] ✅ set_work_order: '${actionValue}' applied.`);
+                log.info(`set_work_order: '${actionValue}' applied`);
                 break;
             }
 
@@ -673,10 +677,7 @@ async function processUIActionCommand(command: {
                     `✅ Switched to ${actionValue} — ${label}${overrideSuffix}. (${simStatus}; no pause required)`,
                 );
 
-                console.log(
-                    `[CWF Listener] ✅ switch_scenario: ${actionValue} applied. ` +
-                    `overrides=${overrideCount} running=${isRunning}`,
-                );
+                log.info(`switch_scenario: ${actionValue} applied, overrides=${overrideCount} running=${isRunning}`);
                 break;
             }
 
@@ -706,7 +707,7 @@ async function processUIActionCommand(command: {
             `✅ CWF UI action '${actionType}' executed.`,
         );
 
-        console.log(`[CWF UI Listener] ✅ Applied UI action: ${actionType}`);
+        log.info(`Applied UI action: ${actionType}`);
 
     } catch (err) {
         /** Catch unexpected errors and mark the command as rejected */
@@ -830,7 +831,7 @@ export function useCWFCommandListener(): void {
                     if (error) console.error('[CWF Listener] Failed to mark copilot message as applied:', error.message);
                 });
 
-            console.log(`[CWF Listener] 🤖 Copilot message injected: ${chatMsg.substring(0, 80)}`);
+            log.debug(`Copilot message injected: ${chatMsg.substring(0, 80)}`);
             return;
         }
 
@@ -941,9 +942,7 @@ export function useCWFCommandListener(): void {
                 );
             });
 
-        console.log(
-            `[CWF Listener] ✅ Applied: ${command.station}.${command.parameter} = ${command.new_value}`,
-        );
+        log.info(`Applied: ${command.station}.${command.parameter} = ${command.new_value}`);
     }, []);
 
     /**
@@ -970,7 +969,7 @@ export function useCWFCommandListener(): void {
 
         /** Process each pending command (processCommand handles deduplication) */
         if (data && data.length > 0) {
-            console.log(`[CWF Poll] Found ${data.length} pending command(s), processing...`);
+            log.debug(`Poll found ${data.length} pending command(s), processing`);
             for (const command of data as CWFCommand[]) {
                 processCommand(command);
             }
@@ -1015,13 +1014,13 @@ export function useCWFCommandListener(): void {
                 },
                 (payload) => {
                     /** Process the newly inserted command */
-                    console.log('[CWF Listener] Realtime INSERT received:', payload.new.id);
+                    log.debug('Realtime INSERT received:', payload.new.id);
                     processCommand(payload.new);
                 },
             )
             .subscribe((status) => {
                 /** Log subscription state for debugging */
-                console.log(`[CWF Listener] Realtime subscription status: ${status}`);
+                log.debug(`Realtime subscription status: ${status}`);
 
                 /**
                  * Run an immediate poll once the subscription is established.
@@ -1046,7 +1045,7 @@ export function useCWFCommandListener(): void {
             pollPendingCommands(sessionId);
         }, CWF_POLL_INTERVAL_MS);
 
-        console.log(`[CWF Listener] Listeners active for session ${sessionId}`);
+        log.info(`Listeners active for session ${sessionId}`);
     }, [processCommand, pollPendingCommands]);
 
     /**
@@ -1057,12 +1056,12 @@ export function useCWFCommandListener(): void {
         if (channelRef.current && supabase) {
             supabase.removeChannel(channelRef.current);
             channelRef.current = null;
-            console.log('[CWF Listener] Realtime subscription removed');
+            log.debug('Realtime subscription removed');
         }
         if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = null;
-            console.log('[CWF Listener] Polling stopped');
+            log.debug('Polling stopped');
         }
     }, []);
 

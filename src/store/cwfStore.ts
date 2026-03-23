@@ -16,6 +16,7 @@
  * Used by: CWFChatPanel.tsx
  */
 import { create } from 'zustand';
+import { createLogger } from '../lib/logger';
 import { cwfApiCall } from '../lib/cwfService';
 import { getSimulationHistory, type SimulationHistoryEntry } from '../services/simulationHistoryService';
 import {
@@ -34,6 +35,9 @@ import { useWorkOrderStore } from './workOrderStore';
 import type { UIContext } from '../lib/types/cwfTypes';
 /** Copilot store — direct state sync when API reports copilot enable/disable */
 import { useCopilotStore } from './copilotStore';
+
+/** Module-level logger for CWF store */
+const log = createLogger('CWFStore');
 
 // =============================================================================
 // TYPES
@@ -410,10 +414,10 @@ export const useCWFStore = create<CWFState>((set, get) => ({
              *  unreliable, ensuring the pink theme activates immediately. */
             if (result.copilotStateChange === 'enabled') {
                 useCopilotStore.getState().enableCopilot();
-                console.log('[CWF Store] 🟢 Copilot enabled via API response flag');
+                log.info('Copilot enabled via API response flag');
             } else if (result.copilotStateChange === 'disabled') {
                 useCopilotStore.getState().disableCopilot();
-                console.log('[CWF Store] 🔴 Copilot disabled via API response flag');
+                log.info('Copilot disabled via API response flag');
             }
         } catch (error) {
             /** Format error message in the user's language */

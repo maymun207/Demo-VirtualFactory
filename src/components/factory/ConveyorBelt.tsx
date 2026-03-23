@@ -653,14 +653,7 @@ function PartSpawner({
      * dependency to this effect, which would cause it to re-run unnecessarily.
      */
     const woState = useWorkOrderStore.getState();
-    // ── DEBUG: trace spawn decisions (REMOVE AFTER DEBUGGING) ──
-    if (pClockCount % 50 === 0 || pClockCount >= 525) {
-      console.log(
-        `[SPAWN] pClock=${pClockCount} tilesSpawned=${woState.tilesSpawned}` +
-          ` pressLimit=${woState.pressLimitReached} partsRef=${partsRef.current.size}` +
-          ` woId=${woState.selectedWorkOrderId}`,
-      );
-    }
+
     if (woState.pressLimitReached) return;
 
     const id = pClockCount;
