@@ -49,7 +49,7 @@ import {
     CWF_AUTH_FAST_PATH_PROMPT_EN,
     CWF_AUTH_FAST_PATH_PROMPT_TR,
     CWF_PARAMETER_DISPLAY_PROMPT,
-} from '../../shared/cwfConstants';
+} from '../../shared/cwfConstants.js';
 
 // =============================================================================
 // API-ONLY CONSTANTS (not shared with client)
