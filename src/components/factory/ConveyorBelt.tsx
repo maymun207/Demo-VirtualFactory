@@ -41,10 +41,8 @@ import { useWorkOrderStore } from "../../store/workOrderStore";
 import { useUIStore } from "../../store/uiStore";
 /** Recipe + Work Order param data — used to look up tile colours for the active recipe */
 import { WORK_ORDERS, RECIPES } from "../../lib/params/demo";
-/** Sync service — used by Phase 2 to flush final data to Supabase before opening panels */
-import { syncService } from "../../services/syncService";
-/** OEE snapshot service — used by Phase 2 to capture post-drain OEE totals */
-import { oeeSnapshotService } from "../../services/oeeSnapshotService";
+/** Shutdown service — used by Phase 2 to run the drain-sync-pause sequence */
+import { executeShutdown } from "../../services/shutdownService";
 /** Logger — scoped logger for Phase 2 shutdown messages */
 import { createLogger } from "../../lib/logger";
 
@@ -1597,120 +1595,25 @@ function PartSpawner({
       );
 
       /**
-       * ═══════════════════════════════════════════════════════════
-       * ASYNC PHASE — runs across subsequent frames via IIFE
-       * ═══════════════════════════════════════════════════════════
+       * ASYNC PHASE — delegated to shutdownService.
        *
-       * CRITICAL SEQUENCE (order matters!):
+       * executeShutdown() runs the full 6-step sequence:
+       *   1. syncService.stop()  2. drainConveyor()  3. microtask flush
+       *   4. syncService.sync()  5. OEE final snapshot  6. pauseSession()
        *
-       *   Step 1: await syncService.stop()
-       *     - Clears the periodic interval
-       *     - Waits for any in-progress periodic sync to COMPLETE
-       *       (including its markAsSynced callbacks)
-       *     - Does one final sync of whatever was queued pre-drain
-       *
-       *   Step 2: drainConveyor()
-       *     - NOW safe because no periodic sync can run concurrently
-       *     - Marks all conveyor tiles as completed (synchronous)
-       *     - Post-drain sweep catches any remaining in_production tiles
-       *     - All completed tiles get synced=false + pushed to queue
-       *
-       *   Step 3: syncService.sync() — SECOND final sync
-       *     - Flushes drain-completed tiles to Supabase
-       *     - No race: periodic sync is stopped, drain is done, queue
-       *       contains ONLY drain-completed tiles
-       *
-       *   Step 4: await pauseSession()
-       *     - Only after DB confirms all tiles written
-       *
-       * WHY drain is AFTER syncService.stop():
-       *   The periodic sync's markAsSynced callback runs during stop()
-       *   and sets tiles to synced=true, removing them from the queue.
-       *   If drain ran BEFORE stop(), the periodic sync's callback would
-       *   overwrite drain-completed tiles back to synced=true, and the
-       *   final sync would skip them → pending tiles in DB.
+       * The module-level isFiring guard inside shutdownService prevents
+       * double-execution if both ConveyorBelt and SimulationRunner fire.
        */
-      (async () => {
-        try {
-          /**
-           * Step 1: Stop periodic sync — waits for in-progress sync,
-           * then does one final sync of pre-drain data.
-           */
-          await syncService.stop();
-          phase2Log.current.info(
-            "Periodic sync stopped + pre-drain flush done",
-          );
-
-          /**
-           * Step 2: Drain conveyor — NOW safe (no concurrent sync).
-           * All tiles on the data-layer belt complete their journey.
-           * Post-drain sweep catches any remaining in_production tiles.
-           */
-          const freshDataStore = useSimulationDataStore.getState();
-          freshDataStore.drainConveyor();
-          phase2Log.current.info("Drain complete — all tiles marked completed");
-
-          /**
-           * Step 2b: Flush pending microtasks before syncing.
-           *
-           * CRITICAL: drainConveyor() → moveTilesOnConveyor() defers
-           * tile_station_snapshot creation via queueMicrotask(). During
-           * the synchronous drain loop, microtasks DON'T fire. Without
-           * this flush, post-drain sync finds zero snapshots and writes
-           * nothing to tile_station_snapshots — CWF loses passport data.
-           */
-          await new Promise((r) => setTimeout(r, 0));
-          phase2Log.current.info(
-            "Microtask flush done — snapshots ready for sync",
-          );
-
-          /**
-           * Step 3: Second final sync — flush drain-completed tiles.
-           * syncService is stopped but we can still call sync() directly.
-           * This is the ONLY sync that sends drain-completed tile data.
-           */
-          await syncService.sync();
-          phase2Log.current.info(
-            "Post-drain sync complete — all tiles flushed to DB",
-          );
-
-          /**
-           * Step 3.5: Final OEE snapshot — captures post-drain production totals.
-           *
-           * The periodic insertSnapshot() has a conveyorStatus='running' guard
-           * that silently skips inserts after stopDataFlow(). This call uses
-           * insertFinalSnapshot() which bypasses that guard, ensuring the
-           * last OEE snapshot reflects the TRUE final counts (e.g. 530 shipped,
-           * not the stale 518 from the last periodic snapshot).
-           */
-          await oeeSnapshotService.insertFinalSnapshot();
-          phase2Log.current.info("Post-drain final OEE snapshot inserted");
-
-          /**
-           * Step 4: Pause session in DB — only after ALL tiles confirmed.
-           */
-          await freshDataStore.pauseSession();
-          phase2Log.current.info("Session paused in Supabase");
-        } catch (err) {
+      executeShutdown('work_order_complete')
+        .then(() => {
+          /** Step 5: UI actions — runs AFTER DB sync + pause (fresh data). */
+          useUIStore.getState().setSimConfigured(false);
+          useUIStore.getState().setSimulationEnded(true);
+          phase2Log.current.info("Simulation fully complete");
+        })
+        .catch((err) => {
           phase2Log.current.error("Phase 2 async shutdown failed:", err);
-        }
-
-        /**
-         * Step 5: UI actions — runs AFTER DB sync + pause (fresh data).
-         */
-
-        /** Re-arm the Demo Settings gate for the next run. */
-        useUIStore.getState().setSimConfigured(false);
-
-        /**
-         * Mark the simulation as naturally ended.
-         * Prevents DemoSettingsPanel close handlers from re-arming the gate.
-         * Cleared by useFactoryReset when the user clicks Reset.
-         */
-        useUIStore.getState().setSimulationEnded(true);
-
-        phase2Log.current.info("Simulation fully complete");
-      })();
+        });
     }
   });
 

@@ -29,6 +29,7 @@ import { useCWFStore } from '../store/cwfStore';
 /** Copilot store — reset activation state / action history on factory reset */
 import { useCopilotStore } from '../store/copilotStore';
 import { syncService } from '../services/syncService';
+import { resetShutdownGuard } from '../services/shutdownService';
 import { createLogger } from '../lib/logger';
 
 /** Module-level logger for factory reset operations. */
@@ -49,13 +50,15 @@ const log = createLogger('FactoryReset');
 export function useFactoryReset() {
   return useCallback(async () => {
     /**
-     * STEP 0: Stop the simulation IMMEDIATELY.
-     * This is the most critical step — the user must see the simulation halt
-     * instantly when they click Reset. All async work (Supabase sync, session
-     * end) happens AFTER the visual stop to maintain responsiveness.
+     * STEP 0: Clear the shutdown guard and stop the simulation IMMEDIATELY.
+     * resetShutdownGuard() ensures a stuck isFiring flag (from a failed or
+     * in-progress shutdown) doesn't permanently block future shutdowns.
+     * stopDataFlow() halts the simulation visually — the user must see it
+     * stop instantly when they click Reset.
      */
+    resetShutdownGuard();
     useSimulationStore.getState().stopDataFlow();
-    log.info('Simulation stopped (immediate)');
+    log.info('Shutdown guard cleared + simulation stopped (immediate)');
 
     const dataStore = useSimulationDataStore.getState();
 

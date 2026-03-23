@@ -25,6 +25,7 @@ import { useSimulationStore } from "../store/simulationStore";
 import { useSimulationDataStore } from "../store/simulationDataStore";
 import { syncService } from "../services/syncService";
 import { oeeSnapshotService } from "../services/oeeSnapshotService";
+import { executeShutdown } from "../services/shutdownService";
 import { createLogger } from "../lib/logger";
 /** Work Order 2-phase production lifecycle enforcer */
 import { useWorkOrderEnforcer } from "../hooks/useWorkOrderEnforcer";
@@ -129,64 +130,15 @@ export function SimulationRunner() {
        * (pressLimitReached + partsRef.size===0) won't be met. In that case
        * we still need a fallback drain→sync→pause:
        */
-      (async () => {
-        try {
-          /**
-           * Step 1: Stop periodic sync — waits for any in-progress sync
-           * to COMPLETE (including its markAsSynced callbacks), then does
-           * one final sync of whatever was queued pre-drain.
-           *
-           * MUST run before drain to prevent the periodic sync's
-           * markAsSynced callback from overwriting drain-completed tiles
-           * back to synced=true (which would cause the post-drain sync
-           * to skip them → pending tiles stuck in DB).
-           */
-          await syncService.stop();
-          log.info("Manual stop: periodic sync stopped + pre-drain flush done");
-
-          /**
-           * Step 2: Drain conveyor — NOW safe (no concurrent sync).
-           * All tiles on the data-layer belt complete their journey.
-           * Post-drain sweep catches any remaining in_production tiles
-           * using defectedPartIds/secondQualityPartIds bridges.
-           */
-          dataStore.drainConveyor();
-          log.info("Manual stop: drain complete — all tiles marked completed");
-
-          /**
-           * Step 2b: Flush pending microtasks before syncing.
-           *
-           * CRITICAL: drainConveyor() calls moveTilesOnConveyor() which
-           * defers tile_station_snapshot creation via queueMicrotask().
-           * During the synchronous drain loop, microtasks DON'T execute.
-           * Without this flush, the post-drain sync would find zero
-           * snapshots and write nothing to the tile_station_snapshots
-           * table — causing CWF to lose all per-station passport data.
-           *
-           * setTimeout(r, 0) yields to the event loop, allowing ALL
-           * queued microtasks (snapshot creation) to execute before
-           * the sync picks them up.
-           */
-          await new Promise((r) => setTimeout(r, 0));
-          log.info(
-            "Manual stop: microtask flush done — snapshots ready for sync",
-          );
-
-          /**
-           * Step 3: Post-drain sync — flush drain-completed tiles to DB.
-           * syncService is stopped but we can still call sync() directly.
-           * This is the ONLY sync that sends drain-completed tile data.
-           */
-          await syncService.sync();
-          log.info("Manual stop: post-drain sync completed");
-
-          /** Step 4: Pause session — only after DB confirms all tiles written. */
-          await dataStore.pauseSession();
-          log.info("Manual stop: session paused");
-        } catch (err) {
-          log.error("Manual stop: drain-sync-pause failed:", err);
-        }
-      })();
+      /**
+       * Delegate to shutdownService — single source of truth for
+       * the drain-sync-pause sequence. The module-level isFiring guard
+       * inside shutdownService prevents double-execution if both
+       * ConveyorBelt Phase 2 and this manual stop fire simultaneously.
+       */
+      executeShutdown('manual_stop').catch((err) => {
+        log.error('Manual stop: shutdown failed:', err);
+      });
     }
   }, [isDataFlowing, isDataStoreRunning, sessionId]);
 
