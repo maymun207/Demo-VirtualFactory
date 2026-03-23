@@ -104,23 +104,22 @@ export function countStationExits(
         let hasConveyorDamage = false;
         let exitedDigital = false;
         let reachedKiln = false;
+        let wasScrappedAtSorting = false;
 
-        // First scan: detect conveyor damage across ALL snapshots for this tile.
-        // We must check all snapshots because conveyor_jam_damage is recorded
-        // at the SORTING station, not at the conveyor itself.
+        // Single pass: detect conveyor damage, count station IN/OUT,
+        // and check sorting scrap — all in one iteration.
         for (const snap of snapshots) {
+            // Check for conveyor damage (recorded at any station, typically sorting)
             if (
+                !hasConveyorDamage &&
                 snap.defect_detected &&
                 snap.defect_types != null &&
                 (snap.defect_types as string[]).includes('conveyor_jam_damage')
             ) {
                 hasConveyorDamage = true;
-                break; // One is enough
             }
-        }
 
-        // Second scan: count station IN/OUT
-        for (const snap of snapshots) {
+            // Count station IN/OUT
             const station = snap.station;
             const stats = stationStats[station];
             if (!stats) continue; // Safety: skip unknown stations
@@ -131,6 +130,9 @@ export function countStationExits(
             if (snap.scrapped_here) {
                 // Tile was scrapped AND removed at this station (Path A)
                 stats.scrappedHere++;
+
+                // Track sorting scrap for conveyor scrap attribution
+                if (station === 'sorting') wasScrappedAtSorting = true;
             } else {
                 // Tile survived this station (Path A: not scrapped, or Path B: defective but continues)
                 stats.out++;
@@ -148,15 +150,9 @@ export function countStationExits(
             conveyorCleanOutput++;
         }
 
-        /**
-         * Conveyor scrap: tile had conveyor_jam_damage AND was scrapped at sorting.
-         * Read directly from the tile passport — the single source of truth.
-         */
-        if (hasConveyorDamage) {
-            const wasScrappedAtSorting = snapshots.some(
-                (s) => s.station === 'sorting' && s.scrapped_here,
-            );
-            if (wasScrappedAtSorting) conveyorScrapped++;
+        // Conveyor scrap: tile had conveyor_jam_damage AND was scrapped at sorting
+        if (hasConveyorDamage && wasScrappedAtSorting) {
+            conveyorScrapped++;
         }
     }
 
