@@ -223,7 +223,7 @@ Maximum 3 sentences per response. Every word must earn its place.
         /** No openingPrompt — Act 0 is the entry point. */
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Start →', tr: 'Başlat →' },
                 scenarioCode: 'SCN-001',
@@ -380,7 +380,7 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show me →', tr: 'Göster →' },
                 mediaInstruction: 'chart:conveyor_speed',
@@ -489,7 +489,7 @@ Maximum 4 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show dashboard →', tr: 'Panoyu göster →' },
                 slideImageUrl: '/demo/ACT-2.jpg',
@@ -600,7 +600,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show the crisis →', tr: 'Krizi göster →' },
                 slideImageUrl: '/demo/ACT-3.jpg',
@@ -707,7 +707,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Ask as CEO →', tr: 'CEO olarak sor →' },
                 slideImageUrl: '/demo/ACT-4a.jpg',
@@ -832,7 +832,7 @@ The Copilot did not alert someone — it acted.
 
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show the incident →', tr: 'Olayı göster →' },
                 slideImageUrl: '/demo/ACT-4d.jpg',
@@ -978,7 +978,7 @@ Maximum 5 sentences per response.
 
         openingPrompt: '',
 
-                                                                                                                                                                                                                                                                                                                                                                ctaSteps: [
+                                                                                                                                                                                                                                                                                                                                                                        ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show the gain', tr: 'Kazancı göster' },
                 slideImageUrl: '/demo/AiPoweredCF-3.jpg',
@@ -1015,12 +1015,12 @@ VE CO₂ yükümlülüğünü aynı anda siler.
             { // Click #2
                 ctaLabel: { en: 'Thank you!', tr: 'Teşekkürler!' },
                 slideImageUrl: '/demo/SentialFactory.jpg',
-                delayMs: 1000,
+                delayMs: 5000,
                 screenText: {
                     en: `<cls><w:500>How much waste did your factory produce last year?
-If you don't know — that's exactly where we start.<w:3000><clck>`,
+If you don't know — that's exactly where we start.<w:5000><clck>`,
                     tr: `<cls><w:500>Fabrikanız geçen yıl ne kadar fire üretti?
-Bilmiyorsanız — tam olarak buradan başlıyoruz.<w:3000><clck>`,
+Bilmiyorsanız — tam olarak buradan başlıyoruz.<w:5000><clck>`,
                 },
                 screenTextSize: 'md',
                 ariaLocal: {
