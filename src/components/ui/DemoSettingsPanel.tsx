@@ -504,6 +504,7 @@ function ConveyorSettingsTable({
         drift: parseFloat(scrapProbabilityDrift) || 0,
       },
     ]);
+    // TODO: refactor to Zustand selectors to eliminate eslint-disable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     jammedTime,
@@ -532,6 +533,7 @@ function ConveyorSettingsTable({
     setImpactedTilesDrift(String(effective.impactedTilesDrift));
     setScrapProbability(String(effective.scrapProbability));
     setScrapProbabilityDrift(String(effective.scrapProbabilityDrift));
+    // TODO: refactor to Zustand selectors to eliminate eslint-disable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSettings]);
 
@@ -585,6 +587,7 @@ function ConveyorSettingsTable({
       setScrapProbabilityDrift(String(storeSPDrift));
     }
     // Run once on mount to pick up committed store values.
+    // TODO: refactor to Zustand selectors to eliminate eslint-disable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -611,6 +614,7 @@ function ConveyorSettingsTable({
       setScrapProbabilityDrift(String(currentEffective.scrapProbabilityDrift));
     });
     // Refresh whenever active scenario changes
+    // TODO: refactor to Zustand selectors to eliminate eslint-disable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSettings, referenceSettings, onRegisterReset]);
 
@@ -1404,6 +1408,7 @@ export const DemoSettingsPanel = () => {
       /** Pause the simulation by toggling data flow off. */
       useSimulationStore.getState().toggleDataFlow();
     }
+    // TODO: refactor to Zustand selectors to eliminate eslint-disable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); // Intentionally runs ONLY on open, not on every isDataFlowing change
 

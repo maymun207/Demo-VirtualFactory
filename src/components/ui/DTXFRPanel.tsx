@@ -145,17 +145,11 @@ export function DTXFRPanel() {
   /** Whether the simulation data flow is active */
   const isDataFlowing = useSimulationStore((s) => s.isDataFlowing);
 
-  /** Read tile counters imperatively from the data store on each render */
-  const dataSnapshot = useMemo(() => {
-    const s = useSimulationDataStore.getState();
-    return {
-      tileCounter: s.tileCounter,
-      conveyorSize: s.conveyorPositions.size,
-      totalScrapped: s.totalTilesScrapped,
-      sessionCode: s.sessionCode,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pClockCount]);
+  /** Direct Zustand selectors — reactive, type-safe, no eslint-disable needed */
+  const tileCounter = useSimulationDataStore((s) => s.tileCounter);
+  const conveyorSize = useSimulationDataStore((s) => s.conveyorPositions.size);
+  const totalScrapped = useSimulationDataStore((s) => s.totalTilesScrapped);
+  const sessionCode = useSimulationDataStore((s) => s.sessionCode);
 
   /**
    * CUMULATIVE COUNTER: Read totalTilesProduced directly.
@@ -163,8 +157,6 @@ export function DTXFRPanel() {
    * Matches the approach used by the 3D quality boxes.
    */
   const totalProduced = useSimulationDataStore((s) => s.totalTilesProduced);
-
-  const { tileCounter, conveyorSize, sessionCode } = dataSnapshot;
 
   /** Manual Tile Number handling — empty = Live Tracking mode */
   const [manualInput, setManualInput] = useState("");
@@ -192,10 +184,15 @@ export function DTXFRPanel() {
     return { activeWorkOrder: wo, activeRecipe: recipe };
   }, [selectedWorkOrderId]);
 
-  /** Derive tile data for the passport display */
+  /**
+   * Derive tile data for the passport display.
+   * getState is a stable Zustand function — safe to call inside useMemo.
+   * pClockCount acts as the tick-based refresh trigger.
+   */
+  const getDataState = useSimulationDataStore.getState;
   const tileData = useMemo(() => {
     if (targetTileNumber === 0) return null;
-    const state = useSimulationDataStore.getState();
+    const state = getDataState();
     const tile = state.getTileByNumber(targetTileNumber);
     if (!tile) return null;
     const snapshots = state.getTileSnapshots(tile.id);
@@ -210,12 +207,11 @@ export function DTXFRPanel() {
       currentStation: conveyorPos?.current_station,
       isOnConveyor: conveyorPos !== undefined,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetTileNumber, pClockCount]);
+  }, [targetTileNumber, pClockCount, getDataState]);
 
   /** Collect all tiles that have at least one defect or scrap grade */
   const defectedTiles = useMemo(() => {
-    const state = useSimulationDataStore.getState();
+    const state = getDataState();
     const result: {
       tileId: string;
       tileNumber: number;
@@ -238,8 +234,7 @@ export function DTXFRPanel() {
       }
     });
     return result.sort((a, b) => b.tileNumber - a.tileNumber).slice(0, 2000);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tileCounter, totalProduced, dataSnapshot.totalScrapped]);
+  }, [tileCounter, totalProduced, totalScrapped, getDataState]);
 
   // ─── Resize Handle Logic ──────────────────────────────────────────────
 

@@ -151,30 +151,12 @@ export const TilePassport = () => {
   const pClockCount = useSimulationStore((s) => s.pClockCount);
   const isDataFlowing = useSimulationStore((s) => s.isDataFlowing);
 
-  /**
-   * Read tile counters imperatively from the data store on each render.
-   * These are re-evaluated whenever pClockCount changes (guaranteed by React).
-   */
-  const dataSnapshot = useMemo(() => {
-    const s = useSimulationDataStore.getState();
-    return {
-      totalProduced: s.totalTilesProduced,
-      tileCounter: s.tileCounter,
-      conveyorSize: s.conveyorPositions.size,
-      totalScrapped: s.totalTilesScrapped,
-      sessionCode: s.sessionCode,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pClockCount]);
-
-  /** Destructure for readability downstream. */
-  const {
-    totalProduced,
-    tileCounter,
-    conveyorSize,
-    totalScrapped,
-    sessionCode,
-  } = dataSnapshot;
+  /** Direct Zustand selectors — reactive, type-safe, no eslint-disable needed */
+  const totalProduced = useSimulationDataStore((s) => s.totalTilesProduced);
+  const tileCounter = useSimulationDataStore((s) => s.tileCounter);
+  const conveyorSize = useSimulationDataStore((s) => s.conveyorPositions.size);
+  const totalScrapped = useSimulationDataStore((s) => s.totalTilesScrapped);
+  const sessionCode = useSimulationDataStore((s) => s.sessionCode);
 
   /**
    * Manual Tile Number handling.
@@ -238,10 +220,16 @@ export const TilePassport = () => {
    * the tracked tile moves through stations (relevant for the fallback case
    * where we track an in-progress tile).
    */
+  /**
+   * Derive tile data for the passport display.
+   * getState is a stable Zustand function — safe to call inside useMemo.
+   * pClockCount acts as the tick-based refresh trigger.
+   */
+  const getDataState = useSimulationDataStore.getState;
   const tileData = useMemo(() => {
     if (targetTileNumber === 0) return null;
 
-    const state = useSimulationDataStore.getState();
+    const state = getDataState();
     /** Look up the target tile by its sequential number. */
     const tile = state.getTileByNumber(targetTileNumber);
     if (!tile) return null;
@@ -262,8 +250,7 @@ export const TilePassport = () => {
        * Only becomes false once pruneCompletedTiles removes it from conveyorPositions. */
       isOnConveyor: conveyorPos !== undefined,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetTileNumber, pClockCount]);
+  }, [targetTileNumber, pClockCount, getDataState]);
 
   /** Controls open/close of the Defected Tiles drawer. */
   const [defectedOpen, setDefectedOpen] = useState(false);
@@ -280,7 +267,7 @@ export const TilePassport = () => {
    * Capped at the 50 most-recent entries to keep the list manageable.
    */
   const defectedTiles = useMemo(() => {
-    const state = useSimulationDataStore.getState();
+    const state = getDataState();
     const result: {
       tileId: string;
       tileNumber: number;
@@ -309,8 +296,7 @@ export const TilePassport = () => {
 
     /* Sort descending by tile number (most recent first) and cap at 50 */
     return result.sort((a, b) => b.tileNumber - a.tileNumber).slice(0, 50);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tileCounter, totalProduced, totalScrapped]);
+  }, [tileCounter, totalProduced, totalScrapped, getDataState]);
 
   /**
    * Auto-expand the Defected Tiles drawer when the simulation ends.
