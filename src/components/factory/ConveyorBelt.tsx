@@ -111,6 +111,9 @@ import {
 } from "../../lib/params";
 /** Phase 4: buffering threshold before visual engine starts consuming snapshots */
 import { MIN_BUFFERED_BEFORE_PLAY } from "../../lib/params/simulation";
+/** Extracted conveyor helpers */
+import type { PartData } from "./conveyorHelpers/types";
+import { useStationQueue } from "./conveyorHelpers/useStationQueue";
 
 // ── Pre-allocated scratch vectors (avoid GC in useFrame) ───────────
 // These are module-level singletons, reused every frame.
@@ -158,66 +161,7 @@ const releaseVec3 = (v: THREE.Vector3) => {
   _vec3Pool.push(v);
 };
 
-/**
- * Internal data for a single tile on the conveyor belt.
- * This is NOT a React component — it's a plain data object
- * managed imperatively inside PartSpawner's useFrame loop.
- */
-interface PartData {
-  /** Unique tile ID (matches P-Clock count at spawn time) */
-  id: number;
-  /** Normalized position on the spline curve (0→1). 0=start, 1=end of line */
-  t: number;
-  /** Whether this tile was flagged as defective at the sorting station */
-  isDefected: boolean;
-  /** Whether this tile has started its sort-to-waste-bin animation */
-  isSorted: boolean;
-  /** Sort animation progress (0→1). At 1.0, tile is removed */
-  sortProgress: number;
-  /** Whether this tile has started its collect-to-shipment animation */
-  isCollected: boolean;
-  /** Collect animation progress (0→1). At 1.0, tile is removed */
-  collectProgress: number;
-  /** Whether this tile has been flagged as second quality by the data layer */
-  isSecondQuality: boolean;
-  /** Whether this tile has started its sort-to-2nd-quality-box animation */
-  isSecondQualitySorted: boolean;
-  /** Second quality animation progress (0→1). At 1.0, tile is removed */
-  secondQualityProgress: number;
-  /** Snapshot of tile's world position when sort/collect begins (pooled) */
-  originalPos: THREE.Vector3;
-  /** Current visual scale (0→1). Animated on spawn for a grow-in effect */
-  scale: number;
-  /** How the tile's collect animation should position relative to Y axis.
-   * Computed at collect-start time from the current shipmentCount so each
-   * tile lands exactly on top of the previous one in the visible stack. */
-  collectTargetY: number;
-  /** Whether this tile is currently waiting in the dryer FIFO queue */
-  isQueued: boolean;
-  /** Whether this tile has already passed through the Dryer station */
-  hasVisitedDryer: boolean;
-  /** Whether this tile is currently waiting in the Kiln FIFO queue */
-  isKilnQueued: boolean;
-  /** Whether this tile has already passed through the Kiln station */
-  hasVisitedKiln: boolean;
-  /**
-   * High-resolution timestamp (performance.now()) when the tile entered
-   * either the Dryer or Kiln queue. Used to enforce minimum dwell time.
-   */
-  enteredQueueAt: number | null;
-  /**
-   * Whether this tile has started its per-station scrap arc animation
-   * (thrown from the station where the defect was detected to the waste bin).
-   * Set to true when the scrappedPartIds bridge flags the tile AND
-   * the scrap probability dice roll succeeds.
-   */
-  isScrapped: boolean;
-  /**
-   * Animation progress for the scrap arc (0→1).
-   * At 1.0, tile has reached the waste bin and is removed from partsRef.
-   */
-  scrapProgress: number;
-}
+// PartData type imported from ./conveyorHelpers/types
 
 /**
  * Part — Renders a single tile mesh on the conveyor belt.
@@ -539,15 +483,15 @@ function PartSpawner({
   const phase2FiredRef = useRef(false);
   /** Scoped logger for Phase 2 shutdown messages */
   const phase2Log = useRef(createLogger("Phase2"));
-  const dryerQueueRef = useRef<number[]>([]);
-  /** Tracks the ID of the last tile released from the dryer queue,
-   *  used for dynamic gap checking to prevent tile overlap. */
-  const lastReleasedIdRef = useRef<number | null>(null);
-  /** FIFO queue for the Kiln station — holds tile IDs awaiting firing. */
-  const kilnQueueRef = useRef<number[]>([]);
-  /** Tracks the ID of the last tile released from the Kiln queue,
-   *  used for dynamic gap checking to prevent tile overlap after the Kiln. */
-  const lastKilnReleasedIdRef = useRef<number | null>(null);
+  // ── Station FIFO queues (extracted into useStationQueue hook) ────────
+  const dryerQueue = useStationQueue(
+    { entryT: DRYER_ENTRY_T, releaseThreshold: DRYER_RELEASE_THRESHOLD, capacity: DRYER_QUEUE_CAPACITY, releaseSpacing: DRYER_RELEASE_SPACING, minDwellMs: DRYER_MIN_DWELL_MS, stationSpacing: STATION_SPACING, stationName: 'Dryer' },
+    'isQueued', 'hasVisitedDryer',
+  );
+  const kilnQueue = useStationQueue(
+    { entryT: KILN_ENTRY_T, releaseThreshold: KILN_RELEASE_THRESHOLD, capacity: KILN_QUEUE_CAPACITY, releaseSpacing: KILN_RELEASE_SPACING, minDwellMs: KILN_MIN_DWELL_MS, stationSpacing: STATION_SPACING, stationName: 'Kiln' },
+    'isKilnQueued', 'hasVisitedKiln',
+  );
 
   /**
    * 1-slot virtual occupant for each pass-through station.
@@ -565,13 +509,8 @@ function PartSpawner({
   // Reset queues on session start (id=0) to prevent stale IDs from being released.
   useEffect(() => {
     if (pClockCount === 0) {
-      /** Clear Dryer queue internal array */
-      dryerQueueRef.current = [];
-      /** Clear Kiln queue internal array */
-      kilnQueueRef.current = [];
-      /** Reset gap-check tracking for a clean start */
-      lastReleasedIdRef.current = null;
-      lastKilnReleasedIdRef.current = null;
+      dryerQueue.clear();
+      kilnQueue.clear();
       /** Clear all 1-slot station occupants for a fresh simulation run */
       stationOccupantRef.current.fill(null);
       /** Reset Phase 2 one-shot guard for the new run */
@@ -598,9 +537,8 @@ function PartSpawner({
   // Reset dryer/kiln release tracking when belt stops or enters jammed
   useEffect(() => {
     if (status === "stopped" || status === "jammed") {
-      lastReleasedIdRef.current = null;
-      /** Also reset Kiln release tracking so a fresh gap-check starts on resume. */
-      lastKilnReleasedIdRef.current = null;
+      dryerQueue.clear();
+      kilnQueue.clear();
       /**
        * Reset Phase 2 one-shot guard whenever the belt enters 'stopped'.
        *
@@ -632,48 +570,44 @@ function PartSpawner({
       const loc = useSimulationStore.getState().jamLocation;
       const remaining = useSimulationStore.getState().jamScrapsRemaining;
 
-      if (loc === "dryer" && dryerQueueRef.current.length > 0) {
+      if (loc === "dryer" && dryerQueue.size > 0) {
         /** Scrap tiles from the Dryer queue (pop from queue, mark as scrapped) */
-        const toScrap = Math.min(remaining, dryerQueueRef.current.length);
+        const toScrap = Math.min(remaining, dryerQueue.size);
         for (let i = 0; i < toScrap; i++) {
-          const tileId = dryerQueueRef.current.shift()!;
+          const tileId = dryerQueue.queueRef.current![i];
           const tile = partsRef.current.get(tileId);
           if (tile) {
-            /** Make tile visible at station position, then arc to bin */
             tile.isQueued = false;
             tile.isScrapped = true;
             tile.scrapProgress = 0;
-            tile.originalPos.copy(
-              curve.getPointAt(JAM_LOCATION_T_POSITIONS.dryer),
-            );
+            tile.originalPos.copy(curve.getPointAt(JAM_LOCATION_T_POSITIONS.dryer));
             tile.t = JAM_LOCATION_T_POSITIONS.dryer;
-            /** Jam scrap counters — these remain as direct store calls for jam visuals */
             useSimulationStore.getState().incrementScrapCount();
             useSimulationStore.getState().incrementWasteCount();
             decrementJamScraps();
           }
         }
-      } else if (loc === "kiln" && kilnQueueRef.current.length > 0) {
+        /** Remove scrapped tiles from the queue front */
+        dryerQueue.queueRef.current!.splice(0, toScrap);
+      } else if (loc === "kiln" && kilnQueue.size > 0) {
         /** Scrap tiles from the Kiln queue (pop from queue, mark as scrapped) */
-        const toScrap = Math.min(remaining, kilnQueueRef.current.length);
+        const toScrap = Math.min(remaining, kilnQueue.size);
         for (let i = 0; i < toScrap; i++) {
-          const tileId = kilnQueueRef.current.shift()!;
+          const tileId = kilnQueue.queueRef.current![i];
           const tile = partsRef.current.get(tileId);
           if (tile) {
-            /** Make tile visible at station position, then arc to bin */
             tile.isKilnQueued = false;
             tile.isScrapped = true;
             tile.scrapProgress = 0;
-            tile.originalPos.copy(
-              curve.getPointAt(JAM_LOCATION_T_POSITIONS.kiln),
-            );
+            tile.originalPos.copy(curve.getPointAt(JAM_LOCATION_T_POSITIONS.kiln));
             tile.t = JAM_LOCATION_T_POSITIONS.kiln;
-            /** Jam scrap counters — these remain as direct store calls for jam visuals */
             useSimulationStore.getState().incrementScrapCount();
             useSimulationStore.getState().incrementWasteCount();
             decrementJamScraps();
           }
         }
+        /** Remove scrapped tiles from the queue front */
+        kilnQueue.queueRef.current!.splice(0, toScrap);
       }
 
       /**
@@ -689,130 +623,8 @@ function PartSpawner({
     prevStatusRef.current = status;
   }, [status]);
 
-  // ═══════════════════════════════════════════════════════════════════
-  // QUEUE RELEASE HELPERS (called from useFrame — no useEffect race)
-  // ═══════════════════════════════════════════════════════════════════
-  //
-  // Three release modes:
-  //   1. NORMAL: triggered when a new tile enters the queue AND
-  //      queue.length > threshold. Gap-check applies.
-  //   2. FORCE: triggered when queue.length >= capacity (headroom full).
-  //      Gap-check bypassed to prevent unbounded growth.
-  //   3. DRAIN: triggered when pressLimitReached=true (post-production).
-  //      Releases tiles even without new entries. Gap-check applies.
-  //
-  // By running release inside useFrame (same frame as entry), we guarantee
-  // atomic one-in → one-out semantics with zero timing race.
-
-  /**
-   * releaseFromDryer — Attempt to shift the oldest tile out of the
-   * Dryer FIFO queue and place it back on the belt.
-   *
-   * @param bypassGap - When true (force-release), skip the dynamic
-   *   gap check. When false, verify sufficient clearance from the
-   *   last released tile before proceeding.
-   * @returns true if a tile was released, false if gap-blocked or queue empty.
-   */
-  const releaseFromDryerRef = useRef((bypassGap: boolean): boolean => {
-    /**
-     * Gap check: only release if there's enough space on the belt after
-     * the Dryer station (STATION_STAGES[1]) to accommodate the new tile.
-     */
-    const parts = Array.from(partsRef.current.values());
-    const isGapClear =
-      bypassGap ||
-      !parts.some(
-        (p) =>
-          !p.isQueued &&
-          !p.isKilnQueued &&
-          p.t > DRYER_ENTRY_T &&
-          p.t < DRYER_ENTRY_T + STATION_SPACING,
-      );
-
-    if (isGapClear) {
-      /** Dwell time check: enforce minimum duration inside the machine to prevent instant jumps. */
-      const headId = dryerQueueRef.current[0]; // Retrieve the ID of the oldest tile in the FIFO queue.
-      if (headId !== undefined) {
-        const headPart = partsRef.current.get(headId); // Look up the actual part data using the ID.
-        if (headPart?.enteredQueueAt) {
-          /** Calculate how long the tile has been inside the Dryer station. */
-          const elapsed = performance.now() - headPart.enteredQueueAt;
-          /** If the minimum dwell time hasn't been reached, skip release to avoid visual artifacts. */
-          if (elapsed < DRYER_MIN_DWELL_MS) return false;
-        }
-      }
-
-      const releasedId = dryerQueueRef.current.shift();
-      if (releasedId === undefined) return false;
-      const part = partsRef.current.get(releasedId);
-      if (!part) return false;
-      /** Un-queue: tile resumes normal belt movement. */
-      part.isQueued = false;
-      /** Position tile at the Dryer's right edge (x ≈ -10). */
-      part.t = DRYER_ENTRY_T + DRYER_RELEASE_SPACING;
-      /** Full size immediately — the Part visibility gate handles the hide/show. */
-      part.scale = 1;
-      /** Track for next gap check. */
-      lastReleasedIdRef.current = releasedId;
-      return true;
-    }
-    return false;
-  });
-
-  /**
-   * releaseFromKiln — Attempt to shift the oldest tile out of the
-   * Kiln FIFO queue and place it back on the belt.
-   *
-   * @param bypassGap - When true (force-release), skip the dynamic
-   *   gap check. When false, verify sufficient clearance.
-   * @returns true if a tile was released, false if gap-blocked or queue empty.
-   */
-  const releaseFromKilnRef = useRef((bypassGap: boolean): boolean => {
-    /**
-     * Gap check: only release if there's enough space on the belt after
-     * the Kiln station (STATION_STAGES[4]) to accommodate the new tile.
-     * Positions around t=0.3125 (KILN_ENTRY_T).
-     */
-    const parts = Array.from(partsRef.current.values());
-    const isGapClear =
-      bypassGap ||
-      !parts.some(
-        (p) =>
-          !p.isQueued &&
-          !p.isKilnQueued &&
-          p.t > KILN_ENTRY_T &&
-          p.t < KILN_ENTRY_T + STATION_SPACING,
-      );
-
-    if (isGapClear) {
-      /** Dwell time check: prevent the 'instant teleport' glitch by enforcing a minimum kiln time. */
-      const headId = kilnQueueRef.current[0]; // Access the first tile in the Kiln's internal FIFO queue.
-      if (headId !== undefined) {
-        const headPart = partsRef.current.get(headId); // Fetch metadata for the oldest tile in the kiln.
-        if (headPart?.enteredQueueAt) {
-          /** Determine total duration residency by comparing current time to entry timestamp. */
-          const elapsed = performance.now() - headPart.enteredQueueAt;
-          /** Abort release if minimum dwell time isn't met (ensures cinematic processing flow). */
-          if (elapsed < KILN_MIN_DWELL_MS) return false;
-        }
-      }
-
-      const releasedId = kilnQueueRef.current.shift();
-      if (releasedId === undefined) return false;
-      const part = partsRef.current.get(releasedId);
-      if (!part) return false;
-      /** Un-queue: tile resumes normal belt movement. */
-      part.isKilnQueued = false;
-      /** Position tile at the Kiln's right edge (x ≈ 4.5). */
-      part.t = KILN_ENTRY_T + KILN_RELEASE_SPACING;
-      /** Full size immediately — the Part visibility gate handles the hide/show. */
-      part.scale = 1;
-      /** Track for next gap check. */
-      lastKilnReleasedIdRef.current = releasedId;
-      return true;
-    }
-    return false;
-  });
+  // Queue release logic is now inside useStationQueue.tryRelease()
+  // — called from useFrame below (same algorithm: gap-check → dwell → shift → reposition)
 
   useEffect(() => {
     /**
@@ -998,12 +810,12 @@ function PartSpawner({
     // Reordered to the top of useFrame to prevent same-frame pop-in issues.
     if (useWorkOrderStore.getState().pressLimitReached || isDraining) {
       /** Drain Dryer queue — one tile per frame with gap-check. */
-      if (dryerQueueRef.current.length > 0) {
-        releaseFromDryerRef.current(false);
+      if (dryerQueue.size > 0) {
+        dryerQueue.tryRelease(false, partsRef);
       }
       /** Drain Kiln queue — one tile per frame with gap-check. */
-      if (kilnQueueRef.current.length > 0) {
-        releaseFromKilnRef.current(false);
+      if (kilnQueue.size > 0) {
+        kilnQueue.tryRelease(false, partsRef);
       }
     }
 
@@ -1085,11 +897,11 @@ function PartSpawner({
        * not ready). The drain-mode block above handles post-production
        * flushing without threshold checks.
        */
-      if (dryerQueueRef.current.length > DRYER_RELEASE_THRESHOLD) {
-        releaseFromDryerRef.current(false);
+      if (dryerQueue.size > DRYER_RELEASE_THRESHOLD) {
+        dryerQueue.tryRelease(false, partsRef);
       }
-      if (kilnQueueRef.current.length > KILN_RELEASE_THRESHOLD) {
-        releaseFromKilnRef.current(false);
+      if (kilnQueue.size > KILN_RELEASE_THRESHOLD) {
+        kilnQueue.tryRelease(false, partsRef);
       }
 
       const idsToRemove: number[] = [];
@@ -1152,17 +964,11 @@ function PartSpawner({
          * one-in → one-out semantics when queue > threshold.
          */
         if (p.t >= DRYER_ENTRY_T && !p.hasVisitedDryer && !p.isQueued) {
-          p.isQueued = true;
-          p.hasVisitedDryer = true;
-          p.enteredQueueAt = performance.now();
-          p.t = DRYER_ENTRY_T; // Snap to entry point
-          /** Visibility gate in Part component handles hiding. */
-          dryerQueueRef.current.push(id);
+          dryerQueue.enqueue(id, p);
 
-          if (dryerQueueRef.current.length > DRYER_RELEASE_THRESHOLD) {
-            const isForce =
-              dryerQueueRef.current.length >= DRYER_QUEUE_CAPACITY;
-            releaseFromDryerRef.current(isForce);
+          if (dryerQueue.size > DRYER_RELEASE_THRESHOLD) {
+            const isForce = dryerQueue.size >= DRYER_QUEUE_CAPACITY;
+            dryerQueue.tryRelease(isForce, partsRef);
           }
           /** Stop frame processing for this tile once queued. */
           return;
@@ -1174,17 +980,11 @@ function PartSpawner({
          * station thresholds in a single frame.
          */
         if (p.t >= KILN_ENTRY_T && !p.hasVisitedKiln && !p.isKilnQueued) {
-          p.isKilnQueued = true;
-          p.hasVisitedKiln = true;
-          p.enteredQueueAt = performance.now();
-          p.t = KILN_ENTRY_T; // Snap to Kiln entry point
-          /** Visibility gate in Part component handles hiding. */
-          kilnQueueRef.current.push(id);
+          kilnQueue.enqueue(id, p);
 
-          if (kilnQueueRef.current.length > KILN_RELEASE_THRESHOLD) {
-            /** Force-release when queue grows beyond capacity (safety valve) */
-            const isForce = kilnQueueRef.current.length >= KILN_QUEUE_CAPACITY;
-            releaseFromKilnRef.current(isForce);
+          if (kilnQueue.size > KILN_RELEASE_THRESHOLD) {
+            const isForce = kilnQueue.size >= KILN_QUEUE_CAPACITY;
+            kilnQueue.tryRelease(isForce, partsRef);
           }
           /** Stop frame processing for this tile once queued. */
           return;
@@ -1379,18 +1179,18 @@ function PartSpawner({
     //   Including all 40+ queued tiles at the same t would pollute the array
     //   with redundant entries. One representative (the oldest, currently being
     //   "processed") is sufficient for both the table and the station light.
-    if (dryerQueueRef.current.length > 0) {
+    if (dryerQueue.size > 0) {
       /** Dryer queue head — the tile currently being dried (oldest in FIFO). */
-      const dryerHeadId = dryerQueueRef.current[0];
+      const dryerHeadId = dryerQueue.queueRef.current![0];
       const dryerHead = partsRef.current.get(dryerHeadId);
       if (dryerHead) {
         posArr.push(dryerHead.t); // snapped to DRYER_ENTRY_T = STATION_STAGES[1]
         idArr.push(dryerHead.id);
       }
     }
-    if (kilnQueueRef.current.length > 0) {
+    if (kilnQueue.size > 0) {
       /** Kiln queue head — the tile currently being fired (oldest in FIFO). */
-      const kilnHeadId = kilnQueueRef.current[0];
+      const kilnHeadId = kilnQueue.queueRef.current![0];
       const kilnHead = partsRef.current.get(kilnHeadId);
       if (kilnHead) {
         posArr.push(kilnHead.t); // snapped to KILN_ENTRY_T = STATION_STAGES[4]
