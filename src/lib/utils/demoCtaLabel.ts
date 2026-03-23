@@ -9,8 +9,8 @@
  *  2. Reused across different UI components if needed.
  *
  * Priority order:
- *   1. isLastAct   → '↺ Restart' / '↺ Yeniden Başlat'
- *   2. ctaLabel    → the step's configured label (if non-empty, resolved to lang)
+ *   1. ctaLabel    → the step's configured label (always takes priority)
+ *   2. isLastAct   → '↺ Restart' / '↺ Yeniden Başlat' (fallback when no label)
  *   3. ctaStepIndex === 0 → '▶ Start' / '▶ Başla'
  *   4. default → 'Next ›' / 'İleri ›'
  *
@@ -48,16 +48,22 @@ export interface CtaLabelArgs {
 /**
  * deriveCtaButtonLabel — pure function for the CTA button label.
  *
+ * Priority order:
+ *   1. Step's explicit ctaLabel (e.g. "Thank you!") — always respected
+ *   2. isLastAct fallback       → '↺ Restart' (only when step has no custom label)
+ *   3. ctaStepIndex === 0       → '▶ Start'
+ *   4. default                  → 'Next ›'
+ *
  * @param args - Current act/step context
  * @returns  The string to show on the CTA button
  */
 export function deriveCtaButtonLabel({ isLastAct, ctaStepIndex, currentStep, lang }: CtaLabelArgs): string {
-    /** Final act overrides everything — presenter can only restart */
-    if (isLastAct) return lang === 'tr' ? '\u21ba Yeniden Başlat' : '\u21ba Restart';
-
-    /** Step has an explicit custom label configured — resolve to current language */
+    /** Step has an explicit custom label configured — ALWAYS takes priority */
     const resolved = resolveText(currentStep?.ctaLabel as I18nText | string | undefined, lang);
     if (resolved) return resolved;
+
+    /** Final act with no custom label — show restart */
+    if (isLastAct) return lang === 'tr' ? '\u21ba Yeniden Başlat' : '\u21ba Restart';
 
     /** First click of the act — show Start to signal demo can begin */
     if (ctaStepIndex === 0) return lang === 'tr' ? '\u25b6 Başla' : '\u25b6 Start';

@@ -5,13 +5,12 @@
  * (src/lib/utils/demoCtaLabel.ts).
  *
  * Covers all label priority cases:
- *   1. isLastAct = true → always '↺ Restart' (EN) / '↺ Yeniden Başlat' (TR)
- *   2. currentStep.ctaLabel set → use custom label (resolved to language)
+ *   1. currentStep.ctaLabel set → use custom label (always takes priority)
+ *   2. isLastAct = true, no ctaLabel → '↺ Restart' / '↺ Yeniden Başlat'
  *   3. ctaStepIndex === 0, no ctaLabel → '▶ Start' / '▶ Başla'
  *   4. ctaStepIndex > 0, no ctaLabel → 'Next ›' / 'İleri ›'
  *   5. Empty string ctaLabel → falls through to index-based default
- *   6. Custom label overrides even later steps
- *   7. I18nText object resolves to the correct language
+ *   6. Custom label on last act → uses the custom label, NOT Restart
  */
 
 import { describe, it, expect } from 'vitest';
@@ -20,25 +19,43 @@ import { deriveCtaButtonLabel } from '../lib/utils/demoCtaLabel';
 describe('deriveCtaButtonLabel', () => {
 
     describe('isLastAct = true (English)', () => {
-        it('returns "↺ Restart" regardless of step index', () => {
+        it('returns "↺ Restart" when no custom ctaLabel is set', () => {
             expect(deriveCtaButtonLabel({ isLastAct: true, ctaStepIndex: 0, lang: 'en' })).toBe('↺ Restart');
             expect(deriveCtaButtonLabel({ isLastAct: true, ctaStepIndex: 3, lang: 'en' })).toBe('↺ Restart');
         });
 
-        it('ignores any configured ctaLabel on the last act', () => {
-            /** Even if a step has a custom label, last act always shows Restart */
+        it('uses custom ctaLabel even on the last act', () => {
+            /** Custom label takes priority — e.g. "Thank you!" on the Close act */
             expect(deriveCtaButtonLabel({
                 isLastAct: true,
                 ctaStepIndex: 0,
-                currentStep: { ctaLabel: 'Do not use me' },
+                currentStep: { ctaLabel: 'Thank you!' },
                 lang: 'en',
-            })).toBe('↺ Restart');
+            })).toBe('Thank you!');
+        });
+
+        it('resolves I18nText ctaLabel on last act', () => {
+            expect(deriveCtaButtonLabel({
+                isLastAct: true,
+                ctaStepIndex: 0,
+                currentStep: { ctaLabel: { en: 'Thank you!', tr: 'Teşekkürler!' } },
+                lang: 'en',
+            })).toBe('Thank you!');
         });
     });
 
     describe('isLastAct = true (Turkish)', () => {
-        it('returns "↺ Yeniden Başlat" in Turkish', () => {
+        it('returns "↺ Yeniden Başlat" when no custom ctaLabel', () => {
             expect(deriveCtaButtonLabel({ isLastAct: true, ctaStepIndex: 0, lang: 'tr' })).toBe('↺ Yeniden Başlat');
+        });
+
+        it('resolves I18nText ctaLabel to Turkish on last act', () => {
+            expect(deriveCtaButtonLabel({
+                isLastAct: true,
+                ctaStepIndex: 0,
+                currentStep: { ctaLabel: { en: 'Thank you!', tr: 'Teşekkürler!' } },
+                lang: 'tr',
+            })).toBe('Teşekkürler!');
         });
     });
 
