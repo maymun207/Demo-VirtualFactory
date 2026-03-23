@@ -19,8 +19,8 @@
  *
  * Used by: main.tsx
  */
-import { useEffect } from "react";
-import { Scene } from "./components/factory/Scene";
+import { useEffect, lazy, Suspense } from "react";
+const Scene = lazy(() => import("./components/factory/Scene").then(m => ({ default: m.Scene })));
 import { Dashboard } from "./components/ui/Dashboard";
 import { CWFChatPanel } from "./components/ui/CWFChatPanel";
 import { DTXFRPanel } from "./components/ui/DTXFRPanel";
@@ -157,7 +157,13 @@ function App() {
         >
           {/* Logic-only: data-layer tick loop + Supabase sync (renders null) */}
           <SimulationRunner />
-          <Scene />
+          <Suspense fallback={
+            <div className="flex-1 h-full flex items-center justify-center bg-black">
+              <div className="text-gray-500 text-sm">Loading 3D scene…</div>
+            </div>
+          }>
+            <Scene />
+          </Suspense>
           <Dashboard />
         </div>
 

@@ -5,7 +5,9 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  /** Suppress chunk size warnings — Three.js and 3D libs produce large bundles. */
+  /** Three.js core (~800kB minified) cannot be split further, even with lazy loading.
+   *  Keep limit above Three.js chunk size to avoid false build warnings.
+   *  Scene.tsx is lazy-loaded so Three.js loads AFTER initial paint. */
   build: {
     chunkSizeWarningLimit: 1800,
   },
