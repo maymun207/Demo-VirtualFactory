@@ -50,8 +50,7 @@
     "vite": "^7.2.4",
     "vitest": "^4.0.18"
   },
-  "description": "",
-  "main": "eslint.config.js",
+  "description": "Interactive 3D ceramic tile factory simulation with real-time OEE analytics, AI-powered root cause analysis (CWF), and Supabase-synced digital twin telemetry",
   "directories": {
     "doc": "docs"
   },
@@ -59,8 +58,8 @@
     "type": "git",
     "url": "git+https://github.com/maymun207/Demo-VirtualFactory.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["digital-twin", "smart-factory", "oee", "ceramic-tiles", "react", "three-js", "supabase", "ai-agent"],
+  "author": "ARDICTECH",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/maymun207/Demo-VirtualFactory/issues"
