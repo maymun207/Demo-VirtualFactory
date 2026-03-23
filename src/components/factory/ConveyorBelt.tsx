@@ -374,8 +374,13 @@ function Part({
         meshRef.current.scale.set(1, 1, 1);
       }
     } else {
-      const point = curve.getPointAt(data.t);
-      const tangent = curve.getTangentAt(data.t);
+      /** Guard: clamp t to [0,1] and skip if NaN — prevents CatmullRomCurve3
+       *  crash when the tile's parameter drifts out of bounds. */
+      const safeT = Math.max(0, Math.min(1, data.t));
+      if (!Number.isFinite(safeT)) return;
+      const point = curve.getPointAt(safeT);
+      const tangent = curve.getTangentAt(safeT);
+      if (!point || !tangent) return;
       meshRef.current.position.copy(point);
       meshRef.current.position.y += TILE_Y_OFFSET;
       // Yaw-only rotation: keeps tile FLAT on the belt (no X/Z tilt)
