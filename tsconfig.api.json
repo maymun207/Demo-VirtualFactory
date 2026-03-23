@@ -22,5 +22,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["api", "src/lib/params/parameterRanges.ts", "src/store/types.ts"]
+  "include": ["api", "shared", "src/lib/params/parameterRanges.ts", "src/store/types.ts"]
 }

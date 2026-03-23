@@ -30,113 +30,29 @@ import { fetchKnowledgeBase } from './cwfKnowledgeDocs.js';
 import { generateSchemaRangesText, generateSafeRangesText, generateParameterGlossary } from './cwfParameterRanges.js';
 
 // =============================================================================
-// CWF AGENT CONFIGURATION
-// These constants mirror src/lib/params/cwfAgent.ts.  The api/ folder is
-// compiled separately (tsconfig.api.json) and cannot import from src/.
-// Keep the two files in sync when changing tunables.
+// CWF AGENT CONFIGURATION — single source of truth from shared/
 // =============================================================================
 
-/** Maximum Gemini tool-use round-trips before forced summarisation */
-const CWF_MAX_TOOL_LOOPS = 12;
-
-/** Maximum retries when Gemini returns an empty response (0 text parts) */
-const CWF_EMPTY_RESPONSE_MAX_RETRIES = 2;
-
-/** Base delay in ms before each retry (multiplied by attempt number for backoff) */
-const CWF_RETRY_BASE_DELAY_MS = 1000;
-
-/** Gemini model identifier */
-const CWF_MODEL_NAME = 'gemini-2.5-flash';
-
-/** Model version tag persisted in ai_analysis_results */
-const CWF_MODEL_VERSION_TAG = 'gemini-2.5-flash-cwf-v1';
-
-/** Fallback when agent produces no text (English) */
-const CWF_FALLBACK_RESPONSE_EN =
-    '⚠️ I gathered data from the database but could not generate a complete answer. ' +
-    'Please try again or rephrase your question with more specific details.';
-
-/** Fallback when agent produces no text (Turkish) */
-const CWF_FALLBACK_RESPONSE_TR =
-    '⚠️ Veritabanından veri topladım ancak tam bir yanıt oluşturamadım. ' +
-    'Lütfen tekrar deneyin veya sorunuzu daha spesifik ayrıntılarla yeniden ifade edin.';
-
-/** Forced-summary prompt injected when loop limit is hit (English) */
-const CWF_FORCE_SUMMARY_PROMPT_EN =
-    'You have reached the maximum number of tool calls. ' +
-    'Please provide your best answer now using ONLY the data you have already collected. ' +
-    'Do NOT request any more tool calls. Summarise your findings clearly.';
-
-/**
- * Unique sentinel prefix prepended to every force-summary / retry injection.
- * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_FORCE_SUMMARY_SENTINEL
- * The history sanitizer detects this prefix in user turns and removes them.
- */
-const CWF_FORCE_SUMMARY_SENTINEL = '[[CWF_FORCE_SUMMARY]]';
-
-/**
- * Fingerprint substring used to detect force-summary contamination in
- * ASSISTANT messages. When Gemini quotes the force-summary instruction back
- * (e.g. "as per your instruction to 'Do NOT call any tools'"), this fingerprint
- * identifies those contaminated assistant turns for removal from history.
- * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_FORCE_SUMMARY_FINGERPRINT
- */
-const CWF_FORCE_SUMMARY_FINGERPRINT = 'Do NOT';
-
-/**
- * Fingerprint for the retry prompt contamination path.
- * The retry prompt text "Answer NOW using all the data you already collected"
- * can also appear quoted back in Gemini assistant responses.
- * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_RETRY_PROMPT_FINGERPRINT
- */
-const CWF_RETRY_PROMPT_FINGERPRINT = 'Answer NOW using all the data';
-
-/**
- * Auth-turn fast-path system instruction injected when the user message
- * is the authorization code. Tells Gemini to execute immediately with ONE
- * tool call rather than re-querying state (which burns loops and can hit
- * CWF_MAX_TOOL_LOOPS before the actual execution tool is called).
- * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_AUTH_FAST_PATH_PROMPT_EN
- */
-const CWF_AUTH_FAST_PATH_PROMPT_EN = `
-## ⚡ AUTHORIZATION TURN — EXECUTE NOW
-
-The user has just provided their authorization response. This is the execution step for a pending machine parameter change.
-
-**YOU MUST do exactly this, in order:**
-1. Call update_parameter ONCE, immediately, using:
-   - All parameter values (station, parameter, old_value, new_value, reason) from the conversation history above
-   - authorized_by = the exact text the user just typed (verbatim, no modifications)
-2. Do NOT query the database again — you already have the values.
-3. Do NOT evaluate whether the auth code looks correct — call the tool and the server validates.
-4. Do NOT generate any text before the tool call — just call the tool.
-5. After the tool returns, report the result in one line.
-
-Example: if the user typed "ardic", call update_parameter with authorized_by="ardic" immediately.
-`;
-
-const CWF_AUTH_FAST_PATH_PROMPT_TR = `
-## ⚡ YETKİLENDİRME TURU — HEMEN UYGULA
-
-Kullanıcı yetkisini az önce sağladı. Bu bekleyen makine parametre değişikliği için uygulama adımıdır.
-
-**BU SIRAYA GÖRE YAPMANIZ GEREKENLER:**
-1. update_parameter'ı hemen, bir kez çağırın:
-   - Tüm parametre değerlerini (station, parameter, old_value, new_value, reason) yukarıdaki konuşma geçmişinden alın
-   - authorized_by = kullanıcının yazdığı tam metin (değiştirmeden)
-2. Veritabanını tekrar sorgulamayın — değerlere zaten sahipsiniz.
-3. Yetki kodunun doğru görünüp görünmediğini değerlendirmeyin — aracı çağırın, sunucu doğrular.
-4. Araç çağrısından önce herhangi bir metin oluşturmayın — sadece aracı çağırın.
-5. Araç döndükten sonra sonucu tek satırda raporlayın.
-
-Örnek: kullanıcı "ardic" yazdıysa, hemen authorized_by="ardic" ile update_parameter'ı çağırın.
-`;
+import {
+    CWF_MAX_TOOL_LOOPS,
+    CWF_EMPTY_RESPONSE_MAX_RETRIES,
+    CWF_RETRY_BASE_DELAY_MS,
+    CWF_MODEL_NAME,
+    CWF_MODEL_VERSION_TAG,
+    CWF_FALLBACK_RESPONSE_EN,
+    CWF_FALLBACK_RESPONSE_TR,
+    CWF_FORCE_SUMMARY_PROMPT_EN,
+    CWF_FORCE_SUMMARY_PROMPT_TR,
+    CWF_FORCE_SUMMARY_SENTINEL,
+    CWF_FORCE_SUMMARY_FINGERPRINT,
+    CWF_RETRY_PROMPT_FINGERPRINT,
+    CWF_AUTH_FAST_PATH_PROMPT_EN,
+    CWF_AUTH_FAST_PATH_PROMPT_TR,
+    CWF_PARAMETER_DISPLAY_PROMPT,
+} from '../../shared/cwfConstants';
 
 // =============================================================================
-// CWF PARAMETER CONTROL — Human-in-the-Loop Auth Code
-// Mirror of CWF_AUTH_CODE from src/lib/params/cwfCommands.ts.
-// The api/ folder is compiled separately (tsconfig.api.json) and cannot
-// import from src/. Keep the two files in sync.
+// API-ONLY CONSTANTS (not shared with client)
 // =============================================================================
 
 /** Authorization code for CWF parameter changes (human-in-the-loop) */
@@ -147,14 +63,11 @@ const CWF_AUTH_CODE = 'ardic';
  * (toggle panels, start/stop simulation, etc.) that do NOT require human
  * authorization. Distinguishes UI-action rows from operator-authorized
  * parameter-change rows in the audit trail.
- * SOURCE OF TRUTH: src/lib/params/cwfAgent.ts — CWF_UI_ACTION_BYPASS_AUTH
  */
 const CWF_UI_ACTION_BYPASS_AUTH = 'system:ui_action_no_auth_required';
 
 /**
  * Valid station names for CWF commands.
- * MIRROR of CWF_VALID_STATIONS in src/lib/params/cwfCommands.ts.
- * Must be kept in sync — api/ cannot import from src/.
  * Includes the 7 production stations PLUS the conveyor belt (8th station).
  */
 const CWF_VALID_STATIONS = [
@@ -165,112 +78,14 @@ const CWF_VALID_STATIONS = [
 
 /**
  * Maximum time (ms) the server waits for the client to acknowledge a parameter
- * change. Mirror of CWF_ACK_WAIT_MS from src/lib/params/cwfCommands.ts.
- * Keep the two in sync — the api/ folder cannot import from src/.
+ * change.
  */
 const CWF_ACK_WAIT_MS = 5_000;
 
 /**
  * How often (ms) the server polls cwf_commands.status for client acknowledgment.
- * Mirror of CWF_ACK_POLL_MS from src/lib/params/cwfCommands.ts.
  */
 const CWF_ACK_POLL_MS = 500;
-
-/** Forced-summary prompt injected when loop limit is hit (Turkish) */
-const CWF_FORCE_SUMMARY_PROMPT_TR =
-    'Maksimum araç çağrısı sayısına ulaştınız. ' +
-    'Lütfen şu ana kadar topladığınız verilerle en iyi yanıtınızı verin. ' +
-    'Daha fazla araç çağrısı yapmayın. Bulgularınızı net bir şekilde özetleyin.';
-
-// =============================================================================
-// PARAMETER DISPLAY PROMPT (Mirrored from src/lib/params/cwfAgent.ts)
-// =============================================================================
-
-/**
- * Tells Gemini to translate raw DB column names into human-readable labels.
- * This is a MIRROR of CWF_PARAMETER_DISPLAY_PROMPT in cwfAgent.ts.
- * Keep the two in sync — the api/ folder cannot import from src/.
- */
-const CWF_PARAMETER_DISPLAY_PROMPT = `## PARAMETER DISPLAY NAMES — MANDATORY
-When presenting machine parameters to the user, you MUST NEVER use raw database column names.
-Always translate them to the human-readable label from the table below.
-Use the label that matches the session language (EN or TR).
-
-**Examples:**
-- ❌ WRONG: "pressure_bar was 350"
-- ✅ RIGHT: "Pressure was 350 bar"
-- ❌ WRONG: "exit_moisture_pct is 1.2"
-- ✅ RIGHT: "Exit Moisture is 1.2%"
-- ❌ WRONG: "glaze_density_g_cm3 = 1.45"
-- ✅ RIGHT: "Glaze Density is 1.45 g/cm³"
-
-| Column Name | English Label | Turkish Label |
-|---|---|---|
-| pressure_bar | Pressure (bar) | Basınç (bar) |
-| cycle_time_sec | Cycle Time (sec) | Çevrim Süresi (sn) |
-| mold_temperature_c | Mould Temperature (°C) | Kalıp Sıcaklığı (°C) |
-| powder_moisture_pct | Powder Moisture (%) | Toz Nemi (%) |
-| fill_amount_g | Fill Amount (g) | Dolum Miktarı (g) |
-| mold_wear_pct | Mould Wear (%) | Kalıp Aşınması (%) |
-| pressure_deviation_pct | Pressure Deviation (%) | Basınç Sapması (%) |
-| fill_homogeneity_pct | Fill Homogeneity (%) | Dolum Homojenliği (%) |
-| inlet_temperature_c | Inlet Temperature (°C) | Giriş Sıcaklığı (°C) |
-| outlet_temperature_c | Outlet Temperature (°C) | Çıkış Sıcaklığı (°C) |
-| belt_speed_m_min | Belt Speed (m/min) | Bant Hızı (m/dk) |
-| drying_time_min | Drying Time (min) | Kurutma Süresi (dk) |
-| exit_moisture_pct | Exit Moisture (%) | Çıkış Nemi (%) |
-| fan_frequency_hz | Fan Frequency (Hz) | Fan Frekansı (Hz) |
-| temperature_gradient_c_m | Temperature Gradient (°C/m) | Sıcaklık Gradyanı (°C/m) |
-| drying_rate | Drying Rate | Kurutma Hızı |
-| moisture_homogeneity_pct | Moisture Homogeneity (%) | Nem Homojenliği (%) |
-| glaze_density_g_cm3 | Glaze Density (g/cm³) | Sır Yoğunluğu (g/cm³) |
-| glaze_viscosity_sec | Glaze Viscosity (sec) | Sır Viskozitesi (sn) |
-| application_weight_g_m2 | Application Weight (g/m²) | Uygulama Ağırlığı (g/m²) |
-| cabin_pressure_bar | Cabin Pressure (bar) | Kabin Basıncı (bar) |
-| nozzle_angle_deg | Nozzle Angle (°) | Nozül Açısı (°) |
-| glaze_temperature_c | Glaze Temperature (°C) | Sır Sıcaklığı (°C) |
-| weight_deviation_pct | Weight Deviation (%) | Ağırlık Sapması (%) |
-| nozzle_clog_pct | Nozzle Clog (%) | Nozül Tıkanıklığı (%) |
-| head_temperature_c | Head Temperature (°C) | Kafa Sıcaklığı (°C) |
-| ink_viscosity_mpa_s | Ink Viscosity (mPa·s) | Mürekkep Viskozitesi (mPa·s) |
-| drop_size_pl | Drop Size (pl) | Damla Boyutu (pl) |
-| resolution_dpi | Resolution (dpi) | Çözünürlük (dpi) |
-| head_gap_mm | Head Gap (mm) | Kafa Boşluğu (mm) |
-| color_channels | Colour Channels | Renk Kanalları |
-| active_nozzle_pct | Active Nozzle (%) | Aktif Nozül (%) |
-| ink_levels_pct | Ink Levels (%) | Mürekkep Seviyeleri (%) |
-| max_temperature_c | Max Temperature (°C) | Maks. Sıcaklık (°C) |
-| firing_time_min | Firing Time (min) | Pişirme Süresi (dk) |
-| preheat_gradient_c_min | Preheat Gradient (°C/min) | Ön Isıtma Gradyanı (°C/dk) |
-| cooling_gradient_c_min | Cooling Gradient (°C/min) | Soğutma Gradyanı (°C/dk) |
-| atmosphere_pressure_mbar | Atmosphere Pressure (mbar) | Atmosfer Basıncı (mbar) |
-| zone_count | Zone Count | Bölge Sayısı |
-| o2_level_pct | O₂ Level (%) | O₂ Seviyesi (%) |
-| zone_temperatures_c | Zone Temperatures (°C) | Bölge Sıcaklıkları (°C) |
-| temperature_deviation_c | Temperature Deviation (°C) | Sıcaklık Sapması (°C) |
-| gradient_balance_pct | Gradient Balance (%) | Gradyan Dengesi (%) |
-| zone_variance_c | Zone Variance (°C) | Bölge Varyansı (°C) |
-| camera_resolution_mp | Camera Resolution (MP) | Kamera Çözünürlüğü (MP) |
-| scan_rate_tiles_min | Scan Rate (tiles/min) | Tarama Hızı (karo/dk) |
-| size_tolerance_mm | Size Tolerance (mm) | Boyut Toleransı (mm) |
-| color_tolerance_de | Colour Tolerance (ΔE) | Renk Toleransı (ΔE) |
-| flatness_tolerance_mm | Flatness Tolerance (mm) | Düzlük Toleransı (mm) |
-| defect_threshold_mm2 | Defect Threshold (mm²) | Hata Eşiği (mm²) |
-| grade_count | Grade Count | Kalite Sınıfı Sayısı |
-| calibration_drift_pct | Calibration Drift (%) | Kalibrasyon Kayması (%) |
-| camera_cleanliness_pct | Camera Cleanliness (%) | Kamera Temizliği (%) |
-| stack_count | Stack Count | İstif Sayısı |
-| box_sealing_pressure_bar | Box Sealing Pressure (bar) | Kutu Mühürleme Basıncı (bar) |
-| pallet_capacity_m2 | Pallet Capacity (m²) | Palet Kapasitesi (m²) |
-| stretch_tension_pct | Stretch Tension (%) | Germe Gerilimi (%) |
-| robot_speed_cycles_min | Robot Speed (cycles/min) | Robot Hızı (çevrim/dk) |
-| label_accuracy_pct | Label Accuracy (%) | Etiket Doğruluğu (%) |
-| jammed_time | Jam Duration (cycles) | Sıkışma Süresi (çevrim) |
-| impacted_tiles | Tiles Scrapped Per Jam | Sıkışma Başı Hurda Karo |
-| scrap_probability | Scrap Probability (%) | Hurda Olasılığı (%) |
-| speed_change | Speed Change Events | Hız Değişimi Olayları |
-| jammed_events | Jam Events Enabled | Sıkışma Olayları Etkin |
-`;
 
 // =============================================================================
 // ENVIRONMENT & CLIENTS
