@@ -1399,13 +1399,26 @@ function PartSpawner({
        */
       executeShutdown('work_order_complete')
         .then(() => {
-          /** Step 5: UI actions — runs AFTER DB sync + pause (fresh data). */
-          useUIStore.getState().setSimConfigured(false);
-          useUIStore.getState().setSimulationEnded(true);
-          phase2Log.current.info("Simulation fully complete");
+          /**
+           * UI actions — ONLY after successful DB sync + session pause.
+           * Opening panels here guarantees KPI data is fresh (final sync
+           * completed) and prevents stale-data display if shutdown fails.
+           */
+          const ui = useUIStore.getState();
+          ui.setSimConfigured(false);
+          ui.setSimulationEnded(true);
+          /** Open analytical panels so user sees final KPI results */
+          if (!ui.showBasicPanel) ui.toggleBasicPanel();
+          if (!ui.showDTXFR) ui.toggleDTXFR();
+          phase2Log.current.info("Simulation fully complete — KPI panels opened");
         })
         .catch((err) => {
-          phase2Log.current.error("Phase 2 async shutdown failed:", err);
+          /**
+           * Shutdown failed (DB sync or session pause threw).
+           * The simulation is ALREADY stopped (synchronous stopDataFlow
+           * above), but panels remain closed to signal something went wrong.
+           */
+          phase2Log.current.error("Phase 2 shutdown failed — panels NOT opened:", err);
         });
     }
   });
