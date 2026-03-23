@@ -631,13 +631,15 @@ describe('Zustand ↔ Supabase Table Sync Consistency', () => {
             '20260309_copilot_tables.sql',
             // 2026-03-22: Allow machine_state_id to be NULL in tile_station_snapshots
             '20260322_make_machine_state_id_nullable.sql',
+            // 2026-03-23: Revoke anon EXECUTE on SECURITY DEFINER RPC functions
+            '20260323_revoke_anon_execute_readonly.sql',
         ];
 
         it('should have exactly the expected number of migration files', () => {
             /**
              * Ensures no migration files are accidentally added or deleted
              * without updating this test.
-             * COUNT: 16 (was 15 before machine_state_id nullable migration 2026-03-22)
+             * COUNT: 17 (was 16 before revoke_anon_execute_readonly migration 2026-03-23)
              */
             const files = getMigrationFileNames();
             expect(

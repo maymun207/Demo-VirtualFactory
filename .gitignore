@@ -25,3 +25,6 @@ dist-ssr
 .vercel
 .env*.local
 supabase/.temp/
+
+# Large uncompressed originals
+public/sketch.png

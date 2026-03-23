@@ -508,7 +508,7 @@ Maximum 4 sentences per response.
                                                                                                                                                                                                                                                                                 ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show dashboard →', tr: 'Panoyu göster →' },
-                slideImageUrl: '/demo/ACT-2.png',
+                slideImageUrl: '/demo/ACT-2.jpg',
                 delayMs: 1000,
                 screenText: {
                     en: `OEE. Throughput. Energy.
@@ -625,7 +625,7 @@ Maximum 5 sentences per response.
                                                                                                                                                                                                                                                                                 ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show the crisis →', tr: 'Krizi göster →' },
-                slideImageUrl: '/demo/ACT-3.png',
+                slideImageUrl: '/demo/ACT-3.jpg',
                 screenText: {
                     en: `Kiln: +14°C above spec.<w:2000>
 Every tile has a digital passport.<w:1500><clck>`,
@@ -732,7 +732,7 @@ Maximum 5 sentences per response.
                                                                                                                                                                                                                                                                                 ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Ask as CEO →', tr: 'CEO olarak sor →' },
-                slideImageUrl: '/demo/ACT-4a.png',
+                slideImageUrl: '/demo/ACT-4a.jpg',
                 screenText: {
                     en: `Glaze Viscosity Drift.
 Subtle. Slow-building.<w:2000>
@@ -763,7 +763,7 @@ herkesin erişimine açık, her saat, her dilde.`,
             },
             { // Click #2
                 ctaLabel: { en: 'Ask about CO₂ →', tr: 'CO₂ sor →' },
-                slideImageUrl: '/demo/ACT-4b.png',
+                slideImageUrl: '/demo/ACT-4b.jpg',
                 delayMs: 2000,
                 screenText: {
                     en: `<cls><w:500>Different role. Same factory. Same data.<w:1500><clck>`,
@@ -777,7 +777,7 @@ herkesin erişimine açık, her saat, her dilde.`,
             },
             { // Click #3
                 ctaLabel: { en: 'Change a parameter →', tr: 'Parametre değiştir →' },
-                slideImageUrl: '/demo/ACT-4c.png',
+                slideImageUrl: '/demo/ACT-4c.jpg',
                 delayMs: 5500,
                 screenText: {
                     en: `<cls><w:500>You don't just ask questions.
@@ -863,7 +863,7 @@ The Copilot did not alert someone — it acted.
                                                                                                                                                                                                                                                                                 ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show the incident →', tr: 'Olayı göster →' },
-                slideImageUrl: '/demo/ACT-4d.png',
+                slideImageUrl: '/demo/ACT-4d.jpg',
                 screenText: {
                     en: `Cascade Failure. Press + Kiln.<w:2000>
 Copilot active. Watch.<w:1500><clck>`,
@@ -1023,7 +1023,7 @@ Maximum 5 sentences per response.
                                                                                                                                                                                                                                                                                 ctaSteps: [
             { // Click #1
                 ctaLabel: { en: 'Show the gain', tr: 'Kazancı göster' },
-                slideImageUrl: '/demo/AiPoweredCF-3.png',
+                slideImageUrl: '/demo/AiPoweredCF-3.jpg',
                 delayMs: 2800,
                 screenText: {
                     en: `Factory → Line → Machine → Parameter.<w:2000>
@@ -1060,7 +1060,7 @@ VE CO₂ yükümlülüğünü aynı anda siler.
             },
             { // Click #2
                 ctaLabel: { en: 'Thank you!', tr: 'Teşekkürler!' },
-                slideImageUrl: '/demo/SentialFactory.png',
+                slideImageUrl: '/demo/SentialFactory.jpg',
                 delayMs: 1000,
                 screenText: {
                     en: `<cls><w:500>How much waste did your factory produce last year?

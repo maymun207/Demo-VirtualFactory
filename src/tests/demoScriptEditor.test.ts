@@ -326,7 +326,7 @@ describe('DemoScript Editor — parseCtaStepsArray', () => {
         const source = `
             {
                 ctaLabel: 'Start the factory',
-                slideImageUrl: '/demo/Welcome.png',
+                slideImageUrl: '/demo/Welcome.jpg',
                 ariaInputEnabled: true,
             },
         `;
@@ -334,7 +334,7 @@ describe('DemoScript Editor — parseCtaStepsArray', () => {
         expect(result).not.toBeNull();
         expect(result).toHaveLength(1);
         expect(result![0].ctaLabel).toBe('Start the factory');
-        expect(result![0].slideImageUrl).toBe('/demo/Welcome.png');
+        expect(result![0].slideImageUrl).toBe('/demo/Welcome.jpg');
         expect(result![0].ariaInputEnabled).toBe(true);
     });
 
@@ -789,7 +789,7 @@ describe('DemoScript Editor — Full Round-Trip (export → re-import)', () => {
         // 1. Create step with data
         const original = createEmptyStep();
         original.ctaLabel = { en: 'Start the journey →', tr: '' };
-        original.slideImageUrl = '/demo/Welcome.png';
+        original.slideImageUrl = '/demo/Welcome.jpg';
         original.delayMs = '1500';
         original.ariaInputEnabled = false;
         original.transitionTo = 'next';

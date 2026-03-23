@@ -421,7 +421,7 @@ second quality, scrap, or machine parameter issues. The story remains throughput
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                slideImageUrl: '/demo/ACT-2.png',
+                slideImageUrl: '/demo/ACT-2.jpg',
                 screenText: `We added a dashboard. OEE. Throughput. Energy. All visible now. <w:1500>But can we explain any of them?<clck>`,
                 ariaApi: `The Basic Panel is now open. Using the current simulation data: what is the OEE figure right now, and what is the gap between actual throughput and theoretical maximum throughput for this session? What specific information would a factory manager need to understand WHY OEE is at this level — information that the basic dashboard fundamentally cannot provide? Be concrete and specific.`,
                 ariaInputEnabled: true,
@@ -492,7 +492,7 @@ Pain is entirely internal. Tone: controlled revelation — this is the discovery
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                slideImageUrl: '/demo/ACT-3.png',
+                slideImageUrl: '/demo/ACT-3.jpg',
                 screenText: `New scenario: Kiln Temperature Crisis. The kiln is running +14°C above specification. <w:1500>Watch the orange tiles appear on the conveyor. Every one of them has a story.<clck>`,
                 ariaApi: `Using the current simulation data for SCN-002: how many tiles have passed through the kiln so far in this session, how many show kiln-related defects or quality downgrade, and what is the CO₂ impact of running the kiln 14°C above specification? Calculate using: kiln consumes approximately 100 m³ natural gas per hour at nominal, 18% overconsumption at +14°C deviation, emission factor 1.9 kg CO₂ per m³. Give me both the energy waste and the excess CO₂ for the session so far.`,
                 ariaInputEnabled: true,
@@ -559,19 +559,19 @@ CO₂ is now queryable — as accessible as OEE or quality data.
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                slideImageUrl: '/demo/ACT-4a.png',
+                slideImageUrl: '/demo/ACT-4a.jpg',
                 screenText: `New scenario: Glaze Viscosity Drift. Subtle. Slow-building. Expensive when ignored. <w:1500>First question — from the CEO.<clck>`,
                 ariaApi: `🏢 CEO QUESTION: I am the CEO. Looking at our current production session, what is our quality situation right now in plain business language? How much is the current glaze viscosity drift costing us — give me an estimate of the double-cost from second-quality tiles (manufacturer pays 40–60% of production cost again at rework). And what production window do we have before this becomes a customer delivery risk? One paragraph. Concrete numbers from the actual session data.`,
                 ariaInputEnabled: true,
             },
             { // Click #2
-                slideImageUrl: '/demo/ACT-4b.png',
+                slideImageUrl: '/demo/ACT-4b.jpg',
                 screenText: `Different role. Same factory. Same data. <w:1000>This time — the Sustainability Director.<clck>`,
                 ariaApi: `🌿 SUSTAINABILITY DIRECTOR QUESTION: What is the CO₂ intensity per 1,000 tiles produced in the current session? How does the glaze viscosity drift specifically contribute to excess carbon output — consider both the direct energy at the glaze station and the additional CO₂ embedded in second-quality tiles that go to rework (where a second energy cycle runs). Use emission factors: electricity = 0.4 kg CO₂/kWh, natural gas = 1.9 kg CO₂/m³. How does this compare to what per-tile carbon intensity should be under SCN-001 optimal conditions?`,
                 ariaInputEnabled: true,
             },
             { // Click #3
-                slideImageUrl: '/demo/ACT-4c.png',
+                slideImageUrl: '/demo/ACT-4c.jpg',
                 screenText: `One more — the most powerful capability. You can instruct the factory to change a parameter. <w:1500>Type this in the CWF panel on the right:<clck>`,
                 ariaLocal: `💬 Try typing this in the CWF chat panel: "Increase glaze cabin pressure to 0.9 bar" The system will ask for your authorisation code. Type: airtk When confirmed: the parameter changes live — while the factory keeps running. No shutdown. No manual adjustment. No phone call. Intent → authorisation → action. In under 30 seconds. → Now watch what happens when the system does this itself.`,
                 ariaInputEnabled: true,
@@ -650,7 +650,7 @@ The Copilot did not alert someone — it acted.
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                slideImageUrl: '/demo/ACT-4d.png',
+                slideImageUrl: '/demo/ACT-4d.jpg',
                 screenText: `New scenario: Multi-Station Cascade Failure. Press + Kiln failing simultaneously. <w:1500>The Copilot is now active. Watch the OEE Hierarchy on the left.<clck>`,
                 ariaApi: `The OEE Hierarchy is now open showing the cascade impact. Using the current simulation data for SCN-004: what is the current factory OEE, which specific line and machine is pulling it down most severely, and what would the monthly financial impact be at a factory producing 10 million tiles per year if OEE remained at the current level? Use the industry benchmark of €8,000–€15,000 per 1% OEE improvement per line per month and give a range based on both ends of the benchmark.`,
                 ariaInputEnabled: true,
@@ -712,13 +712,13 @@ The closing question IS the mechanism. Be precise, credible, and quiet in convic
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ctaSteps: [
             { // Click #1
-                slideImageUrl: '/demo/AiPoweredCF-3.png',
+                slideImageUrl: '/demo/AiPoweredCF-3.jpg',
                 screenText: `The OEE Hierarchy shows the full picture: Factory → Line → Machine → Parameter. <w:2000>Every number has a cause. Every cause has a cost.<clck>`,
                 ariaApi: `Based on everything the visitor has just seen — the invisible throughput loss, the double cost of second quality, the CO₂ dimension, and the autonomous recovery — what is the single most important question a factory manager or CEO should ask themselves after watching this demo? Not about technology. Not about software. About their own operation, their own numbers, their own production gap.`,
                 ariaInputEnabled: true,
             },
             { // Click #2
-                slideImageUrl: '/demo/SentialFactory.png',
+                slideImageUrl: '/demo/SentialFactory.jpg',
                 screenText: `This demo runs in your browser. The platform behind it runs in real factories. <w:2000>16 facilities. 1 million+ IoT endpoints. Running since 2008.<clck>`,
                 ariaLocal: `Thank you for taking the time to walk through this journey. If something resonated — the invisible throughput loss, the double cost of rework, the CO₂ dimension, or the 03:47 incident — that instinct is worth exploring. ARDICTECH has worked with manufacturers facing exactly these questions since 2008, across 16 facilities and over a million IoT endpoints. Restart the demo any time to explore a different scenario. Or reach out directly. → ardic.ai`,
                 ariaInputEnabled: true,

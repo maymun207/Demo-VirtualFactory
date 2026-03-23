@@ -2,7 +2,7 @@
  * assetPath.ts — Runtime Asset Path Resolver
  *
  * When the app is hosted under a subpath (e.g., ardic.ai/virtual-factory-demo),
- * asset paths like '/demo/ACT-2.png' resolve to the root domain instead of
+ * asset paths like '/demo/ACT-2.jpg' resolve to the root domain instead of
  * the subpath. This utility detects the subpath at runtime and prefixes it.
  *
  * Detection logic:
@@ -46,15 +46,15 @@ const BASE = detectBasePath();
 /**
  * Resolve a public-folder asset path relative to the app's base URL.
  *
- * @param path - Absolute path starting with '/' (e.g., '/demo/ACT-2.png')
+ * @param path - Absolute path starting with '/' (e.g., '/demo/ACT-2.jpg')
  * @returns    - Path prefixed with detected base, avoiding double slashes
  *
  * @example
  *   // At virtual-factory-demo.vercel.app:
- *   resolveAssetPath('/demo/ACT-2.png') → '/demo/ACT-2.png'
+ *   resolveAssetPath('/demo/ACT-2.jpg') → '/demo/ACT-2.jpg'
  *
  *   // At ardic.ai/virtual-factory-demo:
- *   resolveAssetPath('/demo/ACT-2.png') → '/virtual-factory-demo/demo/ACT-2.png'
+ *   resolveAssetPath('/demo/ACT-2.jpg') → '/virtual-factory-demo/demo/ACT-2.jpg'
  */
 export function resolveAssetPath(path: string): string {
   // If path doesn't start with '/', return as-is (external URL or already-resolved)
