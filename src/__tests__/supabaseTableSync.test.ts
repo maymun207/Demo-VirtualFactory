@@ -631,6 +631,8 @@ describe('Zustand ↔ Supabase Table Sync Consistency', () => {
             '20260309_copilot_tables.sql',
             // 2026-03-22: Allow machine_state_id to be NULL in tile_station_snapshots
             '20260322_make_machine_state_id_nullable.sql',
+            // 2026-03-23: Add 13 missing defect_type enum values to match TypeScript union
+            '20260323_add_missing_defect_types.sql',
             // 2026-03-23: Revoke anon EXECUTE on SECURITY DEFINER RPC functions
             '20260323_revoke_anon_execute_readonly.sql',
         ];
@@ -639,7 +641,7 @@ describe('Zustand ↔ Supabase Table Sync Consistency', () => {
             /**
              * Ensures no migration files are accidentally added or deleted
              * without updating this test.
-             * COUNT: 17 (was 16 before revoke_anon_execute_readonly migration 2026-03-23)
+             * COUNT: 18 (was 17 before add_missing_defect_types migration 2026-03-23)
              */
             const files = getMigrationFileNames();
             expect(

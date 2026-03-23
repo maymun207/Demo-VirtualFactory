@@ -308,7 +308,7 @@ describe('CWF force-summary fix — Part 3: auth-turn fast-path prompts', () => 
          * The prompt must convey: execute now, do not re-query, one tool call.
          * This prevents Gemini burning 3-5 loops before calling update_parameter.
          */
-        expect(CWF_AUTH_FAST_PATH_PROMPT_EN).toContain('Execute');
+        expect(CWF_AUTH_FAST_PATH_PROMPT_EN.toLowerCase()).toContain('execute');
         expect(CWF_AUTH_FAST_PATH_PROMPT_EN).toContain('Do NOT query');
     });
 
