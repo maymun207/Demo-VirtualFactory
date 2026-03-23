@@ -305,6 +305,30 @@ interface SimulationState {
   addAlarm: (entry: Omit<AlarmEntry, 'sClockTick' | 'timestamp'>) => void;
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Append an alarm entry to the ring buffer, enforcing MAX_ALARM_LOG cap.
+ * Returns a new array (never mutates the input).
+ *
+ * Pure function: no side effects, no store access.
+ */
+function appendToAlarmLog(
+  log: AlarmEntry[],
+  entry: Omit<AlarmEntry, 'sClockTick' | 'timestamp'>,
+  sClockTick: number,
+): AlarmEntry[] {
+  const fullEntry: AlarmEntry = {
+    ...entry,
+    sClockTick,
+    timestamp: Date.now(),
+  };
+  const next = log.length >= MAX_ALARM_LOG
+    ? [...log.slice(-(MAX_ALARM_LOG - 1)), fullEntry]
+    : [...log, fullEntry];
+  return next;
+}
+
 // ─── Store Implementation ────────────────────────────────────────────────────
 
 export const useSimulationStore = create<SimulationState>()(
@@ -526,20 +550,18 @@ export const useSimulationStore = create<SimulationState>()(
           ? JAM_LOCATION_DISPLAY_NAMES[s.jamLocation]
           : 'Conveyor';
 
-        /** Ring-buffered copy of the alarm log (caps at MAX_ALARM_LOG entries). */
-        const nextAlarmLog = s.alarmLog.length >= MAX_ALARM_LOG
-          ? s.alarmLog.slice(-MAX_ALARM_LOG + 1)
-          : [...s.alarmLog];
+        /** Accumulates alarm entries across branches — appendToAlarmLog returns a new array each call. */
+        let nextAlarmLog = s.alarmLog;
 
         /** Partial state delta — conveyor status always changes; other fields are branch-specific. */
         const updates: Record<string, unknown> = { conveyorStatus: status };
 
         /**
-         * emitAlarm — Push one alarm entry to the log AND fire the event bus.
-         * Eliminates the repeated alarmLog.push + eventBus.emit pattern across branches.
+         * emitAlarm — Append one alarm entry to the log AND fire the event bus.
+         * Uses the shared appendToAlarmLog helper for consistent ring-buffer capping.
          */
         const emitAlarm = (type: AlarmType, severity: AlarmSeverity, message: string) => {
-          nextAlarmLog.push({ sClockTick: s.sClockCount, type, severity, timestamp: now, message });
+          nextAlarmLog = appendToAlarmLog(nextAlarmLog, { type, severity, message }, s.sClockCount);
           eventBus.emit('alarm', { type, severity, message });
         };
 
@@ -766,17 +788,9 @@ export const useSimulationStore = create<SimulationState>()(
     },
 
     addAlarm: (entry) =>
-      set((s) => {
-        const nextAlarmLog = s.alarmLog.length >= MAX_ALARM_LOG
-          ? s.alarmLog.slice(-MAX_ALARM_LOG + 1)
-          : [...s.alarmLog];
-        nextAlarmLog.push({
-          ...entry,
-          sClockTick: s.sClockCount,
-          timestamp: Date.now(),
-        });
-        return { alarmLog: nextAlarmLog };
-      }),
+      set((s) => ({
+        alarmLog: appendToAlarmLog(s.alarmLog, entry, s.sClockCount),
+      })),
 
   })),
 );
